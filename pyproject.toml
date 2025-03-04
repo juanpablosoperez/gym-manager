@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "gym_manager"
+version = "0.1.0"
+description = "Sistema de gestión para gimnasios"
+authors = ["Your Name <you@example.com>"]
+license = "n"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">= 3.12"
+fastapi = "^0.115.11"
+uvicorn = "^0.34.0"
+sqlalchemy = "^2.0.38"
+alembic = "^1.15.0"
+pydantic = "^2.10.6"
+pymysql = "^1.1.1"
+flet-easy = "^0.2.9"
+openpyxl = "^3.1.5"
+pandas = "^2.2.3"
+matplotlib = "^3.10.1"
+seaborn = "^0.13.2"
+numpy = "^2.2.3"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+isort = "^6.0.1"
+pylint = "^3.3.4"
+pytest = "^8.3.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
