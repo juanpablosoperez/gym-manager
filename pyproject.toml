@@ -20,6 +20,7 @@ pandas = "^2.2.3"
 matplotlib = "^3.10.1"
 seaborn = "^0.13.2"
 numpy = "^2.2.3"
+dotenv = "^0.9.9"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -31,3 +32,9 @@ pytest = "^8.3.5"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+dev = "gym_manager.main:run_dev"
+prod = "gym_manager.main:run_prod"
+alembic = "alembic.config:main"
+

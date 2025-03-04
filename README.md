@@ -92,3 +92,29 @@ git checkout -b nueva-feature
 
 Crear pull request
 git push origin rama-a-pushear
+
+
+**4️⃣ Ejecutar la App con Poetry**
+Ahora puedes ejecutar la aplicación con:
+
+Modo Desarrollo:
+poetry run dev
+
+Modo Producción:
+poetry run prod
+
+Correr Alembic con Poetry:
+poetry run alembic upgrade head
+
+3️⃣ Crear migraciones:
+poetry run alembic revision --autogenerate -m "Migración inicial"
+
+
+📌 1️⃣0️⃣ Resumen de Comandos
+Acción	                        Comando
+Instalar Alembic	            poetry add alembic
+Inicializar Alembic	            poetry run alembic init alembic
+Crear una migración	            poetry run alembic revision --autogenerate -m "Descripción"
+Aplicar migraciones	            poetry run alembic upgrade head
+Ver historial de migraciones	poetry run alembic history
+Ver estado actual	            poetry run alembic current
