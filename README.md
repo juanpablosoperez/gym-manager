@@ -43,23 +43,6 @@ poetry add flet sqlalchemy alembic pymysql
 poetry add pandas openpyxl matplotlib seaborn numpy
 poetry add --dev black isort pylint pytest
 
-**📂 Estructura del Proyecto**
-
-gym-manager/
-│── gym_manager/        # Módulo principal
-│   ├── controllers/    # Lógica de negocio
-│   ├── models/         # Modelos de base de datos (SQLAlchemy)
-│   ├── views/          # Interfaz gráfica con Flet
-│   ├── services/       # Servicios auxiliares (auth, DB, Excel)
-│   ├── config.py       # Configuración del sistema
-│   ├── main.py         # Punto de entrada de la aplicación
-│
-│── tests/              # Pruebas unitarias
-│── .gitignore          # Archivos ignorados en Git
-│── .env                # Variables de entorno (credenciales)
-│── poetry.lock         # Dependencias Poetry
-│── pyproject.toml      # Configuración de Poetry
-│── README.md           # Documentación del proyecto
 
 **🏃 Ejecutar el Proyecto**
 python gym_manager/main.py
