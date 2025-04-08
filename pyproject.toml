@@ -21,6 +21,7 @@ matplotlib = "^3.10.1"
 seaborn = "^0.13.2"
 numpy = "^2.2.3"
 dotenv = "^0.9.9"
+cryptography = "^44.0.2"
 
 
 [tool.poetry.group.dev.dependencies]
