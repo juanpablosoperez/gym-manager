@@ -8,6 +8,9 @@ class HomeView:
     def __init__(self, page: ft.Page, user_rol: str):
         self.page = page
         self.user_rol = user_rol
+        # Inicializar el snackbar
+        self.snack = ft.SnackBar(content=ft.Text(""))
+        self.page.overlay.append(self.snack)
         self.setup_page()
 
     def setup_page(self):
@@ -158,6 +161,9 @@ class HomeView:
         # Mostrar mensaje de despedida
         self.show_message("¡Hasta pronto! Cerrando sesión...", ft.colors.BLUE)
         
+        # Esperar un momento para que se vea el mensaje
+        self.page.update()
+        
         # Limpiar la página actual
         self.page.clean()
         
@@ -172,9 +178,7 @@ class HomeView:
         LoginView(self.page, auth_controller)
 
     def show_message(self, message: str, color: str):
-        # Crear y mostrar un snackbar
-        snack = ft.SnackBar(
-            content=ft.Text(message),
-            bgcolor=color
-        )
-        self.page.show_snack_bar(snack) 
+        self.snack.bgcolor = color
+        self.snack.content.value = message
+        self.snack.open = True
+        self.page.update() 
