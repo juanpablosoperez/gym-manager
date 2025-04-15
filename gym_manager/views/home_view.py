@@ -1,13 +1,13 @@
 import flet as ft
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from gym_manager.views.login_view import LoginView
+from gym_manager.components.header import create_header
+from gym_manager.components.sidebar import create_sidebar
+from gym_manager.utils.navigation import navigate_to_login
 
 class HomeView:
-    def __init__(self, page: ft.Page, user_rol: str):
+    def __init__(self, page: ft.Page, user_rol: str, user_name: str = "Usuario"):
         self.page = page
         self.user_rol = user_rol
+        self.user_name = user_name
         # Inicializar el snackbar
         self.snack = ft.SnackBar(content=ft.Text(""))
         self.page.overlay.append(self.snack)
@@ -16,116 +16,74 @@ class HomeView:
     def setup_page(self):
         self.page.title = "Gym Manager - Home"
         self.page.padding = 0
-        self.page.bgcolor = ft.colors.WHITE
+        self.page.bgcolor = ft.colors.GREY_50
         self.page.window_width = 1200
         self.page.window_height = 800
         self.page.window_resizable = True
 
-        # Barra superior
-        self.top_bar = ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.Icon(name=ft.icons.FITNESS_CENTER_ROUNDED, color=ft.colors.WHITE, size=30),
-                    ft.Text("Gym Manager", color=ft.colors.WHITE, size=20, weight=ft.FontWeight.BOLD),
-                    ft.Container(expand=True),  # Espaciador
-                    ft.Row(
-                        controls=[
-                            ft.Icon(name=ft.icons.PERSON_OUTLINE, color=ft.colors.WHITE),
-                            ft.Text(f"Rol: {self.user_rol}", color=ft.colors.WHITE),
-                            ft.IconButton(
-                                icon=ft.icons.LOGOUT,
-                                icon_color=ft.colors.WHITE,
-                                tooltip="Cerrar sesión",
-                                on_click=self.logout
-                            )
-                        ]
-                    )
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-            ),
-            bgcolor=ft.colors.BLUE,
-            padding=ft.padding.all(20),
+        # Crear header
+        self.header = create_header(
+            page=self.page,
+            user_name=self.user_name,
+            user_role=self.user_rol,
+            on_logout=self.logout
         )
 
-        # Menú lateral
-        self.nav_rail = ft.NavigationRail(
-            selected_index=0,
-            label_type=ft.NavigationRailLabelType.ALL,
-            min_width=100,
-            min_extended_width=200,
-            leading=ft.Container(
-                content=ft.Icon(name=ft.icons.MENU),
-                margin=ft.margin.only(bottom=20)
-            ),
-            group_alignment=-0.9,
-            destinations=[
-                ft.NavigationRailDestination(
-                    icon=ft.icons.DASHBOARD_OUTLINED,
-                    selected_icon=ft.icons.DASHBOARD,
-                    label="Dashboard",
-                ),
-                ft.NavigationRailDestination(
-                    icon=ft.icons.PEOPLE_OUTLINE,
-                    selected_icon=ft.icons.PEOPLE,
-                    label="Miembros",
-                ),
-                ft.NavigationRailDestination(
-                    icon=ft.icons.FITNESS_CENTER_OUTLINED,
-                    selected_icon=ft.icons.FITNESS_CENTER,
-                    label="Rutinas",
-                ),
-                ft.NavigationRailDestination(
-                    icon=ft.icons.PAYMENTS_OUTLINED,
-                    selected_icon=ft.icons.PAYMENTS,
-                    label="Pagos",
-                ),
-                ft.NavigationRailDestination(
-                    icon=ft.icons.SETTINGS_OUTLINED,
-                    selected_icon=ft.icons.SETTINGS,
-                    label="Configuración",
-                ),
-            ],
-            on_change=self.nav_change,
+        # Crear sidebar
+        self.sidebar = create_sidebar(
+            page=self.page,
+            on_item_selected=self.handle_route_change
         )
 
-        # Área principal con contenido de ejemplo
+        # Contenedor principal para el contenido
         self.main_content = ft.Container(
             content=ft.Column(
                 controls=[
                     ft.Text("¡Bienvenido al Sistema!", size=32, weight=ft.FontWeight.BOLD),
                     ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
                     ft.Container(height=20),
-                    ft.Row(
-                        controls=[
-                            self.create_stat_card("Total Miembros", "150", ft.icons.PEOPLE, ft.colors.BLUE),
-                            self.create_stat_card("Activos Hoy", "45", ft.icons.FITNESS_CENTER, ft.colors.GREEN),
-                            self.create_stat_card("Pagos Pendientes", "12", ft.icons.PAYMENT, ft.colors.ORANGE),
-                            self.create_stat_card("Rutinas Activas", "34", ft.icons.SCHEDULE, ft.colors.PURPLE),
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    ),
+                    self.create_stats_row(),
                 ],
-                scroll=ft.ScrollMode.AUTO
             ),
             expand=True,
             padding=ft.padding.all(20),
+            bgcolor=ft.colors.WHITE,
+            border_radius=10,
+            margin=ft.margin.all(20),
         )
 
         # Construir la interfaz
         self.page.add(
-            self.top_bar,
-            ft.Row(
+            ft.Column(
                 controls=[
-                    self.nav_rail,
-                    ft.VerticalDivider(width=1),
-                    self.main_content,
+                    self.header,
+                    ft.Row(
+                        controls=[
+                            self.sidebar,
+                            ft.VerticalDivider(width=1),
+                            self.main_content,
+                        ],
+                        expand=True,
+                    ),
                 ],
+                spacing=0,
                 expand=True,
-            ),
+            )
         )
         self.page.update()
 
-    def create_stat_card(self, title: str, value: str, icon: str, color: str) -> ft.Container:
+    def create_stats_row(self):
+        return ft.Row(
+            controls=[
+                self.create_stat_card("Total Miembros", "150", ft.icons.PEOPLE, ft.colors.BLUE),
+                self.create_stat_card("Activos Hoy", "45", ft.icons.FITNESS_CENTER, ft.colors.GREEN),
+                self.create_stat_card("Pagos Pendientes", "12", ft.icons.PAYMENT, ft.colors.ORANGE),
+                self.create_stat_card("Rutinas Activas", "34", ft.icons.SCHEDULE, ft.colors.PURPLE),
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
+
+    def create_stat_card(self, title: str, value: str, icon: str, color: str):
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -136,7 +94,7 @@ class HomeView:
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=10,
             ),
-            width=200,
+            width=250,
             height=150,
             border_radius=10,
             bgcolor=ft.colors.WHITE,
@@ -148,37 +106,20 @@ class HomeView:
             padding=20,
         )
 
-    def nav_change(self, e):
-        index = e.control.selected_index
+    def handle_route_change(self, index: int):
         sections = ["Dashboard", "Miembros", "Rutinas", "Pagos", "Configuración"]
-        print(f"Navegando a la sección: {sections[index]}")
+        print(f"Navegando a: {sections[index]}")
         # Aquí se implementará la navegación a cada sección
-
-    def logout(self, e):
-        from gym_manager.views.login_view import LoginView
-        from gym_manager.controllers.auth_controller import AuthController
-        
-        # Mostrar mensaje de despedida
-        self.show_message("¡Hasta pronto! Cerrando sesión...", ft.colors.BLUE)
-        
-        # Esperar un momento para que se vea el mensaje
-        self.page.update()
-        
-        # Limpiar la página actual
-        self.page.clean()
-        
-        # Restablecer el tamaño de la ventana
-        self.page.window_width = 400
-        self.page.window_height = 700
-        self.page.window_resizable = False
-        self.page.update()
-        
-        # Volver a la pantalla de login
-        auth_controller = AuthController(None)  # No necesitamos la sesión para el login inicial
-        LoginView(self.page, auth_controller)
 
     def show_message(self, message: str, color: str):
         self.snack.bgcolor = color
         self.snack.content.value = message
         self.snack.open = True
-        self.page.update() 
+        self.page.update()
+
+    def logout(self, e):
+        self.show_message("¡Hasta pronto! Cerrando sesión...", ft.colors.BLUE)
+        # Esperar un momento para que se vea el mensaje
+        self.page.update()
+        # Navegar al login
+        navigate_to_login(self.page) 
