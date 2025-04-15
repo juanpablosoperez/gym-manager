@@ -1,6 +1,6 @@
 import flet as ft
 from gym_manager.controllers.auth_controller import AuthController
-from gym_manager.views.home_view import HomeView
+from gym_manager.utils.navigation import navigate_to_home
 
 class LoginView:
     def __init__(self, page: ft.Page, auth_controller: AuthController):
@@ -209,9 +209,6 @@ class LoginView:
         success, rol = self.auth_controller.authenticate_user(nombre, contraseña)
         if success:
             self.show_message(f"¡Bienvenido! Iniciando sesión como {rol}", ft.colors.GREEN_400)
-            # Limpiar la página actual
-            self.page.clean()
-            # Iniciar la vista de home
-            HomeView(self.page, rol)
+            navigate_to_home(self.page, rol, nombre)
         else:
             self.show_message("Nombre o contraseña incorrectos") 
