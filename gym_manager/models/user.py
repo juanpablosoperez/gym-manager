@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean
 from gym_manager.models import Base
-from werkzeug.security import generate_password_hash, check_password_hash
+import bcrypt
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -20,11 +20,13 @@ class Usuario(Base):
         self.estado = True
 
     def set_password(self, contraseña):
-        self.contraseña = generate_password_hash(contraseña)
+        # Generar un salt y hashear la contraseña
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(contraseña.encode('utf-8'), salt)
+        self.contraseña = hashed.decode('utf-8')
 
     def check_password(self, contraseña):
-        return check_password_hash(self.contraseña, contraseña)
+        return bcrypt.checkpw(contraseña.encode('utf-8'), self.contraseña.encode('utf-8'))
 
     def __repr__(self):
-    
         return f"<Usuario(id_usuario={self.id_usuario}, nombre={self.nombre}, rol={self.rol})>"
