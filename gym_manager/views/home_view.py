@@ -2,6 +2,10 @@ import flet as ft
 from gym_manager.components.header import create_header
 from gym_manager.components.sidebar import create_sidebar
 from gym_manager.utils.navigation import navigate_to_login
+from gym_manager.views.module_views import (
+    MembersView, PaymentsView, ReportsView,
+    PaymentMethodsView, UsersView, BackupsView
+)
 
 class HomeView:
     def __init__(self, page: ft.Page, user_rol: str, user_name: str = "Usuario"):
@@ -107,9 +111,39 @@ class HomeView:
         )
 
     def handle_route_change(self, index: int):
-        sections = ["Dashboard", "Miembros", "Rutinas", "Pagos", "Configuración"]
-        print(f"Navegando a: {sections[index]}")
-        # Aquí se implementará la navegación a cada sección
+        # Limpiar el contenido actual
+        self.main_content.content = None
+        
+        # Crear la vista correspondiente según el índice
+        if index == 0:  # Dashboard
+            self.main_content.content = ft.Column(
+                controls=[
+                    ft.Text("¡Bienvenido al Sistema!", size=32, weight=ft.FontWeight.BOLD),
+                    ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
+                    ft.Container(height=20),
+                    self.create_stats_row(),
+                ],
+            )
+        elif index == 1:  # Gestión de Miembros
+            view = MembersView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 2:  # Gestión de Pagos
+            view = PaymentsView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 3:  # Informes y Estadísticas
+            view = ReportsView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 4:  # Métodos de Pago
+            view = PaymentMethodsView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 5:  # Gestión de Usuarios
+            view = UsersView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 6:  # Gestión de Backups
+            view = BackupsView(self.page)
+            self.main_content.content = view.get_content()
+        
+        self.page.update()
 
     def show_message(self, message: str, color: str):
         self.snack.bgcolor = color
