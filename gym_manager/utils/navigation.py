@@ -1,8 +1,14 @@
 import flet as ft
 
+# Variable global para mantener la sesión de la base de datos
+db_session = None
+
+def set_db_session(session):
+    global db_session
+    db_session = session
+
 def navigate_to_login(page: ft.Page):
-    from gym_manager.views.login_view import LoginView
-    from gym_manager.controllers.auth_controller import AuthController
+    global db_session
     
     # Limpiar la página actual
     page.clean()
@@ -18,11 +24,16 @@ def navigate_to_login(page: ft.Page):
     page.bgcolor = ft.colors.WHITE
     page.update()
     
-    # Crear y mostrar vista de login
-    auth_controller = AuthController(None)
+    # Importar aquí para evitar circular import
+    from gym_manager.controllers.auth_controller import AuthController
+    from gym_manager.views.login_view import LoginView
+    
+    # Crear y mostrar vista de login con la sesión existente
+    auth_controller = AuthController(db_session)
     LoginView(page, auth_controller)
 
 def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
+    # Importar aquí para evitar circular import
     from gym_manager.views.home_view import HomeView
     
     # Limpiar la página actual

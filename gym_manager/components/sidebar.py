@@ -3,10 +3,12 @@ import flet as ft
 def create_sidebar(page: ft.Page, on_item_selected=None):
     menu_items = [
         {"icon": ft.icons.DASHBOARD_OUTLINED, "text": "Dashboard", "selected_icon": ft.icons.DASHBOARD},
-        {"icon": ft.icons.PEOPLE_OUTLINE, "text": "Miembros", "selected_icon": ft.icons.PEOPLE},
-        {"icon": ft.icons.FITNESS_CENTER_OUTLINED, "text": "Rutinas", "selected_icon": ft.icons.FITNESS_CENTER},
-        {"icon": ft.icons.PAYMENTS_OUTLINED, "text": "Pagos", "selected_icon": ft.icons.PAYMENTS},
-        {"icon": ft.icons.SETTINGS_OUTLINED, "text": "Configuración", "selected_icon": ft.icons.SETTINGS},
+        {"icon": ft.icons.PEOPLE_OUTLINE, "text": "Gestión de Miembros", "selected_icon": ft.icons.PEOPLE},
+        {"icon": ft.icons.PAYMENTS_OUTLINED, "text": "Gestión de Pagos", "selected_icon": ft.icons.PAYMENTS},
+        {"icon": ft.icons.ANALYTICS_OUTLINED, "text": "Informes y Estadísticas", "selected_icon": ft.icons.ANALYTICS},
+        {"icon": ft.icons.CREDIT_CARD_OUTLINED, "text": "Métodos de Pago", "selected_icon": ft.icons.CREDIT_CARD},
+        {"icon": ft.icons.ADMIN_PANEL_SETTINGS_OUTLINED, "text": "Gestión de Usuarios", "selected_icon": ft.icons.ADMIN_PANEL_SETTINGS},
+        {"icon": ft.icons.BACKUP_OUTLINED, "text": "Gestión de Backups", "selected_icon": ft.icons.BACKUP},
     ]
 
     is_expanded = True
