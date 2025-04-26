@@ -25,12 +25,16 @@ class HomeView:
         self.page.window_height = 800
         self.page.window_resizable = True
 
+        # Título de sección por defecto
+        self.section_title = "Dashboard"
+
         # Crear header
         self.header = create_header(
             page=self.page,
             user_name=self.user_name,
             user_role=self.user_rol,
-            on_logout=self.logout
+            on_logout=self.logout,
+            section_title=self.section_title
         )
 
         # Crear sidebar
@@ -113,9 +117,9 @@ class HomeView:
     def handle_route_change(self, index: int):
         # Limpiar el contenido actual
         self.main_content.content = None
-        
-        # Crear la vista correspondiente según el índice
+        # Título de sección según el índice
         if index == 0:  # Dashboard
+            self.section_title = "Dashboard"
             self.main_content.content = ft.Column(
                 controls=[
                     ft.Text("¡Bienvenido al Sistema!", size=32, weight=ft.FontWeight.BOLD),
@@ -125,24 +129,56 @@ class HomeView:
                 ],
             )
         elif index == 1:  # Gestión de Miembros
+            self.section_title = "Gestión de Miembros"
             view = MembersView(self.page)
             self.main_content.content = view.get_content()
         elif index == 2:  # Gestión de Pagos
+            self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
         elif index == 3:  # Informes y Estadísticas
+            self.section_title = "Informes y Estadísticas"
             view = ReportsView(self.page)
             self.main_content.content = view.get_content()
         elif index == 4:  # Métodos de Pago
+            self.section_title = "Métodos de Pago"
             view = PaymentMethodsView(self.page)
             self.main_content.content = view.get_content()
         elif index == 5:  # Gestión de Usuarios
+            self.section_title = "Gestión de Usuarios"
             view = UsersView(self.page)
             self.main_content.content = view.get_content()
         elif index == 6:  # Gestión de Backups
+            self.section_title = "Gestión de Backups"
             view = BackupsView(self.page)
             self.main_content.content = view.get_content()
-        
+        # Actualizar el header con el nuevo título
+        self.header = create_header(
+            page=self.page,
+            user_name=self.user_name,
+            user_role=self.user_rol,
+            on_logout=self.logout,
+            section_title=self.section_title
+        )
+        # Reconstruir la interfaz
+        self.page.controls.clear()
+        self.page.add(
+            ft.Column(
+                controls=[
+                    self.header,
+                    ft.Row(
+                        controls=[
+                            self.sidebar,
+                            ft.VerticalDivider(width=1),
+                            self.main_content,
+                        ],
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            )
+        )
         self.page.update()
 
     def show_message(self, message: str, color: str):

@@ -1,6 +1,6 @@
 import flet as ft
 
-def create_header(page: ft.Page, user_name: str, user_role: str, on_logout=None):
+def create_header(page: ft.Page, user_name: str, user_role: str, on_logout=None, section_title: str = None):
     return ft.Container(
         content=ft.Row(
             controls=[
@@ -15,6 +15,12 @@ def create_header(page: ft.Page, user_name: str, user_role: str, on_logout=None)
                         ft.Text(
                             "Gym Manager",
                             size=20,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.colors.WHITE,
+                        ),
+                        ft.Text(
+                            f"  |  {section_title}" if section_title else "",
+                            size=24,
                             weight=ft.FontWeight.BOLD,
                             color=ft.colors.WHITE,
                         ),
