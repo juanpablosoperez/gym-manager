@@ -28,10 +28,30 @@ class PaymentsView:
                 bgcolor=ft.colors.BLUE,
                 color=ft.colors.WHITE,
                 shape=ft.RoundedRectangleBorder(radius=10),
-                padding=ft.padding.symmetric(horizontal=24, vertical=16),
-                text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                padding=ft.padding.symmetric(horizontal=10, vertical=8),
+                text_style=ft.TextStyle(size=15, weight=ft.FontWeight.BOLD),
             ),
+            width=150,
             on_click=self.show_new_payment_modal
+        )
+
+        # Botón Exportar a Excel (solo icono y tooltip)
+        self.export_excel_btn = ft.IconButton(
+            icon=ft.icons.TABLE_VIEW,
+            icon_color=ft.colors.GREEN_700,
+            tooltip="Exportar a Excel",
+            on_click=self.export_to_excel,
+            width=48,
+            height=48,
+        )
+        # Botón Exportar a PDF (solo icono y tooltip)
+        self.export_pdf_btn = ft.IconButton(
+            icon=ft.icons.PICTURE_AS_PDF,
+            icon_color=ft.colors.RED_700,
+            tooltip="Exportar a PDF",
+            on_click=self.export_to_pdf,
+            width=48,
+            height=48,
         )
 
         # Filtros de búsqueda
@@ -251,15 +271,28 @@ class PaymentsView:
                                 self.date_to_field,
                                 self.payment_method,
                                 self.clear_btn,
-                                ft.Container(self.new_payment_btn, alignment=ft.alignment.center_right, padding=ft.padding.only(left=30)),
+                                self.new_payment_btn,
                             ],
                             alignment=ft.MainAxisAlignment.START,
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             spacing=18,
                             expand=True,
                         ),
-                        padding=ft.padding.only(bottom=50, left=10),
+                        padding=ft.padding.only(bottom=10, left=10),
                         alignment=ft.alignment.top_left,
+                        width=1300,
+                    ),
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.export_excel_btn,
+                                self.export_pdf_btn,
+                            ],
+                            alignment=ft.MainAxisAlignment.END,
+                            spacing=8,
+                        ),
+                        padding=ft.padding.only(bottom=10, left=10, right=30),
+                        alignment=ft.alignment.top_right,
                         width=1300,
                     ),
                     ft.Container(
@@ -537,3 +570,9 @@ class PaymentsView:
         value = self.new_payment_date_picker.value.strftime("%d/%m/%Y") if self.new_payment_date_picker.value else "Seleccionar fecha"
         self.new_payment_date_field.content.controls[0].value = value
         self.page.update()
+
+    def export_to_excel(self, e):
+        self.show_message("Función de exportar a Excel en desarrollo", ft.colors.BLUE)
+
+    def export_to_pdf(self, e):
+        self.show_message("Función de exportar a PDF en desarrollo", ft.colors.BLUE)
