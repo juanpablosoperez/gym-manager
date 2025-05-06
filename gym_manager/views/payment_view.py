@@ -126,7 +126,8 @@ class PaymentsView:
                 ft.dropdown.Option("Tarjeta de crédito")
             ],
             border_radius=10,
-            text_size=16
+            text_size=16,
+            on_change=self.apply_filters
         )
 
         # Filtro de estado
