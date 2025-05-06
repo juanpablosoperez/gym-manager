@@ -62,7 +62,7 @@ class PaymentsView:
             label="Buscar por nombre",
             prefix_icon=ft.icons.SEARCH,
             border_radius=10,
-            width=320,
+            width=260,
             height=48,
             text_size=16
         )
@@ -117,7 +117,7 @@ class PaymentsView:
 
         self.payment_method = ft.Dropdown(
             label="Método de pago",
-            width=220,
+            width=180,
             options=[
                 ft.dropdown.Option("Todos"),
                 ft.dropdown.Option("Efectivo"),
@@ -126,6 +126,21 @@ class PaymentsView:
             ],
             border_radius=10,
             text_size=16
+        )
+
+        # Filtro de estado
+        self.status_filter = ft.Dropdown(
+            label="Estado",
+            width=120,
+            options=[
+                ft.dropdown.Option("Todos"),
+                ft.dropdown.Option("Pagado"),
+                ft.dropdown.Option("Cancelado")
+            ],
+            border_radius=10,
+            text_size=16,
+            value="Pagado",
+            on_change=self.apply_filters
         )
 
         self.clear_btn = ft.OutlinedButton(
@@ -375,6 +390,30 @@ class PaymentsView:
         )
         self.page.overlay.append(self.edit_payment_modal)
 
+        # Modal de confirmación de borrado
+        self.delete_confirm_modal = ft.AlertDialog(
+            title=ft.Text("Confirmar Cancelación", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Text("¿Estás seguro que deseas cancelar este pago? El pago cancelado no se mostrará más en la lista, pero puedes recuperarlo desde la base de datos si es necesario.", size=16),
+            actions=[
+                ft.TextButton("Cancelar", on_click=self.close_delete_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD))),
+                ft.ElevatedButton(
+                    "Confirmar Cancelación",
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.RED_700,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
+                    ),
+                    on_click=self.confirm_delete_payment
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.delete_confirm_modal)
+        self.selected_payment_to_delete = None
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
@@ -392,6 +431,7 @@ class PaymentsView:
                                 self.date_from_field,
                                 self.date_to_field,
                                 self.payment_method,
+                                self.status_filter,
                                 self.clear_btn,
                                 self.new_payment_btn,
                             ],
@@ -497,12 +537,7 @@ class PaymentsView:
         """
         Carga los datos iniciales de la vista
         """
-        # Ya no se carga el resumen
-        # summary = self.payment_controller.get_payment_summary()
-        # self.update_summary_cards(summary)
-        
-        # Cargar pagos
-        payments = self.payment_controller.get_payments()
+        payments = [p for p in self.payment_controller.get_payments() if p.estado == 1]
         self.update_payments_table(payments)
 
     def update_payments_table(self, payments):
@@ -546,6 +581,8 @@ class PaymentsView:
             )
         else:
             for payment in payments:
+                estado_texto = "Pagado" if payment.estado == 1 else "Cancelado"
+                color_estado = ft.colors.GREEN if payment.estado == 1 else ft.colors.RED
                 self.payments_table.rows.append(
                     ft.DataRow(
                         cells=[
@@ -557,10 +594,10 @@ class PaymentsView:
                             ft.DataCell(
                                 ft.Container(
                                     content=ft.Text(
-                                        "Pagado" if payment.estado else "Pendiente",
-                                        color=ft.colors.GREEN if payment.estado else ft.colors.ORANGE
+                                        estado_texto,
+                                        color=color_estado
                                     ),
-                                    bgcolor=ft.colors.GREY_100 if payment.estado else ft.colors.ORANGE_100,
+                                    bgcolor=ft.colors.GREY_100 if payment.estado == 1 else ft.colors.RED_100,
                                     border_radius=8,
                                     padding=5,
                                 )
@@ -595,7 +632,7 @@ class PaymentsView:
                 )
         self.page.update()
 
-    def apply_filters(self, e):
+    def apply_filters(self, e=None):
         """
         Aplica los filtros seleccionados
         """
@@ -613,7 +650,17 @@ class PaymentsView:
         if self.payment_method.value and self.payment_method.value != "Todos":
             filters['payment_method'] = self.payment_method.value
         
+        # Filtro de estado
+        if self.status_filter.value == "Pagado":
+            filters['estado'] = 1
+        elif self.status_filter.value == "Cancelado":
+            filters['estado'] = 0
+        # Si es "Todos", no se agrega filtro
+        
         payments = self.payment_controller.get_payments(filters)
+        # Si el filtro es por estado, filtrar aquí también por si acaso
+        if 'estado' in filters:
+            payments = [p for p in payments if p.estado == filters['estado']]
         self.update_payments_table(payments)
 
     def clear_filters(self, e):
@@ -624,8 +671,8 @@ class PaymentsView:
         self.date_from.value = None
         self.date_to.value = None
         self.payment_method.value = "Todos"
+        self.status_filter.value = "Pagado"
         self.page.update()
-        
         # Recargar datos sin filtros
         self.load_data()
 
@@ -692,14 +739,36 @@ class PaymentsView:
 
     def delete_payment(self, payment):
         """
-        Elimina un pago
+        Abre el modal de confirmación para eliminar un pago
         """
-        success, message = self.payment_controller.delete_payment(payment.id_pago)
+        self.selected_payment_to_delete = payment
+        self.delete_confirm_modal.open = True
+        self.page.update()
+
+    def close_delete_modal(self, e):
+        self.delete_confirm_modal.open = False
+        self.selected_payment_to_delete = None
+        self.page.update()
+
+    def confirm_delete_payment(self, e):
+        if not self.selected_payment_to_delete:
+            self.show_message("No hay pago seleccionado para cancelar", ft.colors.RED)
+            self.delete_confirm_modal.open = False
+            self.page.update()
+            return
+        # Cancelar pago: poner estado en 0
+        payment_data = {'estado': 0}
+        success, message = self.payment_controller.update_payment(self.selected_payment_to_delete.id_pago, payment_data)
         if success:
-            self.show_message(message, ft.colors.GREEN)
+            self.show_message("Pago cancelado correctamente", ft.colors.GREEN)
+            self.delete_confirm_modal.open = False
+            self.selected_payment_to_delete = None
             self.load_data()
         else:
-            self.show_message(message, ft.colors.RED)
+            self.show_message("Error al cancelar el pago", ft.colors.RED)
+            self.delete_confirm_modal.open = False
+            self.selected_payment_to_delete = None
+        self.page.update()
 
     def generate_receipt(self, payment):
         """
