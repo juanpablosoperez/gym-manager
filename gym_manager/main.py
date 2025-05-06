@@ -15,7 +15,7 @@ def main():
         
         # Configuración de la base de datos MySQL
         DB_USER = os.getenv('DB_USER', 'root')
-        DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')  # Asegúrate de que esta es tu contraseña
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'ITEC2025')  # Asegúrate de que esta es tu contraseña
         DB_HOST = os.getenv('DB_HOST', 'localhost')
         DB_PORT = os.getenv('DB_PORT', '3306')
         DB_NAME = os.getenv('DB_NAME', 'gym_manager')
