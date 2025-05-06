@@ -280,6 +280,101 @@ class PaymentsView:
             modal=True,
         )
 
+        # Modal de edición de pago
+        self.edit_payment_client_field = ft.TextField(
+            label="Miembro",
+            prefix_icon=ft.icons.PERSON,
+            border_radius=8,
+            width=500,
+            read_only=True
+        )
+        self.edit_payment_date_picker = ft.DatePicker(
+            first_date=datetime(2024, 1, 1),
+            last_date=datetime(2025, 12, 31),
+            on_change=self.on_edit_payment_date_change
+        )
+        self.page.overlay.append(self.edit_payment_date_picker)
+        self.edit_payment_date_value = None
+        self.edit_payment_date_field = ft.Container(
+            content=ft.Row([
+                ft.Text(self.edit_payment_date_value.strftime("%d/%m/%Y") if self.edit_payment_date_value else "Seleccionar fecha",
+                        size=16,
+                        color=ft.colors.BLACK54),
+                ft.Icon(ft.icons.CALENDAR_TODAY, size=20, color=ft.colors.GREY_700),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            border=ft.border.all(1, ft.colors.GREY_300),
+            border_radius=8,
+            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            width=500,
+            on_click=lambda e: self.open_date_picker(self.edit_payment_date_picker),
+            bgcolor=ft.colors.GREY_100,
+            tooltip="Seleccionar fecha",
+        )
+        self.edit_payment_amount_field = ft.TextField(
+            label="Monto",
+            prefix_icon=ft.icons.ATTACH_MONEY,
+            border_radius=8,
+            width=500,
+            value="0.00",
+        )
+        self.edit_payment_method_field = ft.Dropdown(
+            label="Método de pago",
+            options=[
+                ft.dropdown.Option("Efectivo"),
+                ft.dropdown.Option("Transferencia bancaria"),
+                ft.dropdown.Option("Tarjeta de crédito")
+            ],
+            border_radius=8,
+            width=500,
+            hint_text="Seleccionar método",
+        )
+        self.edit_payment_observations_field = ft.TextField(
+            label="Observaciones",
+            multiline=True,
+            min_lines=3,
+            max_lines=5,
+            border_radius=8,
+            width=500,
+            height=60,
+            hint_text="Agregar observaciones...",
+        )
+        self.edit_payment_modal = ft.AlertDialog(
+            title=ft.Text("Editar Pago", size=26, weight=ft.FontWeight.BOLD),
+            content=ft.Column(
+                controls=[
+                    ft.Text("Miembro", size=16, weight=ft.FontWeight.BOLD),
+                    self.edit_payment_client_field,
+                    ft.Text("Fecha", size=16, weight=ft.FontWeight.BOLD),
+                    self.edit_payment_date_field,
+                    ft.Text("Monto", size=16, weight=ft.FontWeight.BOLD),
+                    self.edit_payment_amount_field,
+                    ft.Text("Método de pago", size=16, weight=ft.FontWeight.BOLD),
+                    self.edit_payment_method_field,
+                    ft.Text("Observaciones", size=16, weight=ft.FontWeight.BOLD),
+                    self.edit_payment_observations_field,
+                ],
+                spacing=18,
+                width=540,
+            ),
+            actions=[
+                ft.TextButton("Cancelar", on_click=self.close_edit_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
+                ft.ElevatedButton(
+                    "Actualizar",
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE_900,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                    ),
+                    on_click=self.update_payment
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.edit_payment_modal)
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
@@ -536,10 +631,64 @@ class PaymentsView:
 
     def edit_payment(self, payment):
         """
-        Abre el modal para editar un pago
+        Abre el modal para editar un pago, cargando los datos del pago seleccionado
         """
-        # TODO: Implementar edición de pago
-        self.show_message("Función en desarrollo", ft.colors.ORANGE)
+        self.selected_payment = payment
+        self.edit_payment_client_field.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
+        self.edit_payment_date_value = payment.fecha_pago
+        self.edit_payment_date_picker.value = payment.fecha_pago
+        self.edit_payment_date_field.content.controls[0].value = payment.fecha_pago.strftime("%d/%m/%Y")
+        self.edit_payment_amount_field.value = str(payment.monto)
+        self.edit_payment_method_field.value = payment.metodo_pago.descripcion
+        self.edit_payment_observations_field.value = payment.referencia if payment.referencia else ""
+        self.edit_payment_modal.open = True
+        self.page.update()
+
+    def close_edit_modal(self, e):
+        self.edit_payment_client_field.value = ""
+        self.edit_payment_date_value = None
+        self.edit_payment_date_picker.value = None
+        self.edit_payment_date_field.content.controls[0].value = "Seleccionar fecha"
+        self.edit_payment_amount_field.value = "0.00"
+        self.edit_payment_method_field.value = None
+        self.edit_payment_observations_field.value = ""
+        self.edit_payment_modal.open = False
+        self.selected_payment = None
+        self.page.update()
+
+    def on_edit_payment_date_change(self, e):
+        self.edit_payment_date_value = self.edit_payment_date_picker.value
+        value = self.edit_payment_date_picker.value.strftime("%d/%m/%Y") if self.edit_payment_date_picker.value else "Seleccionar fecha"
+        self.edit_payment_date_field.content.controls[0].value = value
+        self.page.update()
+
+    def update_payment(self, e):
+        if not self.selected_payment:
+            self.show_message("No hay pago seleccionado para editar", ft.colors.RED)
+            return
+        if not self.edit_payment_date_value:
+            self.show_message("Debe seleccionar una fecha", ft.colors.RED)
+            return
+        if not self.edit_payment_amount_field.value or float(self.edit_payment_amount_field.value) <= 0:
+            self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+            return
+        if not self.edit_payment_method_field.value:
+            self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
+            return
+        payment_data = {
+            'fecha_pago': self.edit_payment_date_value,
+            'monto': float(self.edit_payment_amount_field.value),
+            'id_miembro': self.selected_payment.miembro.id_miembro,
+            'id_metodo_pago': self.get_payment_method_id(self.edit_payment_method_field.value),
+            'referencia': self.edit_payment_observations_field.value
+        }
+        success, message = self.payment_controller.update_payment(self.selected_payment.id_pago, payment_data)
+        if success:
+            self.show_message(message, ft.colors.GREEN)
+            self.close_edit_modal(e)
+            self.load_data()
+        else:
+            self.show_message(message, ft.colors.RED)
 
     def delete_payment(self, payment):
         """
