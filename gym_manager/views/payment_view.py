@@ -575,7 +575,6 @@ class PaymentsView:
                                 padding=40,
                                 alignment=ft.alignment.center,
                             ),
-                            col_span=6
                         )
                     ]
                 )
@@ -642,9 +641,11 @@ class PaymentsView:
         if self.search_field.value:
             filters['member_name'] = self.search_field.value
         
+        # Filtro de fecha desde
         if self.date_from.value:
             filters['date_from'] = self.date_from.value
         
+        # Filtro de fecha hasta
         if self.date_to.value:
             filters['date_to'] = self.date_to.value
         
@@ -671,6 +672,8 @@ class PaymentsView:
         self.search_field.value = ""
         self.date_from.value = None
         self.date_to.value = None
+        self.date_from_field.content.controls[0].value = ""
+        self.date_to_field.content.controls[0].value = ""
         self.payment_method.value = "Todos"
         self.status_filter.value = "Pagado"
         self.page.update()
@@ -900,6 +903,7 @@ class PaymentsView:
         value = self.date_to.value.strftime("%d/%m/%Y") if self.date_to.value else ""
         self.date_to_field.content.controls[0].value = value
         self.page.update()
+        self.apply_filters()  # Aplicar filtros automáticamente al cambiar la fecha hasta
 
     def open_date_picker(self, picker):
         picker.open = True
