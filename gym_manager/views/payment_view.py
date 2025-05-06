@@ -2,11 +2,14 @@ import flet as ft
 from gym_manager.controllers.payment_controller import PaymentController
 from datetime import datetime, timedelta
 from gym_manager.utils.navigation import db_session
+from gym_manager.models.member import Miembro
+from gym_manager.models.payment_method import MetodoPago
 
 class PaymentsView:
     def __init__(self, page: ft.Page):
         self.page = page
         self.payment_controller = PaymentController(db_session)
+        self.db_session = db_session
         self.setup_payment_view()
         self.load_data()
 
@@ -118,8 +121,8 @@ class PaymentsView:
             options=[
                 ft.dropdown.Option("Todos"),
                 ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Tarjeta"),
-                ft.dropdown.Option("Transferencia")
+                ft.dropdown.Option("Transferencia bancaria"),
+                ft.dropdown.Option("Tarjeta de crédito")
             ],
             border_radius=10,
             text_size=16
@@ -145,6 +148,7 @@ class PaymentsView:
                 ft.DataColumn(ft.Text("Fecha", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Monto", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Método", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Observaciones", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Estado", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Acciones", size=18, weight=ft.FontWeight.BOLD)),
             ],
@@ -162,12 +166,33 @@ class PaymentsView:
 
         # Modal de nuevo pago
         self.new_payment_client_field = ft.TextField(
-            label="Cliente",
+            label="Miembro",
             prefix_icon=ft.icons.SEARCH,
             border_radius=8,
-            hint_text="Buscar cliente...",
+            hint_text="Buscar miembro por nombre o documento...",
             width=500,
+            height= 40,
+            on_change=self.search_member
         )
+        
+        # Primero define el ListView
+        self.member_search_results = ft.ListView(
+            spacing=10,
+            padding=10,
+            height=40,
+            visible=False,
+            auto_scroll=False,
+            expand=False
+        )
+        # Luego el Container que lo envuelve
+        self.member_search_results_container = ft.Container(
+            content=self.member_search_results,
+            height=0 if not self.member_search_results.visible else 60,  # altura dinámica
+            padding=0,
+            margin=0
+        )
+        
+        self.selected_member = None
         self.new_payment_date_picker = ft.DatePicker(
             first_date=datetime(2024, 1, 1),
             last_date=datetime(2025, 12, 31),
@@ -201,8 +226,8 @@ class PaymentsView:
             label="Método de pago",
             options=[
                 ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Tarjeta"),
-                ft.dropdown.Option("Transferencia")
+                ft.dropdown.Option("Transferencia bancaria"),
+                ft.dropdown.Option("Tarjeta de crédito")
             ],
             border_radius=8,
             width=500,
@@ -215,14 +240,16 @@ class PaymentsView:
             max_lines=5,
             border_radius=8,
             width=500,
+            height=60,
             hint_text="Agregar observaciones...",
         )
         self.new_payment_modal = ft.AlertDialog(
             title=ft.Text("Registrar Nuevo Pago", size=26, weight=ft.FontWeight.BOLD),
             content=ft.Column(
                 controls=[
-                    ft.Text("Cliente", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Miembro", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_client_field,
+                    self.member_search_results_container,
                     ft.Text("Fecha", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_date_field,
                     ft.Text("Monto", size=16, weight=ft.FontWeight.BOLD),
@@ -358,6 +385,16 @@ class PaymentsView:
         self.page.update()
 
     def close_modal(self, e):
+        self.new_payment_client_field.value = ""
+        self.selected_member = None
+        self.member_search_results.visible = False
+        self.new_payment_date_value = None
+        self.new_payment_date_picker.value = None
+        self.new_payment_date_field.content.controls[0].value = "Seleccionar fecha"
+        self.new_payment_amount_field.value = "0.00"
+        self.new_payment_method_field.value = None
+        self.new_payment_observations_field.value = ""
+        self.new_payment_observations_field.height = 100
         self.new_payment_modal.open = False
         self.page.update()
 
@@ -421,6 +458,7 @@ class PaymentsView:
                             ft.DataCell(ft.Text(payment.fecha_pago.strftime("%d/%m/%Y"))),
                             ft.DataCell(ft.Text(f"${payment.monto}")),
                             ft.DataCell(ft.Text(payment.metodo_pago.descripcion)),
+                            ft.DataCell(ft.Text(payment.referencia if payment.referencia else "")),
                             ft.DataCell(
                                 ft.Container(
                                     content=ft.Text(
@@ -521,16 +559,92 @@ class PaymentsView:
         # TODO: Implementar generación de comprobante
         self.show_message("Función en desarrollo", ft.colors.ORANGE)
 
+    def search_member(self, e):
+        """
+        Busca miembros según el texto ingresado
+        """
+        search_text = self.new_payment_client_field.value.lower()
+        if not search_text:
+            self.member_search_results.visible = False
+            self.member_search_results_container.height = 0
+            self.page.update()
+            return
+
+        # Buscar miembros que coincidan con el texto de búsqueda
+        members = self.db_session.query(Miembro).filter(
+            (Miembro.nombre.ilike(f"%{search_text}%")) |
+            (Miembro.apellido.ilike(f"%{search_text}%")) |
+            (Miembro.documento.ilike(f"%{search_text}%"))
+        ).limit(5).all()
+
+        self.member_search_results.controls.clear()
+        
+        if members:
+            for member in members:
+                self.member_search_results.controls.append(
+                    ft.Container(
+                        content=ft.ListTile(
+                            leading=ft.Icon(ft.icons.PERSON),
+                            title=ft.Text(f"{member.nombre} {member.apellido}"),
+                            subtitle=ft.Text(f"Documento: {member.documento}"),
+                            on_click=lambda e, m=member: self.select_member(m)
+                        ),
+                        border=ft.border.all(1, ft.colors.GREY_300),
+                        border_radius=8,
+                        bgcolor=ft.colors.WHITE,
+                    )
+                )
+            self.member_search_results.visible = True
+            self.member_search_results_container.height = 60
+        else:
+            self.member_search_results.controls.append(
+                ft.Container(
+                    content=ft.Text("No se encontraron miembros", color=ft.colors.GREY_700),
+                    padding=10,
+                    alignment=ft.alignment.center,
+                )
+            )
+            self.member_search_results.visible = True
+            self.member_search_results_container.height = 60
+        
+        self.page.update()
+
+    def select_member(self, member):
+        """
+        Selecciona un miembro de la lista de resultados
+        """
+        self.selected_member = member
+        self.new_payment_client_field.value = f"{member.nombre} {member.apellido}"
+        self.member_search_results.visible = False
+        self.member_search_results_container.height = 0
+        self.page.update()
+
     def save_payment(self, e):
         """
         Guarda un nuevo pago
         """
-        # TODO: Implementar validación de campos
+        if not self.selected_member:
+            self.show_message("Debe seleccionar un miembro", ft.colors.RED)
+            return
+
+        if not self.new_payment_date_value:
+            self.show_message("Debe seleccionar una fecha", ft.colors.RED)
+            return
+
+        if not self.new_payment_amount_field.value or float(self.new_payment_amount_field.value) <= 0:
+            self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+            return
+
+        if not self.new_payment_method_field.value:
+            self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
+            return
+
         payment_data = {
-            'fecha_pago': datetime.now(),
+            'fecha_pago': self.new_payment_date_value,
             'monto': float(self.new_payment_amount_field.value),
-            'id_miembro': 1,  # TODO: Obtener ID del miembro seleccionado
-            'id_metodo_pago': 1,  # TODO: Obtener ID del método de pago seleccionado
+            'id_miembro': self.selected_member.id_miembro,
+            'id_metodo_pago': self.get_payment_method_id(self.new_payment_method_field.value),
+            'referencia': self.new_payment_observations_field.value
         }
         
         success, message = self.payment_controller.create_payment(payment_data)
@@ -540,6 +654,13 @@ class PaymentsView:
             self.load_data()
         else:
             self.show_message(message, ft.colors.RED)
+
+    def get_payment_method_id(self, method_name):
+        """
+        Obtiene el ID del método de pago según su nombre
+        """
+        method = self.db_session.query(MetodoPago).filter_by(descripcion=method_name).first()
+        return method.id_metodo_pago if method else None
 
     def show_message(self, message: str, color: str):
         self.page.snack_bar = ft.SnackBar(
