@@ -64,7 +64,8 @@ class PaymentsView:
             border_radius=10,
             width=260,
             height=48,
-            text_size=16
+            text_size=16,
+            on_change=self.apply_filters
         )
 
         # DatePicker Desde
