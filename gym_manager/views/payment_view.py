@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from gym_manager.utils.navigation import db_session
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
+from gym_manager.models.payment import Pago
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import os
@@ -17,6 +18,7 @@ class PaymentsView:
         self.setup_payment_view()
         self.load_data()
         self.export_type = None  # Agregar variable para el tipo de exportación
+        self.check_overdue_payments()  # Verificar pagos vencidos al iniciar
 
     def setup_payment_view(self):
         # Título amigable arriba de los filtros, en negro y bien arriba
@@ -977,7 +979,7 @@ class PaymentsView:
             table_style = TableStyle([
                 ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
                 ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 12),
                 ('TOPPADDING', (0, 0), (-1, -1), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
@@ -1571,3 +1573,127 @@ class PaymentsView:
             print(f"Error en _export_to_pdf: {str(e)}")  # Debug
             self.show_message(f"Error al generar PDF: {str(e)}", ft.colors.RED)
             raise  # Re-lanzar la excepción para ver el error completo
+
+    def check_overdue_payments(self):
+        """
+        Verifica los pagos vencidos y muestra una alerta
+        """
+        try:
+            # Obtener todos los miembros
+            members = self.db_session.query(Miembro).all()
+            overdue_members = []
+
+            for member in members:
+                # Obtener el último pago del miembro
+                last_payment = self.db_session.query(Pago).filter(
+                    Pago.id_miembro == member.id_miembro,
+                    Pago.estado == 1  # Solo pagos activos
+                ).order_by(Pago.fecha_pago.desc()).first()
+
+                if last_payment:
+                    # Calcular días desde el último pago
+                    days_since_payment = (datetime.now() - last_payment.fecha_pago).days
+                    
+                    # Si han pasado más de 30 días, agregar a la lista de vencidos
+                    if days_since_payment > 30:
+                        overdue_members.append({
+                            'member': member,
+                            'days_overdue': days_since_payment,
+                            'last_payment_date': last_payment.fecha_pago
+                        })
+
+            if overdue_members:
+                # Crear el contenido de la alerta
+                alert_content = ft.Column(
+                    controls=[
+                        ft.Text(
+                            "¡Atención! Los siguientes miembros tienen pagos vencidos:",
+                            size=16,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.colors.RED_700
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Container(
+                                        content=ft.Row(
+                                            controls=[
+                                                ft.Text(
+                                                    f"• {m['member'].nombre} {m['member'].apellido}",
+                                                    size=14,
+                                                    weight=ft.FontWeight.BOLD
+                                                ),
+                                                ft.Text(
+                                                    f"Último pago: {m['last_payment_date'].strftime('%d/%m/%Y')}",
+                                                    size=14,
+                                                    color=ft.colors.GREY_700
+                                                ),
+                                                ft.Container(
+                                                    content=ft.Text(
+                                                        f"Vencido hace {m['days_overdue']} días",
+                                                        color=ft.colors.WHITE,
+                                                        weight=ft.FontWeight.BOLD
+                                                    ),
+                                                    bgcolor=ft.colors.RED_700,
+                                                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
+                                                    border_radius=5
+                                                )
+                                            ],
+                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                                        ),
+                                        border=ft.border.all(1, ft.colors.GREY_300),
+                                        border_radius=8,
+                                        padding=10,
+                                        margin=ft.margin.only(bottom=5)
+                                    ) for m in overdue_members
+                                ],
+                                scroll=ft.ScrollMode.AUTO,
+                                height=200
+                            ),
+                            margin=ft.margin.only(top=10, bottom=10)
+                        ),
+                        ft.Text(
+                            "Por favor, contacte a estos miembros para regularizar sus pagos.",
+                            size=14,
+                            color=ft.colors.GREY_700
+                        )
+                    ],
+                    spacing=10
+                )
+
+                # Crear el diálogo de alerta
+                self.overdue_alert = ft.AlertDialog(
+                    title=ft.Text("Pagos Vencidos", size=24, weight=ft.FontWeight.BOLD),
+                    content=alert_content,
+                    actions=[
+                        ft.ElevatedButton(
+                            "Entendido",
+                            on_click=self.close_overdue_alert,
+                            style=ft.ButtonStyle(
+                                bgcolor=ft.colors.BLUE_900,
+                                color=ft.colors.WHITE,
+                                shape=ft.RoundedRectangleBorder(radius=8),
+                                padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                                text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                            )
+                        ),
+                    ],
+                    actions_alignment=ft.MainAxisAlignment.END,
+                    modal=True
+                )
+
+                # Mostrar la alerta
+                self.page.overlay.append(self.overdue_alert)
+                self.overdue_alert.open = True
+                self.page.update()
+
+        except Exception as e:
+            print(f"Error al verificar pagos vencidos: {str(e)}")
+
+    def close_overdue_alert(self, e):
+        """
+        Cierra la alerta de pagos vencidos
+        """
+        if hasattr(self, 'overdue_alert'):
+            self.overdue_alert.open = False
+            self.page.update()
