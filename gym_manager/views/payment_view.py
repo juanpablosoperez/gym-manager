@@ -4,6 +4,10 @@ from datetime import datetime, timedelta
 from gym_manager.utils.navigation import db_session
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill
+import os
+from pathlib import Path
 
 class PaymentsView:
     def __init__(self, page: ft.Page):
@@ -415,6 +419,43 @@ class PaymentsView:
         )
         self.page.overlay.append(self.delete_confirm_modal)
         self.selected_payment_to_delete = None
+
+        # Modal de exportación
+        self.export_dialog = ft.AlertDialog(
+            title=ft.Text("Confirmar Exportación", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Text(
+                "¿Deseas exportar los pagos a Excel?\n"
+                "El archivo se guardará en tu carpeta de Descargas.",
+                size=16
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.close_export_dialog,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.WHITE,
+                        color=ft.colors.BLACK87,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+                ft.ElevatedButton(
+                    "Exportar",
+                    on_click=self.confirm_export,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE_900,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.export_dialog)
 
         # Layout principal
         self.content = ft.Container(
@@ -917,7 +958,79 @@ class PaymentsView:
         self.page.update()
 
     def export_to_excel(self, e):
-        self.show_message("Función de exportar a Excel en desarrollo", ft.colors.BLUE)
+        """
+        Exporta los pagos actuales a un archivo Excel
+        """
+        try:
+            # Obtener los pagos actuales
+            payments = self.payment_controller.get_payments()
+            
+            if not payments:
+                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
+                return
+
+            # Actualizar el contenido del diálogo con el número de pagos
+            self.export_dialog.content.value = f"¿Deseas exportar {len(payments)} pagos a Excel?\nEl archivo se guardará en tu carpeta de Descargas."
+            
+            # Mostrar el diálogo
+            self.export_dialog.open = True
+            self.page.update()
+
+        except Exception as e:
+            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
+
+    def close_export_dialog(self, e):
+        """
+        Cierra el diálogo de exportación
+        """
+        self.export_dialog.open = False
+        self.page.update()
+
+    def confirm_export(self, e):
+        """
+        Confirma la exportación y genera el archivo Excel
+        """
+        try:
+            # Obtener la ruta de la carpeta de descargas
+            downloads_path = str(Path.home() / "Downloads")
+            
+            # Obtener los pagos actuales
+            payments = self.payment_controller.get_payments()
+
+            # Crear un nuevo libro de Excel
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Pagos"
+
+            # Escribir encabezados
+            headers = ["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]
+            for col, header in enumerate(headers, 1):
+                ws.cell(row=1, column=col).value = header
+
+            # Escribir datos
+            for row, payment in enumerate(payments, 2):
+                ws.cell(row=row, column=1).value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
+                ws.cell(row=row, column=2).value = payment.fecha_pago.strftime("%d/%m/%Y")
+                ws.cell(row=row, column=3).value = f"${payment.monto}"
+                ws.cell(row=row, column=4).value = payment.metodo_pago.descripcion
+                ws.cell(row=row, column=5).value = payment.referencia if payment.referencia else ""
+                ws.cell(row=row, column=6).value = "Pagado" if payment.estado == 1 else "Cancelado"
+
+            # Generar nombre del archivo
+            filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            filepath = os.path.join(downloads_path, filename)
+
+            # Guardar archivo
+            wb.save(filepath)
+
+            # Cerrar el diálogo de confirmación
+            self.close_export_dialog(e)
+
+            # Mostrar mensaje de éxito
+            self.show_message(f"Archivo Excel guardado en: {filepath}", ft.colors.GREEN)
+
+        except Exception as e:
+            self.show_message(f"Error al exportar: {str(e)}", ft.colors.RED)
 
     def export_to_pdf(self, e):
         self.show_message("Función de exportar a PDF en desarrollo", ft.colors.BLUE)
