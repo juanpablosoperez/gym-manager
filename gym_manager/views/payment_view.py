@@ -5,7 +5,7 @@ from gym_manager.utils.navigation import db_session
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
 import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import os
 from pathlib import Path
 
@@ -1002,19 +1002,85 @@ class PaymentsView:
             ws = wb.active
             ws.title = "Pagos"
 
+            # Estilos
+            header_font = Font(bold=True, size=12, color="FFFFFF")
+            header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+            header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            money_format = '#,##0.00'
+            date_format = 'dd/mm/yyyy'
+
+            # Configurar ancho de columnas
+            ws.column_dimensions['A'].width = 30  # Miembro
+            ws.column_dimensions['B'].width = 15  # Fecha
+            ws.column_dimensions['C'].width = 15  # Monto
+            ws.column_dimensions['D'].width = 20  # Método
+            ws.column_dimensions['E'].width = 30  # Observaciones
+            ws.column_dimensions['F'].width = 15  # Estado
+
             # Escribir encabezados
             headers = ["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]
             for col, header in enumerate(headers, 1):
-                ws.cell(row=1, column=col).value = header
+                cell = ws.cell(row=1, column=col)
+                cell.value = header
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = border
 
             # Escribir datos
             for row, payment in enumerate(payments, 2):
-                ws.cell(row=row, column=1).value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
-                ws.cell(row=row, column=2).value = payment.fecha_pago.strftime("%d/%m/%Y")
-                ws.cell(row=row, column=3).value = f"${payment.monto}"
-                ws.cell(row=row, column=4).value = payment.metodo_pago.descripcion
-                ws.cell(row=row, column=5).value = payment.referencia if payment.referencia else ""
-                ws.cell(row=row, column=6).value = "Pagado" if payment.estado == 1 else "Cancelado"
+                # Miembro
+                cell = ws.cell(row=row, column=1)
+                cell.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
+                cell.border = border
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+
+                # Fecha
+                cell = ws.cell(row=row, column=2)
+                cell.value = payment.fecha_pago
+                cell.number_format = date_format
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+                # Monto
+                cell = ws.cell(row=row, column=3)
+                cell.value = payment.monto
+                cell.number_format = money_format
+                cell.border = border
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+
+                # Método
+                cell = ws.cell(row=row, column=4)
+                cell.value = payment.metodo_pago.descripcion
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+                # Observaciones
+                cell = ws.cell(row=row, column=5)
+                cell.value = payment.referencia if payment.referencia else ""
+                cell.border = border
+                cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+                # Estado
+                cell = ws.cell(row=row, column=6)
+                cell.value = "Pagado" if payment.estado == 1 else "Cancelado"
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                
+                # Color de fondo según estado
+                if payment.estado == 1:
+                    cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+                else:
+                    cell.fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")
+
+            # Congelar la primera fila
+            ws.freeze_panes = 'A2'
 
             # Generar nombre del archivo
             filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
