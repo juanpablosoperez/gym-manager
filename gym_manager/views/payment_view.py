@@ -962,8 +962,31 @@ class PaymentsView:
         Exporta los pagos actuales a un archivo Excel
         """
         try:
-            # Obtener los pagos actuales
-            payments = self.payment_controller.get_payments()
+            # Obtener los pagos filtrados actuales
+            filters = {}
+            
+            if self.search_field.value:
+                filters['member_name'] = self.search_field.value
+            
+            if self.date_from.value:
+                filters['date_from'] = self.date_from.value
+            
+            if self.date_to.value:
+                filters['date_to'] = self.date_to.value
+            
+            if self.payment_method.value and self.payment_method.value != "Todos":
+                filters['payment_method'] = self.payment_method.value
+            
+            # Aplicar filtro de estado
+            if self.status_filter.value == "Pagado":
+                filters['estado'] = 1
+            elif self.status_filter.value == "Cancelado":
+                filters['estado'] = 0
+
+            payments = self.payment_controller.get_payments(filters)
+            # Filtrar por estado aquí también para asegurarnos
+            if 'estado' in filters:
+                payments = [p for p in payments if p.estado == filters['estado']]
             
             if not payments:
                 self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
@@ -994,8 +1017,31 @@ class PaymentsView:
             # Obtener la ruta de la carpeta de descargas
             downloads_path = str(Path.home() / "Downloads")
             
-            # Obtener los pagos actuales
-            payments = self.payment_controller.get_payments()
+            # Obtener los pagos filtrados actuales
+            filters = {}
+            
+            if self.search_field.value:
+                filters['member_name'] = self.search_field.value
+            
+            if self.date_from.value:
+                filters['date_from'] = self.date_from.value
+            
+            if self.date_to.value:
+                filters['date_to'] = self.date_to.value
+            
+            if self.payment_method.value and self.payment_method.value != "Todos":
+                filters['payment_method'] = self.payment_method.value
+            
+            # Aplicar filtro de estado
+            if self.status_filter.value == "Pagado":
+                filters['estado'] = 1
+            elif self.status_filter.value == "Cancelado":
+                filters['estado'] = 0
+
+            payments = self.payment_controller.get_payments(filters)
+            # Filtrar por estado aquí también para asegurarnos
+            if 'estado' in filters:
+                payments = [p for p in payments if p.estado == filters['estado']]
 
             # Crear un nuevo libro de Excel
             wb = openpyxl.Workbook()
