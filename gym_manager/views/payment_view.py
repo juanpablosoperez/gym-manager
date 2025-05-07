@@ -1,5 +1,6 @@
 import flet as ft
 from gym_manager.controllers.payment_controller import PaymentController
+from gym_manager.controllers.monthly_fee_controller import MonthlyFeeController
 from datetime import datetime, timedelta
 from gym_manager.utils.navigation import db_session
 from gym_manager.models.member import Miembro
@@ -14,6 +15,7 @@ class PaymentsView:
     def __init__(self, page: ft.Page):
         self.page = page
         self.payment_controller = PaymentController(db_session)
+        self.monthly_fee_controller = MonthlyFeeController(db_session)
         self.db_session = db_session
         self.setup_payment_view()
         self.load_data()
@@ -498,6 +500,109 @@ class PaymentsView:
         self.page.overlay.append(self.receipt_confirm_modal)
         self.selected_payment_for_receipt = None
 
+        # Agregar el indicador de cuota mensual
+        self.monthly_fee_card = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Icon(
+                                name=ft.icons.ATTACH_MONEY,
+                                color=ft.colors.BLUE_900,
+                                size=32
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(
+                                        "Cuota Mensual",
+                                        size=16,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.colors.BLUE_900
+                                    ),
+                                    ft.Text(
+                                        f"${self.monthly_fee_controller.get_current_fee().monto:,.2f}" if self.monthly_fee_controller.get_current_fee() else "No configurada",
+                                        size=24,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.colors.BLUE_900
+                                    )
+                                ],
+                                spacing=2
+                            ),
+                            ft.IconButton(
+                                icon=ft.icons.EDIT,
+                                icon_color=ft.colors.BLUE_900,
+                                tooltip="Editar cuota mensual",
+                                on_click=self.show_edit_fee_modal
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        spacing=10
+                    )
+                ],
+                spacing=5
+            ),
+            padding=20,
+            border_radius=12,
+            bgcolor=ft.colors.WHITE,
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=10,
+                color=ft.colors.GREY_300,
+            )
+        )
+
+        # Modal para editar la cuota mensual
+        self.edit_fee_field = ft.TextField(
+            label="Nueva cuota mensual",
+            prefix_icon=ft.icons.ATTACH_MONEY,
+            border_radius=8,
+            width=300,
+            value=str(self.monthly_fee_controller.get_current_fee().monto) if self.monthly_fee_controller.get_current_fee() else "0.00"
+        )
+
+        self.edit_fee_modal = ft.AlertDialog(
+            title=ft.Text("Editar Cuota Mensual", size=24, weight=ft.FontWeight.BOLD),
+            content=ft.Column(
+                controls=[
+                    ft.Text(
+                        "Ingrese el nuevo monto de la cuota mensual:",
+                        size=16,
+                        color=ft.colors.GREY_700
+                    ),
+                    self.edit_fee_field
+                ],
+                spacing=20,
+                width=400
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.close_edit_fee_modal,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.WHITE,
+                        color=ft.colors.BLACK87,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+                ft.ElevatedButton(
+                    "Guardar",
+                    on_click=self.save_monthly_fee,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE_900,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True
+        )
+        self.page.overlay.append(self.edit_fee_modal)
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
@@ -511,18 +616,29 @@ class PaymentsView:
                     ft.Container(
                         content=ft.Row(
                             controls=[
-                                self.search_field,
-                                self.date_from_field,
-                                self.date_to_field,
-                                self.payment_method,
-                                self.status_filter,
-                                self.clear_btn,
-                                self.new_payment_btn,
+                                ft.Container(
+                                    content=ft.Row(
+                                        controls=[
+                                            self.search_field,
+                                            self.date_from_field,
+                                            self.date_to_field,
+                                            self.payment_method,
+                                            self.status_filter,
+                                            self.clear_btn,
+                                            self.new_payment_btn,
+                                        ],
+                                        alignment=ft.MainAxisAlignment.START,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                        spacing=18,
+                                        expand=True,
+                                    ),
+                                    padding=ft.padding.only(bottom=10, left=10),
+                                    alignment=ft.alignment.top_left,
+                                    expand=True,
+                                ),
                             ],
                             alignment=ft.MainAxisAlignment.START,
-                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            spacing=18,
-                            expand=True,
+                            spacing=20,
                         ),
                         padding=ft.padding.only(bottom=10, left=10),
                         alignment=ft.alignment.top_left,
@@ -531,10 +647,21 @@ class PaymentsView:
                     ft.Container(
                         content=ft.Row(
                             controls=[
-                                self.export_excel_btn,
-                                self.export_pdf_btn,
+                                self.monthly_fee_card,  # Mover la tarjeta aquí
+                                ft.Container(
+                                    content=ft.Row(
+                                        controls=[
+                                            self.export_excel_btn,
+                                            self.export_pdf_btn,
+                                        ],
+                                        alignment=ft.MainAxisAlignment.END,
+                                        spacing=8,
+                                    ),
+                                    padding=ft.padding.only(bottom=10, left=10, right=30),
+                                    alignment=ft.alignment.top_right,
+                                ),
                             ],
-                            alignment=ft.MainAxisAlignment.END,
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                             spacing=8,
                         ),
                         padding=ft.padding.only(bottom=10, left=10, right=30),
@@ -1117,6 +1244,15 @@ class PaymentsView:
 
         if not self.new_payment_method_field.value:
             self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
+            return
+
+        # Verificar si el monto coincide con la cuota mensual
+        current_fee = self.monthly_fee_controller.get_current_fee()
+        if current_fee and float(self.new_payment_amount_field.value) != current_fee.monto:
+            self.show_message(
+                f"El monto debe ser igual a la cuota mensual (${current_fee.monto:,.2f})",
+                ft.colors.ORANGE
+            )
             return
 
         payment_data = {
@@ -1819,3 +1955,42 @@ class PaymentsView:
         if hasattr(self, 'overdue_alert'):
             self.overdue_alert.open = False
             self.page.update()
+
+    def show_edit_fee_modal(self, e):
+        """
+        Muestra el modal para editar la cuota mensual
+        """
+        current_fee = self.monthly_fee_controller.get_current_fee()
+        if current_fee:
+            self.edit_fee_field.value = str(current_fee.monto)
+        self.edit_fee_modal.open = True
+        self.page.update()
+
+    def close_edit_fee_modal(self, e):
+        """
+        Cierra el modal de edición de cuota mensual
+        """
+        self.edit_fee_modal.open = False
+        self.page.update()
+
+    def save_monthly_fee(self, e):
+        """
+        Guarda la nueva cuota mensual
+        """
+        try:
+            new_amount = float(self.edit_fee_field.value)
+            if new_amount <= 0:
+                self.show_message("El monto debe ser mayor a 0", ft.colors.RED)
+                return
+
+            success, message = self.monthly_fee_controller.update_fee(new_amount)
+            if success:
+                self.show_message(message, ft.colors.GREEN)
+                # Actualizar el valor mostrado en la tarjeta
+                self.monthly_fee_card.content.controls[0].controls[1].controls[1].value = f"${new_amount:,.2f}"
+                self.close_edit_fee_modal(e)
+                self.page.update()
+            else:
+                self.show_message(message, ft.colors.RED)
+        except ValueError:
+            self.show_message("Por favor, ingrese un monto válido", ft.colors.RED)
