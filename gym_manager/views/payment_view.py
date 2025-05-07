@@ -1599,75 +1599,197 @@ class PaymentsView:
                         overdue_members.append({
                             'member': member,
                             'days_overdue': days_since_payment,
-                            'last_payment_date': last_payment.fecha_pago
+                            'last_payment_date': last_payment.fecha_pago,
+                            'last_payment_amount': last_payment.monto,
+                            'payment_method': last_payment.metodo_pago.descripcion
                         })
 
             if overdue_members:
                 # Crear el contenido de la alerta
                 alert_content = ft.Column(
                     controls=[
-                        ft.Text(
-                            "¡Atención! Los siguientes miembros tienen pagos vencidos:",
-                            size=16,
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.colors.RED_700
+                        # Encabezado con icono
+                        ft.Container(
+                            content=ft.Row(
+                                controls=[
+                                    ft.Icon(
+                                        name=ft.icons.WARNING_ROUNDED,
+                                        size=40,
+                                        color=ft.colors.RED_700
+                                    ),
+                                    ft.Column(
+                                        controls=[
+                                            ft.Text(
+                                                "¡Atención! Pagos Vencidos",
+                                                size=24,
+                                                weight=ft.FontWeight.BOLD,
+                                                color=ft.colors.RED_700
+                                            ),
+                                            ft.Text(
+                                                "Los siguientes miembros tienen pagos pendientes:",
+                                                size=16,
+                                                color=ft.colors.GREY_700
+                                            )
+                                        ],
+                                        spacing=5
+                                    )
+                                ],
+                                alignment=ft.MainAxisAlignment.START,
+                                spacing=15
+                            ),
+                            padding=ft.padding.only(bottom=20)
                         ),
+                        
+                        # Lista de miembros con pagos vencidos
                         ft.Container(
                             content=ft.Column(
                                 controls=[
                                     ft.Container(
-                                        content=ft.Row(
+                                        content=ft.Column(
                                             controls=[
-                                                ft.Text(
-                                                    f"• {m['member'].nombre} {m['member'].apellido}",
-                                                    size=14,
-                                                    weight=ft.FontWeight.BOLD
+                                                # Encabezado de la tarjeta
+                                                ft.Row(
+                                                    controls=[
+                                                        ft.Icon(
+                                                            name=ft.icons.PERSON,
+                                                            color=ft.colors.BLUE_900,
+                                                            size=24
+                                                        ),
+                                                        ft.Text(
+                                                            f"{m['member'].nombre} {m['member'].apellido}",
+                                                            size=16,
+                                                            weight=ft.FontWeight.BOLD,
+                                                            color=ft.colors.BLUE_900
+                                                        ),
+                                                        ft.Container(
+                                                            content=ft.Text(
+                                                                f"Vencido hace {m['days_overdue']} días",
+                                                                color=ft.colors.WHITE,
+                                                                weight=ft.FontWeight.BOLD,
+                                                                size=12
+                                                            ),
+                                                            bgcolor=ft.colors.RED_700,
+                                                            padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                                                            border_radius=20
+                                                        )
+                                                    ],
+                                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                                                 ),
-                                                ft.Text(
-                                                    f"Último pago: {m['last_payment_date'].strftime('%d/%m/%Y')}",
-                                                    size=14,
-                                                    color=ft.colors.GREY_700
-                                                ),
+                                                
+                                                # Línea separadora
                                                 ft.Container(
-                                                    content=ft.Text(
-                                                        f"Vencido hace {m['days_overdue']} días",
-                                                        color=ft.colors.WHITE,
-                                                        weight=ft.FontWeight.BOLD
-                                                    ),
-                                                    bgcolor=ft.colors.RED_700,
-                                                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
-                                                    border_radius=5
+                                                    content=ft.Divider(height=1, color=ft.colors.GREY_300),
+                                                    margin=ft.margin.symmetric(vertical=10)
+                                                ),
+                                                
+                                                # Detalles del pago
+                                                ft.Row(
+                                                    controls=[
+                                                        ft.Column(
+                                                            controls=[
+                                                                ft.Text(
+                                                                    "Último Pago",
+                                                                    size=12,
+                                                                    color=ft.colors.GREY_600
+                                                                ),
+                                                                ft.Text(
+                                                                    m['last_payment_date'].strftime("%d/%m/%Y"),
+                                                                    size=14,
+                                                                    weight=ft.FontWeight.BOLD
+                                                                )
+                                                            ],
+                                                            spacing=2
+                                                        ),
+                                                        ft.Column(
+                                                            controls=[
+                                                                ft.Text(
+                                                                    "Monto",
+                                                                    size=12,
+                                                                    color=ft.colors.GREY_600
+                                                                ),
+                                                                ft.Text(
+                                                                    f"${m['last_payment_amount']:,.2f}",
+                                                                    size=14,
+                                                                    weight=ft.FontWeight.BOLD
+                                                                )
+                                                            ],
+                                                            spacing=2
+                                                        ),
+                                                        ft.Column(
+                                                            controls=[
+                                                                ft.Text(
+                                                                    "Método",
+                                                                    size=12,
+                                                                    color=ft.colors.GREY_600
+                                                                ),
+                                                                ft.Text(
+                                                                    m['payment_method'],
+                                                                    size=14,
+                                                                    weight=ft.FontWeight.BOLD
+                                                                )
+                                                            ],
+                                                            spacing=2
+                                                        )
+                                                    ],
+                                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN
                                                 )
                                             ],
-                                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+                                            spacing=5
                                         ),
                                         border=ft.border.all(1, ft.colors.GREY_300),
-                                        border_radius=8,
-                                        padding=10,
-                                        margin=ft.margin.only(bottom=5)
+                                        border_radius=12,
+                                        padding=15,
+                                        bgcolor=ft.colors.WHITE,
+                                        shadow=ft.BoxShadow(
+                                            spread_radius=1,
+                                            blur_radius=10,
+                                            color=ft.colors.GREY_300,
+                                        ),
+                                        margin=ft.margin.only(bottom=10)
                                     ) for m in overdue_members
                                 ],
                                 scroll=ft.ScrollMode.AUTO,
-                                height=200
+                                height=300
                             ),
                             margin=ft.margin.only(top=10, bottom=10)
                         ),
-                        ft.Text(
-                            "Por favor, contacte a estos miembros para regularizar sus pagos.",
-                            size=14,
-                            color=ft.colors.GREY_700
+                        
+                        # Pie de página
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Text(
+                                        "Acción Requerida",
+                                        size=16,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.colors.BLUE_900
+                                    ),
+                                    ft.Text(
+                                        "Por favor, contacte a estos miembros para regularizar sus pagos lo antes posible.",
+                                        size=14,
+                                        color=ft.colors.GREY_700
+                                    )
+                                ],
+                                spacing=5,
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER
+                            ),
+                            padding=ft.padding.symmetric(vertical=10),
+                            bgcolor=ft.colors.BLUE_50,
+                            border_radius=8
                         )
                     ],
-                    spacing=10
+                    spacing=10,
+                    width=600
                 )
 
                 # Crear el diálogo de alerta
                 self.overdue_alert = ft.AlertDialog(
-                    title=ft.Text("Pagos Vencidos", size=24, weight=ft.FontWeight.BOLD),
+                    title=None,  # Quitamos el título por defecto
                     content=alert_content,
                     actions=[
                         ft.ElevatedButton(
                             "Entendido",
+                            icon=ft.icons.CHECK_CIRCLE,
                             on_click=self.close_overdue_alert,
                             style=ft.ButtonStyle(
                                 bgcolor=ft.colors.BLUE_900,
