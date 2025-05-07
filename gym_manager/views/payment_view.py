@@ -16,6 +16,7 @@ class PaymentsView:
         self.db_session = db_session
         self.setup_payment_view()
         self.load_data()
+        self.export_type = None  # Agregar variable para el tipo de exportación
 
     def setup_payment_view(self):
         # Título amigable arriba de los filtros, en negro y bien arriba
@@ -424,7 +425,7 @@ class PaymentsView:
         self.export_dialog = ft.AlertDialog(
             title=ft.Text("Confirmar Exportación", size=22, weight=ft.FontWeight.BOLD),
             content=ft.Text(
-                "¿Deseas exportar los pagos a Excel?\n"
+                "¿Deseas exportar los pagos?\n"
                 "El archivo se guardará en tu carpeta de Descargas.",
                 size=16
             ),
@@ -962,6 +963,8 @@ class PaymentsView:
         Exporta los pagos actuales a un archivo Excel
         """
         try:
+            self.export_type = "excel"  # Establecer tipo de exportación
+            
             # Obtener los pagos filtrados actuales
             filters = {}
             
@@ -1002,20 +1005,14 @@ class PaymentsView:
         except Exception as e:
             self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
 
-    def close_export_dialog(self, e):
+    def export_to_pdf(self, e):
         """
-        Cierra el diálogo de exportación
-        """
-        self.export_dialog.open = False
-        self.page.update()
-
-    def confirm_export(self, e):
-        """
-        Confirma la exportación y genera el archivo Excel
+        Exporta los pagos actuales a un archivo PDF
         """
         try:
-            # Obtener la ruta de la carpeta de descargas
-            downloads_path = str(Path.home() / "Downloads")
+            print("Iniciando exportación a PDF...")  # Debug
+            self.export_type = "pdf"  # Establecer tipo de exportación
+            print(f"Tipo de exportación establecido: {self.export_type}")  # Debug
             
             # Obtener los pagos filtrados actuales
             filters = {}
@@ -1042,107 +1039,322 @@ class PaymentsView:
             # Filtrar por estado aquí también para asegurarnos
             if 'estado' in filters:
                 payments = [p for p in payments if p.estado == filters['estado']]
+            
+            print(f"Número de pagos a exportar: {len(payments)}")  # Debug
+            
+            if not payments:
+                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
+                return
 
-            # Crear un nuevo libro de Excel
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Pagos"
+            # Actualizar el contenido del diálogo con el número de pagos
+            self.export_dialog.content.value = f"¿Deseas exportar {len(payments)} pagos a PDF?\nEl archivo se guardará en tu carpeta de Descargas."
+            
+            # Guardar los pagos en una variable de instancia para usarla en confirm_export
+            self.payments_to_export = payments
+            
+            # Mostrar el diálogo
+            self.export_dialog.open = True
+            self.page.update()
 
-            # Estilos
-            header_font = Font(bold=True, size=12, color="FFFFFF")
-            header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-            header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
-            money_format = '#,##0.00'
-            date_format = 'dd/mm/yyyy'
+        except Exception as e:
+            print(f"Error en export_to_pdf: {str(e)}")  # Debug
+            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
 
-            # Configurar ancho de columnas
-            ws.column_dimensions['A'].width = 30  # Miembro
-            ws.column_dimensions['B'].width = 15  # Fecha
-            ws.column_dimensions['C'].width = 15  # Monto
-            ws.column_dimensions['D'].width = 20  # Método
-            ws.column_dimensions['E'].width = 30  # Observaciones
-            ws.column_dimensions['F'].width = 15  # Estado
+    def confirm_export(self, e):
+        """
+        Confirma la exportación y genera el archivo
+        """
+        try:
+            print("Iniciando confirmación de exportación...")  # Debug
+            print(f"Tipo de exportación actual: {self.export_type}")  # Debug
+            
+            # Obtener la ruta de la carpeta de descargas
+            downloads_path = str(Path.home() / "Downloads")
+            print(f"Ruta de descargas: {downloads_path}")  # Debug
 
-            # Escribir encabezados
-            headers = ["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=1, column=col)
-                cell.value = header
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = header_alignment
-                cell.border = border
+            # Usar los pagos guardados en export_to_pdf
+            payments = getattr(self, 'payments_to_export', [])
+            if not payments:
+                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
+                return
 
-            # Escribir datos
-            for row, payment in enumerate(payments, 2):
-                # Miembro
-                cell = ws.cell(row=row, column=1)
-                cell.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
-                cell.border = border
-                cell.alignment = Alignment(horizontal='left', vertical='center')
+            print(f"Número de pagos a exportar: {len(payments)}")  # Debug
 
-                # Fecha
-                cell = ws.cell(row=row, column=2)
-                cell.value = payment.fecha_pago
-                cell.number_format = date_format
-                cell.border = border
-                cell.alignment = Alignment(horizontal='center', vertical='center')
+            # Determinar el tipo de exportación
+            if self.export_type == "excel":
+                print("Exportando a Excel...")  # Debug
+                self._export_to_excel(payments, downloads_path)
+            elif self.export_type == "pdf":
+                print("Exportando a PDF...")  # Debug
+                self._export_to_pdf(payments, downloads_path)
+            else:
+                print(f"Error: Tipo de exportación no válido: {self.export_type}")  # Debug
+                self.show_message("Error: Tipo de exportación no válido", ft.colors.RED)
+                return
 
-                # Monto
-                cell = ws.cell(row=row, column=3)
-                cell.value = payment.monto
-                cell.number_format = money_format
-                cell.border = border
-                cell.alignment = Alignment(horizontal='right', vertical='center')
-
-                # Método
-                cell = ws.cell(row=row, column=4)
-                cell.value = payment.metodo_pago.descripcion
-                cell.border = border
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-
-                # Observaciones
-                cell = ws.cell(row=row, column=5)
-                cell.value = payment.referencia if payment.referencia else ""
-                cell.border = border
-                cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
-
-                # Estado
-                cell = ws.cell(row=row, column=6)
-                cell.value = "Pagado" if payment.estado == 1 else "Cancelado"
-                cell.border = border
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-                
-                # Color de fondo según estado
-                if payment.estado == 1:
-                    cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-                else:
-                    cell.fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")
-
-            # Congelar la primera fila
-            ws.freeze_panes = 'A2'
-
-            # Generar nombre del archivo
-            filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            filepath = os.path.join(downloads_path, filename)
-
-            # Guardar archivo
-            wb.save(filepath)
+            # Limpiar los pagos guardados
+            self.payments_to_export = None
 
             # Cerrar el diálogo de confirmación
             self.close_export_dialog(e)
 
-            # Mostrar mensaje de éxito
-            self.show_message(f"Archivo Excel guardado en: {filepath}", ft.colors.GREEN)
-
         except Exception as e:
+            print(f"Error en confirm_export: {str(e)}")  # Debug
             self.show_message(f"Error al exportar: {str(e)}", ft.colors.RED)
 
-    def export_to_pdf(self, e):
-        self.show_message("Función de exportar a PDF en desarrollo", ft.colors.BLUE)
+    def close_export_dialog(self, e):
+        """
+        Cierra el diálogo de exportación
+        """
+        self.export_dialog.open = False
+        self.export_type = None  # Resetear el tipo de exportación
+        self.page.update()
+
+    def _export_to_excel(self, payments, downloads_path):
+        """
+        Exporta los pagos a Excel
+        """
+        # Crear un nuevo libro de Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Pagos"
+
+        # Estilos
+        header_font = Font(bold=True, size=12, color="FFFFFF")
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        money_format = '#,##0.00'
+        date_format = 'dd/mm/yyyy'
+
+        # Configurar ancho de columnas
+        ws.column_dimensions['A'].width = 30  # Miembro
+        ws.column_dimensions['B'].width = 15  # Fecha
+        ws.column_dimensions['C'].width = 15  # Monto
+        ws.column_dimensions['D'].width = 20  # Método
+        ws.column_dimensions['E'].width = 30  # Observaciones
+        ws.column_dimensions['F'].width = 15  # Estado
+
+        # Escribir encabezados
+        headers = ["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = border
+
+        # Escribir datos
+        for row, payment in enumerate(payments, 2):
+            # Miembro
+            cell = ws.cell(row=row, column=1)
+            cell.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # Fecha
+            cell = ws.cell(row=row, column=2)
+            cell.value = payment.fecha_pago
+            cell.number_format = date_format
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Monto
+            cell = ws.cell(row=row, column=3)
+            cell.value = payment.monto
+            cell.number_format = money_format
+            cell.border = border
+            cell.alignment = Alignment(horizontal='right', vertical='center')
+
+            # Método
+            cell = ws.cell(row=row, column=4)
+            cell.value = payment.metodo_pago.descripcion
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Observaciones
+            cell = ws.cell(row=row, column=5)
+            cell.value = payment.referencia if payment.referencia else ""
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+            # Estado
+            cell = ws.cell(row=row, column=6)
+            cell.value = "Pagado" if payment.estado == 1 else "Cancelado"
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            # Color de fondo según estado
+            if payment.estado == 1:
+                cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            else:
+                cell.fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")
+
+        # Congelar la primera fila
+        ws.freeze_panes = 'A2'
+
+        # Generar nombre del archivo
+        filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filepath = os.path.join(downloads_path, filename)
+
+        # Guardar archivo
+        wb.save(filepath)
+
+        # Mostrar mensaje de éxito
+        self.show_message(f"Archivo Excel guardado en: {filepath}", ft.colors.GREEN)
+
+    def _export_to_pdf(self, payments, downloads_path):
+        """
+        Exporta los pagos a PDF
+        """
+        try:
+            print("Iniciando generación de PDF...")  # Debug
+            try:
+                from reportlab.lib import colors
+                from reportlab.lib.pagesizes import letter, landscape
+                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.lib.units import inch
+                from reportlab.pdfbase import pdfmetrics
+                from reportlab.pdfbase.ttfonts import TTFont
+            except ImportError as e:
+                print(f"Error al importar reportlab: {str(e)}")  # Debug
+                self.show_message("Error: No se pudo importar la biblioteca reportlab. Por favor, asegúrese de que está instalada correctamente.", ft.colors.RED)
+                return
+
+            # Generar nombre del archivo
+            filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(downloads_path, filename)
+            print(f"Ruta del archivo PDF: {filepath}")  # Debug
+
+            # Crear el documento PDF
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=landscape(letter),
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+
+            # Estilos
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                alignment=1  # Centrado
+            )
+
+            # Contenido del PDF
+            elements = []
+
+            # Título
+            title = Paragraph("Reporte de Pagos", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 20))
+
+            # Información de filtros aplicados
+            filter_info = []
+            if self.search_field.value:
+                filter_info.append(f"Miembro: {self.search_field.value}")
+            if self.date_from.value:
+                filter_info.append(f"Desde: {self.date_from.value.strftime('%d/%m/%Y')}")
+            if self.date_to.value:
+                filter_info.append(f"Hasta: {self.date_to.value.strftime('%d/%m/%Y')}")
+            if self.payment_method.value and self.payment_method.value != "Todos":
+                filter_info.append(f"Método: {self.payment_method.value}")
+            if self.status_filter.value != "Todos":
+                filter_info.append(f"Estado: {self.status_filter.value}")
+
+            if filter_info:
+                filter_text = " | ".join(filter_info)
+                filter_paragraph = Paragraph(f"Filtros aplicados: {filter_text}", styles["Normal"])
+                elements.append(filter_paragraph)
+                elements.append(Spacer(1, 20))
+
+            # Datos de la tabla
+            data = [["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]]
+            
+            for payment in payments:
+                data.append([
+                    f"{payment.miembro.nombre} {payment.miembro.apellido}",
+                    payment.fecha_pago.strftime("%d/%m/%Y"),
+                    f"${payment.monto:,.2f}",
+                    payment.metodo_pago.descripcion,
+                    payment.referencia if payment.referencia else "",
+                    "Pagado" if payment.estado == 1 else "Cancelado"
+                ])
+
+            # Crear la tabla
+            table = Table(data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.5*inch, 2.5*inch, 1.2*inch])
+            
+            # Estilo de la tabla
+            table_style = TableStyle([
+                # Encabezados
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                
+                # Alineación específica
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Miembro
+                ('ALIGN', (2, 1), (2, -1), 'RIGHT'),  # Monto
+                ('ALIGN', (4, 1), (4, -1), 'LEFT'),  # Observaciones
+            ])
+
+            # Agregar colores de fondo según estado
+            for i, payment in enumerate(payments, 1):
+                if payment.estado == 1:
+                    table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#E2EFDA'))
+                else:
+                    table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#FFD9D9'))
+
+            table.setStyle(table_style)
+            elements.append(table)
+
+            # Pie de página con fecha y hora
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(footer)
+
+            # Generar el PDF
+            print("Construyendo PDF...")  # Debug
+            doc.build(elements)
+            print("PDF generado exitosamente")  # Debug
+
+            # Mostrar mensaje de éxito
+            self.show_message(f"Archivo PDF guardado en: {filepath}", ft.colors.GREEN)
+
+        except Exception as e:
+            print(f"Error en _export_to_pdf: {str(e)}")  # Debug
+            self.show_message(f"Error al generar PDF: {str(e)}", ft.colors.RED)
+            raise  # Re-lanzar la excepción para ver el error completo
