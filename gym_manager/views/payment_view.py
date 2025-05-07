@@ -458,6 +458,44 @@ class PaymentsView:
         )
         self.page.overlay.append(self.export_dialog)
 
+        # Modal de confirmación de comprobante
+        self.receipt_confirm_modal = ft.AlertDialog(
+            title=ft.Text("Generar Comprobante", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Text(
+                "¿Deseas generar el comprobante de pago?\n"
+                "El archivo se guardará en tu carpeta de Descargas.",
+                size=16
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.close_receipt_modal,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.WHITE,
+                        color=ft.colors.BLACK87,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+                ft.ElevatedButton(
+                    "Generar",
+                    on_click=self.confirm_generate_receipt,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE_900,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.receipt_confirm_modal)
+        self.selected_payment_for_receipt = None
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
@@ -819,10 +857,185 @@ class PaymentsView:
 
     def generate_receipt(self, payment):
         """
-        Genera un comprobante de pago
+        Prepara la generación del comprobante de pago
         """
-        # TODO: Implementar generación de comprobante
-        self.show_message("Función en desarrollo", ft.colors.ORANGE)
+        self.selected_payment_for_receipt = payment
+        self.receipt_confirm_modal.open = True
+        self.page.update()
+
+    def close_receipt_modal(self, e):
+        """
+        Cierra el modal de confirmación del comprobante
+        """
+        self.receipt_confirm_modal.open = False
+        self.selected_payment_for_receipt = None
+        self.page.update()
+
+    def confirm_generate_receipt(self, e):
+        """
+        Confirma la generación del comprobante
+        """
+        if not self.selected_payment_for_receipt:
+            self.show_message("No hay pago seleccionado", ft.colors.RED)
+            return
+
+        try:
+            print("Iniciando generación de comprobante...")  # Debug
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.ttfonts import TTFont
+
+            # Generar nombre del archivo
+            downloads_path = str(Path.home() / "Downloads")
+            filename = f"comprobante_pago_{self.selected_payment_for_receipt.id_pago}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(downloads_path, filename)
+            print(f"Ruta del comprobante: {filepath}")  # Debug
+
+            # Crear el documento PDF
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=letter,
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+
+            # Estilos
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=28,
+                spaceAfter=30,
+                alignment=1,  # Centrado
+                textColor=colors.HexColor('#1F4E78')
+            )
+            subtitle_style = ParagraphStyle(
+                'Subtitle',
+                parent=styles['Normal'],
+                fontSize=16,
+                spaceAfter=12,
+                alignment=1,
+                textColor=colors.HexColor('#1F4E78')
+            )
+            normal_style = styles['Normal']
+            bold_style = ParagraphStyle(
+                'Bold',
+                parent=styles['Normal'],
+                fontSize=12,
+                fontName='Helvetica-Bold',
+                textColor=colors.HexColor('#1F4E78')
+            )
+            value_style = ParagraphStyle(
+                'Value',
+                parent=styles['Normal'],
+                fontSize=12,
+                textColor=colors.black
+            )
+
+            # Contenido del PDF
+            elements = []
+
+            # Título con línea decorativa
+            title = Paragraph("COMPROBANTE DE PAGO", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 10))
+            
+            # Línea decorativa
+            line = Table([['']], colWidths=[7*inch])
+            line_style = TableStyle([
+                ('LINEBELOW', (0, 0), (0, 0), 2, colors.HexColor('#1F4E78')),
+                ('TOPPADDING', (0, 0), (0, 0), 5),
+                ('BOTTOMPADDING', (0, 0), (0, 0), 5),
+            ])
+            line.setStyle(line_style)
+            elements.append(line)
+            elements.append(Spacer(1, 20))
+
+            # Número de comprobante
+            receipt_number = Paragraph(f"N° {self.selected_payment_for_receipt.id_pago:06d}", subtitle_style)
+            elements.append(receipt_number)
+            elements.append(Spacer(1, 30))
+
+            # Información del pago con diseño mejorado
+            payment_info = [
+                ["Fecha:", self.selected_payment_for_receipt.fecha_pago.strftime("%d/%m/%Y")],
+                ["Miembro:", f"{self.selected_payment_for_receipt.miembro.nombre} {self.selected_payment_for_receipt.miembro.apellido}"],
+                ["Documento:", self.selected_payment_for_receipt.miembro.documento],
+                ["Método de Pago:", self.selected_payment_for_receipt.metodo_pago.descripcion],
+                ["Monto:", f"${self.selected_payment_for_receipt.monto:,.2f}"],
+                ["Estado:", "PAGADO" if self.selected_payment_for_receipt.estado == 1 else "CANCELADO"]
+            ]
+
+            # Crear tabla de información con estilo mejorado
+            table = Table(payment_info, colWidths=[2*inch, 4*inch])
+            table_style = TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1F4E78')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
+                ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+            ])
+            table.setStyle(table_style)
+            elements.append(table)
+            elements.append(Spacer(1, 30))
+
+            # Observaciones si existen
+            if self.selected_payment_for_receipt.referencia:
+                elements.append(Paragraph("Observaciones:", bold_style))
+                elements.append(Spacer(1, 5))
+                elements.append(Paragraph(self.selected_payment_for_receipt.referencia, value_style))
+                elements.append(Spacer(1, 30))
+
+            # Línea decorativa
+            line = Table([['']], colWidths=[7*inch])
+            line_style = TableStyle([
+                ('LINEBELOW', (0, 0), (0, 0), 1, colors.HexColor('#E0E0E0')),
+                ('TOPPADDING', (0, 0), (0, 0), 5),
+                ('BOTTOMPADDING', (0, 0), (0, 0), 5),
+            ])
+            line.setStyle(line_style)
+            elements.append(line)
+            elements.append(Spacer(1, 20))
+
+            # Pie de página con fecha y hora
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Comprobante generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(footer)
+
+            # Generar el PDF
+            print("Construyendo comprobante...")  # Debug
+            doc.build(elements)
+            print("Comprobante generado exitosamente")  # Debug
+
+            # Mostrar mensaje de éxito
+            self.show_message(f"Comprobante guardado en: {filepath}", ft.colors.GREEN)
+            
+            # Cerrar el modal
+            self.close_receipt_modal(e)
+
+        except Exception as e:
+            print(f"Error al generar comprobante: {str(e)}")  # Debug
+            self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
+            self.close_receipt_modal(e)
 
     def search_member(self, e):
         """
