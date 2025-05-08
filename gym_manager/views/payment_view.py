@@ -1331,12 +1331,13 @@ class PaymentsView:
 
         # Verificar si el monto coincide con la cuota mensual
         current_fee = self.monthly_fee_controller.get_current_fee()
-        if current_fee and float(self.new_payment_amount_field.value) != current_fee.monto:
-            self.show_message(
-                f"El monto debe ser igual a la cuota mensual (${current_fee.monto:,.2f})",
-                ft.colors.ORANGE
-            )
-            return
+        if current_fee:
+            # Mostrar advertencia si el monto es diferente, pero permitir continuar
+            if float(self.new_payment_amount_field.value) != current_fee.monto:
+                self.show_message(
+                    f"Advertencia: El monto ingresado (${float(self.new_payment_amount_field.value):,.2f}) es diferente a la cuota mensual (${current_fee.monto:,.2f})",
+                    ft.colors.ORANGE
+                )
 
         payment_data = {
             'fecha_pago': self.new_payment_date_value,
