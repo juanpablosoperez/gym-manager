@@ -247,7 +247,17 @@ class PaymentsView:
             border_radius=8,
             width=500,
             value="0.00",
+            on_change=self.validate_payment_amount
         )
+        
+        # Mensaje de advertencia para el monto
+        self.amount_warning_text = ft.Text(
+            "",
+            color=ft.colors.RED,
+            size=12,
+            visible=False
+        )
+
         self.new_payment_method_field = ft.Dropdown(
             label="Método de pago",
             options=[
@@ -280,6 +290,7 @@ class PaymentsView:
                     self.new_payment_date_field,
                     ft.Text("Monto", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_amount_field,
+                    self.amount_warning_text,  # Agregar el mensaje de advertencia aquí
                     ft.Text("Método de pago", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_method_field,
                     ft.Text("Observaciones", size=16, weight=ft.FontWeight.BOLD),
@@ -404,7 +415,7 @@ class PaymentsView:
         # Modal de confirmación de borrado
         self.delete_confirm_modal = ft.AlertDialog(
             title=ft.Text("Confirmar Cancelación", size=22, weight=ft.FontWeight.BOLD),
-            content=ft.Text("¿Estás seguro que deseas cancelar este pago? El pago cancelado no se mostrará más en la lista, pero puedes recuperarlo desde la base de datos si es necesario.", size=16),
+            content=ft.Text("¿Estás seguro que deseas cancelar este pago? El pago cancelado no se mostrará más en la lista.", size=16),
             actions=[
                 ft.TextButton("Cancelar", on_click=self.close_delete_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD))),
                 ft.ElevatedButton(
@@ -821,6 +832,7 @@ class PaymentsView:
         self.new_payment_date_picker.value = None
         self.new_payment_date_field.content.controls[0].value = "Seleccionar fecha"
         self.new_payment_amount_field.value = "0.00"
+        self.amount_warning_text.visible = False  # Ocultar el mensaje al cerrar
         self.new_payment_method_field.value = None
         self.new_payment_observations_field.value = ""
         self.new_payment_observations_field.height = 100
@@ -1366,6 +1378,9 @@ class PaymentsView:
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message),
             bgcolor=color,
+            duration=5000 if color == ft.colors.ORANGE else 3000,  # 5 segundos para advertencias, 3 para otros mensajes
+            action="OK",
+            action_color=ft.colors.WHITE
         )
         self.page.snack_bar.open = True
         self.page.update()
@@ -2087,3 +2102,22 @@ class PaymentsView:
         value = self.edit_fee_date_picker.value.strftime("%d/%m/%Y") if self.edit_fee_date_picker.value else "Seleccionar fecha"
         self.edit_fee_date_field.content.controls[0].value = value
         self.page.update()
+
+    def validate_payment_amount(self, e):
+        """
+        Valida el monto ingresado contra la cuota mensual
+        """
+        try:
+            amount = float(self.new_payment_amount_field.value)
+            current_fee = self.monthly_fee_controller.get_current_fee()
+            
+            if current_fee and amount != current_fee.monto:
+                self.amount_warning_text.value = f"Advertencia: El monto ingresado (${amount:,.2f}) es diferente a la cuota mensual (${current_fee.monto:,.2f})"
+                self.amount_warning_text.visible = True
+            else:
+                self.amount_warning_text.visible = False
+                
+            self.page.update()
+        except ValueError:
+            self.amount_warning_text.visible = False
+            self.page.update()
