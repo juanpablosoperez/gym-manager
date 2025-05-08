@@ -560,19 +560,102 @@ class PaymentsView:
             value=str(self.monthly_fee_controller.get_current_fee().monto) if self.monthly_fee_controller.get_current_fee() else "0.00"
         )
 
-        self.edit_fee_modal = ft.AlertDialog(
-            title=ft.Text("Editar Cuota Mensual", size=24, weight=ft.FontWeight.BOLD),
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        "Ingrese el nuevo monto de la cuota mensual:",
+        # DatePicker para la fecha de actualización
+        self.edit_fee_date_picker = ft.DatePicker(
+            first_date=datetime(2024, 1, 1),
+            last_date=datetime(2025, 12, 31),
+            on_change=self.on_edit_fee_date_change
+        )
+        self.page.overlay.append(self.edit_fee_date_picker)
+        self.edit_fee_date_value = None
+        self.edit_fee_date_field = ft.Container(
+            content=ft.Row([
+                ft.Text(self.edit_fee_date_value.strftime("%d/%m/%Y") if self.edit_fee_date_value else "Seleccionar fecha",
                         size=16,
-                        color=ft.colors.GREY_700
-                    ),
-                    self.edit_fee_field
-                ],
-                spacing=20,
-                width=400
+                        color=ft.colors.BLACK54),
+                ft.Icon(ft.icons.CALENDAR_TODAY, size=20, color=ft.colors.GREY_700),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            border=ft.border.all(1, ft.colors.GREY_300),
+            border_radius=8,
+            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            width=300,
+            on_click=lambda e: self.open_date_picker(self.edit_fee_date_picker),
+            bgcolor=ft.colors.GREY_100,
+            tooltip="Seleccionar fecha",
+        )
+
+        self.edit_fee_modal = ft.AlertDialog(
+            title=ft.Container(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(
+                            name=ft.icons.ATTACH_MONEY,
+                            color=ft.colors.BLUE_900,
+                            size=32
+                        ),
+                        ft.Text(
+                            "Editar Cuota Mensual",
+                            size=24,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.colors.BLUE_900
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=10
+                ),
+                padding=ft.padding.only(bottom=20)
+            ),
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Text(
+                                        "Monto Actual",
+                                        size=14,
+                                        color=ft.colors.GREY_700
+                                    ),
+                                    ft.Text(
+                                        f"${self.monthly_fee_controller.get_current_fee().monto:,.2f}" if self.monthly_fee_controller.get_current_fee() else "$0.00",
+                                        size=24,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.colors.BLUE_900
+                                    ),
+                                    ft.Text(
+                                        f"Última actualización: {self.monthly_fee_controller.get_current_fee().fecha_actualizacion.strftime('%d/%m/%Y')}" if self.monthly_fee_controller.get_current_fee() else "No hay fecha de actualización",
+                                        size=12,
+                                        color=ft.colors.GREY_600
+                                    )
+                                ],
+                                spacing=2,
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER
+                            ),
+                            padding=ft.padding.only(bottom=20)
+                        ),
+                        ft.Container(
+                            content=ft.Divider(height=1, color=ft.colors.GREY_300),
+                            margin=ft.margin.only(bottom=20)
+                        ),
+                        ft.Text(
+                            "Nuevo Monto",
+                            size=16,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.colors.BLUE_900
+                        ),
+                        self.edit_fee_field,
+                    ],
+                    spacing=15,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER
+                ),
+                padding=20,
+                bgcolor=ft.colors.WHITE,
+                border_radius=12,
+                shadow=ft.BoxShadow(
+                    spread_radius=1,
+                    blur_radius=10,
+                    color=ft.colors.GREY_300,
+                )
             ),
             actions=[
                 ft.TextButton(
@@ -1994,3 +2077,12 @@ class PaymentsView:
                 self.show_message(message, ft.colors.RED)
         except ValueError:
             self.show_message("Por favor, ingrese un monto válido", ft.colors.RED)
+
+    def on_edit_fee_date_change(self, e):
+        """
+        Maneja el cambio de fecha en el selector de fecha de la cuota mensual
+        """
+        self.edit_fee_date_value = self.edit_fee_date_picker.value
+        value = self.edit_fee_date_picker.value.strftime("%d/%m/%Y") if self.edit_fee_date_picker.value else "Seleccionar fecha"
+        self.edit_fee_date_field.content.controls[0].value = value
+        self.page.update()
