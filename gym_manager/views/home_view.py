@@ -115,6 +115,9 @@ class HomeView:
         )
 
     def handle_route_change(self, index: int):
+        # Limpiar el contenido actual
+        self.main_content.content = None
+        
         # Título de sección según el índice
         if index == 0:  # Dashboard
             self.section_title = "Dashboard"
@@ -134,6 +137,7 @@ class HomeView:
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
+            self.page.update()
         elif index == 3:  # Informes y Estadísticas
             self.section_title = "Informes y Estadísticas"
             view = ReportsView(self.page)
@@ -150,7 +154,7 @@ class HomeView:
             self.section_title = "Gestión de Backups"
             view = BackupsView(self.page)
             self.main_content.content = view.get_content()
-
+        
         # Actualizar el header con el nuevo título
         self.header = create_header(
             page=self.page,
@@ -159,9 +163,10 @@ class HomeView:
             on_logout=self.logout,
             section_title=self.section_title
         )
-
-        # Actualizar la página
-        self.page.controls = [
+        
+        # Reconstruir la interfaz
+        self.page.controls.clear()
+        self.page.add(
             ft.Column(
                 controls=[
                     self.header,
@@ -177,7 +182,7 @@ class HomeView:
                 spacing=0,
                 expand=True,
             )
-        ]
+        )
         self.page.update()
 
     def show_message(self, message: str, color: str):
