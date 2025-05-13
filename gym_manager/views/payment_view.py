@@ -258,13 +258,10 @@ class PaymentsView:
             visible=False
         )
 
+        # Actualizar el dropdown de métodos de pago para que cargue los métodos activos
         self.new_payment_method_field = ft.Dropdown(
             label="Método de pago",
-            options=[
-                ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Transferencia bancaria"),
-                ft.dropdown.Option("Tarjeta de crédito")
-            ],
+            options=[],  # Se llenará dinámicamente
             border_radius=8,
             width=500,
             hint_text="Seleccionar método",
@@ -356,11 +353,7 @@ class PaymentsView:
         )
         self.edit_payment_method_field = ft.Dropdown(
             label="Método de pago",
-            options=[
-                ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Transferencia bancaria"),
-                ft.dropdown.Option("Tarjeta de crédito")
-            ],
+            options=[],  # Se llenará dinámicamente
             border_radius=8,
             width=500,
             hint_text="Seleccionar método",
@@ -843,8 +836,24 @@ class PaymentsView:
         """
         Carga los datos iniciales de la vista
         """
+        # Cargar pagos
         payments = [p for p in self.payment_controller.get_payments() if p.estado == 1]
         self.update_payments_table(payments)
+
+        # Cargar métodos de pago activos
+        active_payment_methods = self.db_session.query(MetodoPago).filter_by(estado=True).all()
+        self.new_payment_method_field.options = [
+            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+        ]
+        self.edit_payment_method_field.options = [
+            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+        ]
+        self.payment_method.options = [
+            ft.dropdown.Option("Todos")
+        ] + [
+            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+        ]
+        self.page.update()
 
     def update_payments_table(self, payments):
         """
