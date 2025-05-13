@@ -33,9 +33,6 @@ def navigate_to_login(page: ft.Page):
     LoginView(page, auth_controller)
 
 def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
-    # Importar aquí para evitar circular import
-    from gym_manager.views.home_view import HomeView
-    
     # Limpiar la página actual
     page.clean()
     
@@ -48,5 +45,13 @@ def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
     page.window_resizable = True
     page.update()
     
-    # Crear y mostrar vista de home
-    HomeView(page, user_rol, user_name) 
+    try:
+        # Importar aquí para evitar circular import
+        from gym_manager.views.home_view import HomeView
+        # Crear y mostrar vista de home
+        HomeView(page, user_rol, user_name)
+    except ImportError as e:
+        print(f"Error al importar HomeView: {e}")
+        # Mostrar mensaje de error en la página
+        page.add(ft.Text("Error al cargar la vista principal", color=ft.colors.RED))
+        page.update() 
