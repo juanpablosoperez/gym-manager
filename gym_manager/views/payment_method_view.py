@@ -19,6 +19,57 @@ class PaymentMethodView:
             text_align=ft.TextAlign.LEFT,
         )
 
+        # Tarjeta del método más utilizado
+        self.most_used_card = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Icon(
+                                name=ft.icons.STAR,
+                                color=ft.colors.AMBER_700,
+                                size=32
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(
+                                        "Método más Utilizado",
+                                        size=16,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.colors.AMBER_700
+                                    ),
+                                    ft.Text(
+                                        "N/A",  # Se actualizará dinámicamente
+                                        size=18,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=ft.colors.AMBER_700
+                                    ),
+                                    ft.Text(
+                                        "0 pagos",  # Se actualizará dinámicamente
+                                        size=14,
+                                        color=ft.colors.GREY_600
+                                    )
+                                ],
+                                spacing=2
+                            )
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        spacing=10
+                    )
+                ],
+                spacing=5,
+            ),
+            padding=20,
+            border_radius=12,
+            bgcolor=ft.colors.WHITE,
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=10,
+                color=ft.colors.GREY_300,
+            ),
+            width=300
+        )
+
         # Botón Agregar Método de Pago
         self.new_method_btn = ft.ElevatedButton(
             text="Agregar Método de Pago",
@@ -253,9 +304,9 @@ class PaymentMethodView:
                 controls=[
                     ft.Container(
                         content=self.welcome_title,
-                        padding=ft.padding.only(bottom=30, top=0, left=10, right=10),
+                        padding=ft.padding.only(bottom=20, top=0, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=900,
+                        width=1200,
                     ),
                     ft.Container(
                         content=ft.Row(
@@ -267,13 +318,14 @@ class PaymentMethodView:
                                             self.status_filter,
                                             self.clear_btn,
                                             self.new_method_btn,
+                                            self.most_used_card,
                                         ],
-                                        alignment=ft.MainAxisAlignment.START,
+                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                         spacing=18,
                                         expand=True,
                                     ),
-                                    padding=ft.padding.only(bottom=10, left=10),
+                                    padding=ft.padding.only(bottom=10, left=10, right=10),
                                     alignment=ft.alignment.top_left,
                                     expand=True,
                                 ),
@@ -289,15 +341,15 @@ class PaymentMethodView:
                                     content=self.methods_table,
                                     expand=True,
                                     alignment=ft.alignment.center,
-                                    padding=ft.padding.symmetric(horizontal=40),
+                                    padding=ft.padding.symmetric(horizontal=20),
                                 )
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
                             expand=True,
                         ),
                         alignment=ft.alignment.center,
-                        width=1300,
-                        padding=ft.padding.only(top=30),
+                        width=1200,
+                        padding=ft.padding.only(top=20),
                     ),
                 ],
                 spacing=0,
@@ -321,6 +373,7 @@ class PaymentMethodView:
         """
         methods = self.payment_method_controller.get_payment_methods()
         self.update_methods_table(methods)
+        self.update_stats_cards(methods)
 
     def update_methods_table(self, methods):
         """
@@ -411,6 +464,29 @@ class PaymentMethodView:
                         ]
                     )
                 )
+        self.page.update()
+
+    def update_stats_cards(self, methods):
+        """
+        Actualiza la tarjeta del método más utilizado
+        """
+        # Encontrar el método más utilizado
+        most_used_method = None
+        max_payments = 0
+        for method in methods:
+            payment_count = len(method.pagos)
+            if payment_count > max_payments:
+                max_payments = payment_count
+                most_used_method = method
+
+        # Actualizar tarjeta del método más utilizado
+        if most_used_method:
+            self.most_used_card.content.controls[0].controls[1].controls[1].value = most_used_method.descripcion
+            self.most_used_card.content.controls[0].controls[1].controls[2].value = f"{max_payments} pagos"
+        else:
+            self.most_used_card.content.controls[0].controls[1].controls[1].value = "N/A"
+            self.most_used_card.content.controls[0].controls[1].controls[2].value = "0 pagos"
+
         self.page.update()
 
     def show_new_method_modal(self, e):
@@ -546,6 +622,7 @@ class PaymentMethodView:
         
         methods = self.payment_method_controller.get_payment_methods(filters)
         self.update_methods_table(methods)
+        self.update_stats_cards(methods)
 
     def clear_filters(self, e):
         """
