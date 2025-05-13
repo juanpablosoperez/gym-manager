@@ -7,6 +7,7 @@ class PaymentMethodView:
         self.page = page
         self.payment_method_controller = PaymentMethodController(db_session)
         self.setup_payment_method_view()
+        self.setup_history_modal()
         self.load_data()
 
     def setup_payment_method_view(self):
@@ -364,6 +365,44 @@ class PaymentMethodView:
             alignment=ft.alignment.top_left,
         )
 
+    def setup_history_modal(self):
+        self.history_modal = ft.AlertDialog(
+            title=ft.Text("Historial de Uso del Método", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Column(
+                controls=[
+                    ft.Text("Cargando...", key="stats"),
+                    ft.Text("Últimos pagos", size=16, weight=ft.FontWeight.BOLD),
+                    ft.DataTable(
+                        columns=[
+                            ft.DataColumn(ft.Text("Fecha")),
+                            ft.DataColumn(ft.Text("Monto")),
+                            ft.DataColumn(ft.Text("Socio")),
+                        ],
+                        rows=[],
+                        key="pagos_table"
+                    )
+                ],
+                spacing=16,
+                width=540,
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cerrar",
+                    on_click=self.close_history_modal,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.WHITE,
+                        color=ft.colors.BLACK87,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.history_modal)
+
     def get_content(self):
         return self.content
 
@@ -424,7 +463,17 @@ class PaymentMethodView:
                 self.methods_table.rows.append(
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text(method.descripcion)),
+                            ft.DataCell(
+                                ft.Row([
+                                    ft.Text(method.descripcion),
+                                    ft.IconButton(
+                                        icon=ft.icons.HISTORY,
+                                        icon_color=ft.colors.AMBER_700,
+                                        tooltip="Ver historial de uso",
+                                        on_click=lambda e, m=method: self.show_history_modal(m)
+                                    )
+                                ], spacing=6)
+                            ),
                             ft.DataCell(
                                 ft.Container(
                                     content=ft.Text(
@@ -664,4 +713,33 @@ class PaymentMethodView:
             )
             self.load_data()
         else:
-            self.show_message(message, ft.colors.RED) 
+            self.show_message(message, ft.colors.RED)
+
+    def show_history_modal(self, method):
+        # Obtener todos los métodos para calcular el total de pagos
+        all_methods = self.payment_method_controller.get_payment_methods()
+        total_pagos = sum(len(m.pagos) for m in all_methods)
+        pagos = method.pagos[-5:] if len(method.pagos) > 0 else []
+        total_acumulado = sum(p.monto for p in method.pagos)
+        porcentaje = (len(method.pagos) / total_pagos * 100) if total_pagos > 0 else 0
+        # Actualizar contenido del modal
+        stats_text = f"Total acumulado: ${total_acumulado:,.2f} | Cantidad de pagos: {len(method.pagos)} | % del total: {porcentaje:.1f}%"
+        pagos_rows = [
+            ft.DataRow(cells=[
+                ft.DataCell(ft.Text(getattr(p, 'fecha_pago', ''))),
+                ft.DataCell(ft.Text(f"${getattr(p, 'monto', 0):,.2f}")),
+                ft.DataCell(ft.Text(getattr(p, 'socio', ''))),
+            ]) for p in pagos
+        ]
+        # Buscar los controles por key
+        for c in self.history_modal.content.controls:
+            if hasattr(c, 'key') and c.key == "stats":
+                c.value = stats_text
+            if hasattr(c, 'key') and c.key == "pagos_table":
+                c.rows = pagos_rows
+        self.history_modal.open = True
+        self.page.update()
+
+    def close_history_modal(self, e):
+        self.history_modal.open = False
+        self.page.update() 
