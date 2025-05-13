@@ -137,6 +137,7 @@ class HomeView:
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
+            self.page.update()
         elif index == 3:  # Informes y Estadísticas
             self.section_title = "Informes y Estadísticas"
             view = ReportsView(self.page)

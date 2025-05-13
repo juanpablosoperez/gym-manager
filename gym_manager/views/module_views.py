@@ -24,6 +24,7 @@ class PaymentsView(ModuleView):
         from gym_manager.views.payment_view import PaymentsView as PaymentViewImpl
         self.payment_view = PaymentViewImpl(page)
         self.content = self.payment_view.get_content()
+        self.page.update()
 
 class ReportsView(ModuleView):
     def __init__(self, page: ft.Page):

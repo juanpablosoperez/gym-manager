@@ -879,8 +879,14 @@ class PaymentsView:
                                 ),
                                 padding=40,
                                 alignment=ft.alignment.center,
-                            ),
-                        )
+                            )
+                        ),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
                     ]
                 )
             )
