@@ -1,4 +1,5 @@
 import flet as ft
+from gym_manager.views.member_view import MembersView as MembersViewImpl
 
 class ModuleView:
     def __init__(self, page: ft.Page, title: str):
@@ -12,6 +13,9 @@ class ModuleView:
 class MembersView(ModuleView):
     def __init__(self, page: ft.Page):
         super().__init__(page, "Gestión de Miembros")
+        self.members_view = MembersViewImpl(page)
+        self.content = self.members_view.get_content()
+        self.page.update()
 
 class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
