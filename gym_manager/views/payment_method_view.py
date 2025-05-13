@@ -376,7 +376,7 @@ class PaymentMethodView:
                         columns=[
                             ft.DataColumn(ft.Text("Fecha")),
                             ft.DataColumn(ft.Text("Monto")),
-                            ft.DataColumn(ft.Text("Socio")),
+                            ft.DataColumn(ft.Text("Miembro")),
                         ],
                         rows=[],
                         key="pagos_table"
@@ -464,15 +464,7 @@ class PaymentMethodView:
                     ft.DataRow(
                         cells=[
                             ft.DataCell(
-                                ft.Row([
-                                    ft.Text(method.descripcion),
-                                    ft.IconButton(
-                                        icon=ft.icons.HISTORY,
-                                        icon_color=ft.colors.AMBER_700,
-                                        tooltip="Ver historial de uso",
-                                        on_click=lambda e, m=method: self.show_history_modal(m)
-                                    )
-                                ], spacing=6)
+                                ft.Text(method.descripcion)
                             ),
                             ft.DataCell(
                                 ft.Container(
@@ -488,6 +480,12 @@ class PaymentMethodView:
                             ft.DataCell(
                                 ft.Row(
                                     controls=[
+                                        ft.IconButton(
+                                            icon=ft.icons.HISTORY,
+                                            icon_color=ft.colors.AMBER_700,
+                                            tooltip="Ver historial de uso",
+                                            on_click=lambda e, m=method: self.show_history_modal(m)
+                                        ),
                                         ft.IconButton(
                                             icon=ft.icons.EDIT,
                                             icon_color=ft.colors.BLUE,
@@ -726,9 +724,9 @@ class PaymentMethodView:
         stats_text = f"Total acumulado: ${total_acumulado:,.2f} | Cantidad de pagos: {len(method.pagos)} | % del total: {porcentaje:.1f}%"
         pagos_rows = [
             ft.DataRow(cells=[
-                ft.DataCell(ft.Text(getattr(p, 'fecha_pago', ''))),
-                ft.DataCell(ft.Text(f"${getattr(p, 'monto', 0):,.2f}")),
-                ft.DataCell(ft.Text(getattr(p, 'socio', ''))),
+                ft.DataCell(ft.Text(p.fecha_pago.strftime("%d/%m/%Y"))),
+                ft.DataCell(ft.Text(f"${p.monto:,.2f}")),
+                ft.DataCell(ft.Text(f"{p.miembro.nombre} {p.miembro.apellido}")),
             ]) for p in pagos
         ]
         # Buscar los controles por key
