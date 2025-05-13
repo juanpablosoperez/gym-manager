@@ -2,6 +2,10 @@ import flet as ft
 from gym_manager.components.header import create_header
 from gym_manager.components.sidebar import create_sidebar
 from gym_manager.utils.navigation import navigate_to_login
+from gym_manager.views.module_views import (
+    MembersView, PaymentsView, ReportsView,
+    PaymentMethodsView, UsersView, BackupsView
+)
 
 class HomeView:
     def __init__(self, page: ft.Page, user_rol: str, user_name: str = "Usuario"):
@@ -21,12 +25,16 @@ class HomeView:
         self.page.window_height = 800
         self.page.window_resizable = True
 
+        # Título de sección por defecto
+        self.section_title = "Dashboard"
+
         # Crear header
         self.header = create_header(
             page=self.page,
             user_name=self.user_name,
             user_role=self.user_rol,
-            on_logout=self.logout
+            on_logout=self.logout,
+            section_title=self.section_title
         )
 
         # Crear sidebar
@@ -107,9 +115,75 @@ class HomeView:
         )
 
     def handle_route_change(self, index: int):
-        sections = ["Dashboard", "Miembros", "Rutinas", "Pagos", "Configuración"]
-        print(f"Navegando a: {sections[index]}")
-        # Aquí se implementará la navegación a cada sección
+        # Limpiar el contenido actual
+        self.main_content.content = None
+        
+        # Título de sección según el índice
+        if index == 0:  # Dashboard
+            self.section_title = "Dashboard"
+            self.main_content.content = ft.Column(
+                controls=[
+                    ft.Text("¡Bienvenido al Sistema!", size=32, weight=ft.FontWeight.BOLD),
+                    ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
+                    ft.Container(height=20),
+                    self.create_stats_row(),
+                ],
+            )
+        elif index == 1:  # Gestión de Miembros
+            self.section_title = "Gestión de Miembros"
+            view = MembersView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 2:  # Gestión de Pagos
+            self.section_title = "Gestión de Pagos"
+            view = PaymentsView(self.page)
+            self.main_content.content = view.get_content()
+            self.page.update()
+        elif index == 3:  # Informes y Estadísticas
+            self.section_title = "Informes y Estadísticas"
+            view = ReportsView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 4:  # Métodos de Pago
+            self.section_title = "Métodos de Pago"
+            view = PaymentMethodsView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 5:  # Gestión de Usuarios
+            self.section_title = "Gestión de Usuarios"
+            view = UsersView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 6:  # Gestión de Backups
+            self.section_title = "Gestión de Backups"
+            view = BackupsView(self.page)
+            self.main_content.content = view.get_content()
+        
+        # Actualizar el header con el nuevo título
+        self.header = create_header(
+            page=self.page,
+            user_name=self.user_name,
+            user_role=self.user_rol,
+            on_logout=self.logout,
+            section_title=self.section_title
+        )
+        
+        # Reconstruir la interfaz
+        self.page.controls.clear()
+        self.page.add(
+            ft.Column(
+                controls=[
+                    self.header,
+                    ft.Row(
+                        controls=[
+                            self.sidebar,
+                            ft.VerticalDivider(width=1),
+                            self.main_content,
+                        ],
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            )
+        )
+        self.page.update()
 
     def show_message(self, message: str, color: str):
         self.snack.bgcolor = color
