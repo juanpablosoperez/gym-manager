@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from gym_manager.views.login_view import LoginView
 from gym_manager.controllers.auth_controller import AuthController
 from gym_manager.models import Base
+from gym_manager.utils.navigation import set_db_session
 import os
 from dotenv import load_dotenv
 
@@ -58,6 +59,9 @@ def main():
         # Crear el controlador de autenticación
         SessionLocal = sessionmaker(bind=engine)
         db_session = SessionLocal()
+        
+        # Establecer la sesión de la base de datos
+        set_db_session(db_session)
 
         # Iniciar la vista de login
         auth_controller = AuthController(db_session)
