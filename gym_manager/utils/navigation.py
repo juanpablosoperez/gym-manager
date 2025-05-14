@@ -1,7 +1,8 @@
 import flet as ft
+from gym_manager.utils.database import get_db_session, cleanup_db_session
 
-# Variable global para mantener la sesión de la base de datos
-db_session = None
+# Crear una sesión global de base de datos
+db_session = get_db_session()
 
 def set_db_session(session):
     global db_session
@@ -54,4 +55,8 @@ def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
         print(f"Error al importar HomeView: {e}")
         # Mostrar mensaje de error en la página
         page.add(ft.Text("Error al cargar la vista principal", color=ft.colors.RED))
-        page.update() 
+        page.update()
+
+def cleanup():
+    """Cleanup resources when the application closes."""
+    cleanup_db_session() 

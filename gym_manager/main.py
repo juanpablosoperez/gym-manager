@@ -1,9 +1,8 @@
 import flet as ft
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 from gym_manager.views.login_view import LoginView
 from gym_manager.controllers.auth_controller import AuthController
 from gym_manager.models import Base
+from gym_manager.utils.database import get_db_session, cleanup_db_session
 from gym_manager.utils.navigation import set_db_session
 import os
 from dotenv import load_dotenv
@@ -16,55 +15,27 @@ def main():
         else:
             load_dotenv()
 
-        # Usar DATABASE_URL si está definida (Railway)
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        if DATABASE_URL:
-            print(f"Conectando a la base de datos (DATABASE_URL): {DATABASE_URL}")
-        else:
-            # Configuración de la base de datos MySQL por variables separadas
-            DB_USER = os.getenv('DB_USER', 'root')
-            DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
-            DB_HOST = os.getenv('DB_HOST', 'localhost')
-            DB_PORT = os.getenv('DB_PORT', '3306')
-            DB_NAME = os.getenv('DB_NAME', 'gym_manager')
-            DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-            print(f"Conectando a la base de datos: {DATABASE_URL}")
-
-        engine = create_engine(
-            DATABASE_URL,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=1800,
-            echo=True  # Esto mostrará todas las consultas SQL
-        )
-
         try:
-            # Probar la conexión
-            with engine.connect() as conn:
-                result = conn.execute(text("SELECT COUNT(*) FROM usuarios"))
-                count = result.scalar()
-                print(f"Conexión exitosa. Total de usuarios en la base de datos: {count}")
-                result = conn.execute(text("SELECT * FROM usuarios LIMIT 1"))
-                user = result.fetchone()
-                if user:
-                    user_dict = {key: value for key, value in zip(result.keys(), user)}
-                    print(f"Usuario de ejemplo encontrado:")
-                    print(f"  ID: {user_dict.get('id_usuario')}")
-                    print(f"  Nombre: {user_dict.get('nombre')}")
-                    print(f"  Rol: {user_dict.get('rol')}")
-                    print(f"  Estado: {user_dict.get('estado')}")
+            # Obtener una sesión de base de datos
+            db_session = get_db_session()
+            
+            # Configurar la sesión global
+            set_db_session(db_session)
+            
+            # Crear el controlador de autenticación
+            auth_controller = AuthController(db_session)
+            
+            # Crear la vista de login
+            login_view = LoginView(page, auth_controller)
+            
+            # Registrar la función de limpieza para cuando se cierre la aplicación
+            page.on_close = lambda _: cleanup_db_session()
+            
         except Exception as e:
-            print(f"Error al conectar a la base de datos: {e}")
+            print(f"Error al inicializar la aplicación: {e}")
             import traceback
             print(traceback.format_exc())
             return
-
-        SessionLocal = sessionmaker(bind=engine)
-        db_session = SessionLocal()
-        set_db_session(db_session)
-        auth_controller = AuthController(db_session)
-        login_view = LoginView(page, auth_controller)
 
     ft.app(target=init)
 
