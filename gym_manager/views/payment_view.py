@@ -19,6 +19,7 @@ class PaymentsView:
         self.payment_controller = PaymentController(db_session)
         self.monthly_fee_controller = MonthlyFeeController(db_session)
         self.db_session = db_session
+        self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
         self.setup_payment_view()
         self.load_data()
         self.export_type = None  # Agregar variable para el tipo de exportación
@@ -841,6 +842,15 @@ class PaymentsView:
         # Cargar pagos
         payments = [p for p in self.payment_controller.get_payments() if p.estado == 1]
         self.update_payments_table(payments)
+
+        # Cargar la cuota mensual actual
+        try:
+            with session_scope() as session:
+                current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
+                self.current_monthly_fee = current_fee.monto if current_fee else None
+        except Exception as e:
+            print(f"Error al cargar cuota mensual: {str(e)}")
+            self.current_monthly_fee = None
 
         # Cargar métodos de pago activos
         active_payment_methods = self.db_session.query(MetodoPago).filter_by(estado=True).all()
@@ -2135,6 +2145,8 @@ class PaymentsView:
                 self.show_message(message, ft.colors.GREEN)
                 # Actualizar el valor mostrado en la tarjeta
                 self.monthly_fee_card.content.controls[0].controls[1].controls[1].value = f"${new_amount:,.2f}"
+                # Actualizar la cuota mensual en memoria
+                self.current_monthly_fee = new_amount
                 self.close_edit_fee_modal(e)
                 self.page.update()
             else:
@@ -2159,18 +2171,11 @@ class PaymentsView:
             # Solo validar si el valor es un número válido
             amount = float(self.new_payment_amount_field.value)
             
-            # Obtener la cuota actual de forma segura
-            try:
-                with session_scope() as session:
-                    current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
-                    
-                    if current_fee and amount != current_fee.monto:
-                        self.amount_warning_text.value = f"Advertencia: El monto ingresado (${amount:,.2f}) es diferente a la cuota mensual (${current_fee.monto:,.2f})"
-                        self.amount_warning_text.visible = True
-                    else:
-                        self.amount_warning_text.visible = False
-            except Exception as e:
-                print(f"Error al validar monto: {str(e)}")
+            # Usar la cuota mensual almacenada en memoria
+            if self.current_monthly_fee and amount != self.current_monthly_fee:
+                self.amount_warning_text.value = f"Advertencia: El monto ingresado (${amount:,.2f}) es diferente a la cuota mensual (${self.current_monthly_fee:,.2f})"
+                self.amount_warning_text.visible = True
+            else:
                 self.amount_warning_text.visible = False
                 
             self.page.update()
