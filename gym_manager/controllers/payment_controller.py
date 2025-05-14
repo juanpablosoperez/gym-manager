@@ -2,6 +2,8 @@ from datetime import datetime
 from gym_manager.models.payment import Pago
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
+from gym_manager.utils.database import session_scope
+from sqlalchemy.exc import DBAPIError, PendingRollbackError
 
 class PaymentController:
     def __init__(self, db_session=None):
@@ -11,60 +13,70 @@ class PaymentController:
         """
         Obtiene la lista de pagos con filtros opcionales
         """
-        query = self.db_session.query(Pago)
-        
-        if filters:
-            if filters.get('member_name'):
-                query = query.join(Miembro).filter(
-                    Miembro.nombre.ilike(f"%{filters['member_name']}%")
-                )
-            if filters.get('date_from'):
-                query = query.filter(Pago.fecha_pago >= filters['date_from'])
-            if filters.get('date_to'):
-                query = query.filter(Pago.fecha_pago <= filters['date_to'])
-            if filters.get('payment_method'):
-                query = query.join(MetodoPago).filter(
-                    MetodoPago.descripcion == filters['payment_method']
-                )
-        
-        return query.all()
+        try:
+            query = self.db_session.query(Pago)
+            
+            if filters:
+                if filters.get('member_name'):
+                    query = query.join(Miembro).filter(
+                        Miembro.nombre.ilike(f"%{filters['member_name']}%")
+                    )
+                if filters.get('date_from'):
+                    query = query.filter(Pago.fecha_pago >= filters['date_from'])
+                if filters.get('date_to'):
+                    query = query.filter(Pago.fecha_pago <= filters['date_to'])
+                if filters.get('payment_method'):
+                    query = query.join(MetodoPago).filter(
+                        MetodoPago.descripcion == filters['payment_method']
+                    )
+            
+            return query.all()
+        except (DBAPIError, PendingRollbackError):
+            # Si hay un error de conexión, hacer rollback y reintentar
+            self.db_session.rollback()
+            return self.get_payments(filters)
 
     def create_payment(self, payment_data):
         """
         Crea un nuevo pago
         """
+        print("Iniciando creación de pago...")  # Debug log
         try:
-            new_payment = Pago(
-                fecha_pago=payment_data['fecha_pago'],
-                monto=payment_data['monto'],
-                referencia=payment_data.get('referencia'),
-                estado=True,
-                id_miembro=payment_data['id_miembro'],
-                id_metodo_pago=payment_data['id_metodo_pago']
-            )
-            self.db_session.add(new_payment)
-            self.db_session.commit()
-            return True, "Pago registrado exitosamente"
+            # Crear una nueva sesión para esta operación
+            with session_scope() as session:
+                print("Creando nuevo objeto Pago...")  # Debug log
+                new_payment = Pago(
+                    fecha_pago=payment_data['fecha_pago'],
+                    monto=payment_data['monto'],
+                    referencia=payment_data.get('referencia'),
+                    estado=True,
+                    id_miembro=payment_data['id_miembro'],
+                    id_metodo_pago=payment_data['id_metodo_pago']
+                )
+                print(f"Datos del pago: {payment_data}")  # Debug log
+                session.add(new_payment)
+                session.flush()
+                print("Pago creado exitosamente")  # Debug log
+                return True, "Pago registrado exitosamente"
         except Exception as e:
-            self.db_session.rollback()
-            return False, str(e)
+            print(f"Error al crear pago: {str(e)}")  # Debug log
+            return False, f"Error al crear el pago: {str(e)}"
 
     def update_payment(self, payment_id, payment_data):
         """
         Actualiza un pago existente
         """
         try:
-            payment = self.db_session.query(Pago).filter_by(id_pago=payment_id).first()
-            if not payment:
-                return False, "Pago no encontrado"
-            
-            for key, value in payment_data.items():
-                setattr(payment, key, value)
-            
-            self.db_session.commit()
-            return True, "Pago actualizado exitosamente"
+            with session_scope() as session:
+                payment = session.query(Pago).filter_by(id_pago=payment_id).first()
+                if not payment:
+                    return False, "Pago no encontrado"
+                
+                for key, value in payment_data.items():
+                    setattr(payment, key, value)
+                
+                return True, "Pago actualizado exitosamente"
         except Exception as e:
-            self.db_session.rollback()
             return False, str(e)
 
     def delete_payment(self, payment_id):
@@ -72,15 +84,14 @@ class PaymentController:
         Elimina un pago
         """
         try:
-            payment = self.db_session.query(Pago).filter_by(id_pago=payment_id).first()
-            if not payment:
-                return False, "Pago no encontrado"
-            
-            self.db_session.delete(payment)
-            self.db_session.commit()
-            return True, "Pago eliminado exitosamente"
+            with session_scope() as session:
+                payment = session.query(Pago).filter_by(id_pago=payment_id).first()
+                if not payment:
+                    return False, "Pago no encontrado"
+                
+                session.delete(payment)
+                return True, "Pago eliminado exitosamente"
         except Exception as e:
-            self.db_session.rollback()
             return False, str(e)
 
     def get_payment_summary(self):
@@ -104,7 +115,8 @@ class PaymentController:
                 'pending_payments': pending_payments,
                 'monthly_total': monthly_total
             }
-        except Exception as e:
+        except (DBAPIError, PendingRollbackError):
+            self.db_session.rollback()
             return {
                 'total_payments': 0,
                 'pending_payments': 0,
