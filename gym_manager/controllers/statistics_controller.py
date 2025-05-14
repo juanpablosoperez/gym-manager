@@ -10,6 +10,7 @@ class StatisticsController:
     def __init__(self, view, page):
         self.view = view
         self.page = page
+        self.current_year = datetime.now().year
         # self.member_service = MemberService() # Ejemplo
         # self.payment_service = PaymentService() # Ejemplo
         # NO llamar a _initialize_event_handlers() aquí
@@ -42,27 +43,34 @@ class StatisticsController:
 
     async def load_summary_cards_data(self):
         """Carga los datos para las tarjetas de resumen."""
-        # --- Total de Miembros ---
-        # total_members = await self.member_service.get_total_members_count() # Ejemplo
-        total_members = 150 # Dummy data
-        self.view.total_members_card.content.controls[1].value = str(total_members)
+        # --- Tarjetas Conservadas ---
+        # total_members = 150 # Eliminada
+        # self.view.total_members_card.content.controls[1].controls[0].value = str(total_members)
 
-        # --- Pagos del Mes ---
-        # current_month_payments = await self.payment_service.get_current_month_payments_sum() # Ejemplo
-        current_month_payments = 125000.00 # Dummy data
-        self.view.monthly_payments_card.content.controls[1].value = f"${current_month_payments:,.2f}"
+        current_month_payments = 125000.00
+        self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${current_month_payments:,.2f}"
 
-        # --- Método de Pago Más Usado ---
-        # most_used_method_data = await self.payment_service.get_most_used_payment_method_info() # Ejemplo
-        # (method_name, count)
-        most_used_method_data = ("Efectivo", 64) # Dummy data
-        self.view.most_used_method_card.content.controls[1].value = f"Método más usado: {most_used_method_data[0]}"
-        self.view.most_used_method_card.content.controls[2].value = f"{most_used_method_data[1]} pagos"
+        # most_used_method_data = ("Efectivo", 64) # Eliminada
+        # self.view.most_used_method_card.content.controls[1].controls[0].value = f"Método más usado: {most_used_method_data[0]}"
+        # self.view.most_used_method_card.content.controls[1].controls[1].value = f"{most_used_method_data[1]} pagos"
         
-        # --- Miembros Activos Hoy ---
-        # active_today = await self.member_service.get_active_members_today_count() # Ejemplo
-        active_today = 25 # Dummy data
-        self.view.active_members_today_card.content.controls[1].value = str(active_today)
+        active_today = 25
+        self.view.active_members_today_card.content.controls[1].controls[0].value = str(active_today)
+
+        expired_memberships_count = 10 # Dummy
+        self.view.expired_memberships_card.content.controls[1].controls[0].value = str(expired_memberships_count)
+
+        # pending_payments_count = 5 # Eliminada
+        # self.view.pending_payments_card.content.controls[1].controls[0].value = str(pending_payments_count)
+
+        # top_client_name = "Juampi Codes" # Eliminada
+        # top_client_assists = 22 # Eliminada
+        # self.view.top_assisting_client_card.content.controls[1].controls[0].value = top_client_name
+        # self.view.top_assisting_client_card.content.controls[1].controls[2].value = f"{top_client_assists} asistencias"
+
+        annual_income = 750000.00 # Dummy
+        self.view.total_annual_income_card.content.controls[1].controls[0].value = f"${annual_income:,.2f}"
+        # El texto f"Ingresos {self.current_year}" ya se establece en la vista.
         
     async def load_charts_data(self):
         """Carga y configura los datos para los gráficos."""

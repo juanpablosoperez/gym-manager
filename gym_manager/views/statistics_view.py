@@ -7,6 +7,7 @@ class StatisticsView: # Eliminar la herencia de UserControl
         # super().__init__() # Eliminar llamada al super de UserControl
         self.page = page
         self.controller = controller
+        current_year = datetime.now().year
 
         # --- Componentes de la UI --- 
         # (Se definen aquí para mejor organización)
@@ -69,35 +70,32 @@ class StatisticsView: # Eliminar la herencia de UserControl
         )
 
         # --- Panel de Estadísticas Dinámicas ---
-        self.total_members_card = self._create_summary_card(
-            icon_name=ft.icons.PEOPLE_ALT_OUTLINED, # Icono 👥
-            value="0", description="Miembros Totales",
-            color=ft.colors.BLUE_600
-        )
+        # Tarjetas de Métricas (Conservadas)
         self.monthly_payments_card = self._create_summary_card(
-            icon_name=ft.icons.PAYMENT_OUTLINED, # Icono 💳
-            value="$0.00", description="Pagos del Mes",
-            color=ft.colors.GREEN_600
-        )
-        self.most_used_method_card = self._create_summary_card(
-            icon_name=ft.icons.INSIGHTS, # Icono 🟡 (placeholder)
-            value_text="N/A", description_value_format="Método más usado: {}",
-            text_value="0 pagos",
-            color=ft.colors.ORANGE_600
+            icon_name=ft.icons.PAYMENT_OUTLINED, value="$0.00", 
+            description="Pagos del Mes", color=ft.colors.GREEN_600
         )
         self.active_members_today_card = self._create_summary_card(
-            icon_name=ft.icons.DIRECTIONS_RUN_OUTLINED, # Icono 🏃‍♂️
-            value="0", description="Miembros hoy", # Descripción más corta
-            color=ft.colors.PURPLE_600
+            icon_name=ft.icons.DIRECTIONS_RUN_OUTLINED, value="0", 
+            description="Miembros totales", color=ft.colors.PURPLE_600
         )
-
-        # Marcadores de posición para gráficos
-        self.income_bar_chart = self._create_chart_placeholder("Ingresos por Mes (últimos 6 meses)")
+        self.expired_memberships_card = self._create_summary_card(
+            icon_name=ft.icons.EVENT_BUSY_OUTLINED, value="0", 
+            description="Membresías Vencidas", color=ft.colors.RED_ACCENT_200
+        )
+        self.total_annual_income_card = self._create_summary_card(
+            icon_name=ft.icons.SHOW_CHART_OUTLINED, value="$0.00", 
+            description=f"Ingresos {current_year}", color=ft.colors.TEAL_500
+        )
+        
+        # Marcadores de posición para gráficos (Conservados)
+        self.income_bar_chart = self._create_chart_placeholder("Ingresos por Mes")
         self.payment_method_pie_chart = self._create_chart_placeholder("Distribución de Métodos de Pago")
         self.new_members_line_chart = self._create_chart_placeholder("Nuevos Miembros por Mes")
+        self.active_memberships_by_type_chart = self._create_chart_placeholder("Membresías Activas")
 
     def _create_summary_card(self, icon_name, value=None, description=None, color=ft.colors.PRIMARY, value_text=None, text_value=None, description_value_format="{}"):
-        icon_widget = ft.Icon(name=icon_name, size=40, color=color) # Ícono grande
+        icon_widget = ft.Icon(name=icon_name, size=40, color=color)
         
         text_column_controls = []
         if value is not None:
@@ -116,33 +114,29 @@ class StatisticsView: # Eliminar la herencia de UserControl
                 [icon_widget, text_column],
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 alignment=ft.MainAxisAlignment.START,
-                spacing=20 # Espacio entre ícono y texto
+                spacing=20 
             ),
             padding=ft.padding.all(20),
             border_radius=ft.border_radius.all(12),
-            bgcolor=ft.colors.WHITE, # Fondo blanco para las cards
+            bgcolor=ft.colors.WHITE, 
             shadow=ft.BoxShadow(
                 spread_radius=1, blur_radius=10, color=ft.colors.BLACK12,
                 offset=ft.Offset(1, 1)
             ),
             margin=ft.margin.all(5),
-            # expand=True # Se manejará con ResponsiveRow
         )
 
     def _create_chart_placeholder(self, title_text):
         return ft.Container(
             content=ft.Column([
                 ft.Text(title_text, size=18, weight=ft.FontWeight.W_600, text_align=ft.TextAlign.CENTER),
-                # Aquí iría el control del gráfico real más adelante
-                ft.Container(ft.ProgressRing(), alignment=ft.alignment.center, expand=True) # Placeholder visual para el gráfico
+                ft.Container(ft.ProgressRing(), alignment=ft.alignment.center, expand=True)
             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True, spacing=10),
-            padding=20,
-            border_radius=12,
-            border=ft.border.all(1, ft.colors.GREY_300),
+            padding=20, border_radius=12, border=ft.border.all(1, ft.colors.GREY_300),
             bgcolor=ft.colors.WHITE,
             shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)),
             margin=ft.margin.symmetric(vertical=10),
-            height=350 # Altura fija para los placeholders de gráficos
+            height=350 
         )
 
     def build(self):
@@ -190,25 +184,30 @@ class StatisticsView: # Eliminar la herencia de UserControl
 
         # --- Sección Panel de Estadísticas ---
         metrics_cards_section = ft.ResponsiveRow([
-                ft.Column([self.total_members_card], col={"xs": 12, "sm": 6, "md": 3}),
                 ft.Column([self.monthly_payments_card], col={"xs": 12, "sm": 6, "md": 3}),
-                ft.Column([self.most_used_method_card], col={"xs": 12, "sm": 6, "md": 3}),
                 ft.Column([self.active_members_today_card], col={"xs": 12, "sm": 6, "md": 3}),
+                ft.Column([self.expired_memberships_card], col={"xs": 12, "sm": 6, "md": 3}),
+                ft.Column([self.total_annual_income_card], col={"xs": 12, "sm": 6, "md": 3}),
             ], spacing=10, run_spacing=10
         )
 
-        charts_section = ft.ResponsiveRow([
-                ft.Column([self.income_bar_chart], col={"xs": 12, "md": 6}),
-                ft.Column([self.payment_method_pie_chart], col={"xs": 12, "md": 6}),
-                ft.Column([self.new_members_line_chart], col={"xs": 12}), # Este ocupa todo el ancho en todas las vistas
-            ], spacing=10, run_spacing=10
+        charts_section = ft.Column([
+                ft.ResponsiveRow([
+                    ft.Column([self.income_bar_chart], col={"xs": 12, "md": 6}),
+                    ft.Column([self.payment_method_pie_chart], col={"xs": 12, "md": 6}),
+                ], spacing=10, run_spacing=10),
+                ft.ResponsiveRow([
+                    ft.Column([self.new_members_line_chart], col={"xs": 12, "md": 6}),
+                    ft.Column([self.active_memberships_by_type_chart], col={"xs": 12, "md": 6}),
+                ], spacing=10, run_spacing=10),
+            ], spacing=10
         )
 
         statistics_panel = ft.Container(
             content=ft.Column([
                 ft.Text("Métricas Clave", size=22, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
-                metrics_cards_section,
-                ft.Divider(height=20, thickness=1),
+                metrics_cards_section, # Solo una sección de tarjetas ahora
+                ft.Divider(height=30, thickness=1, color=ft.colors.GREY_300),
                 ft.Text("Análisis Gráfico", size=22, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
                 charts_section
             ], spacing=20),
@@ -243,42 +242,3 @@ class StatisticsView: # Eliminar la herencia de UserControl
         self.page.update() # Necesario para que el texto de la fecha se actualice visualmente.
 
 
-# Example usage (for testing this view standalone)
-# if __name__ == "__main__":
-#     def main(page: ft.Page):
-#         page.title = "Statistics View"
-#         page.vertical_alignment = ft.MainAxisAlignment.START
-#         page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-#         page.theme_mode = ft.ThemeMode.LIGHT
-#         page.bgcolor = ft.colors.WHITE
-#
-#         # Dummy controller for testing
-#         class DummyController:
-#             def handle_report_type_change(self, e): print(f"Report type changed: {e.control.value}")
-#             def handle_start_date_change(self, e): print(f"Start date changed: {e.control.value}")
-#             def handle_end_date_change(self, e): print(f"End date changed: {e.control.value}")
-#             def handle_membership_status_change(self, e): print(f"Membership status changed: {e.control.value}")
-#             async def handle_generate_report(self, e): 
-#                 print("Generate report clicked")
-#                 self.page.show_snack_bar(ft.SnackBar(ft.Text("Informe generado!"), open=True))
-#             def handle_card_click(self, e): print("Card clicked")
-#             async def initialize_statistics(self):
-#                 print("Dummy init stats")
-#                 # Simulate data loading for cards
-#                 if hasattr(stats_view, 'total_members_card'):
-#                     stats_view.total_members_card.content.controls[1].value = "175"
-#                     stats_view.monthly_payments_card.content.controls[1].value = "$130,000"
-#                     stats_view.most_used_method_card.content.controls[1].value = "Método: Débito"
-#                     stats_view.most_used_method_card.content.controls[3].value = "70 pagos"
-#                     stats_view.active_members_today_card.content.controls[1].value = "30"
-#                     stats_view.update() # Actualizar la vista después de cambiar los valores
-#
-#         controller = DummyController()
-#         # Asignar page al dummy controller si lo necesita, como para show_snack_bar
-#         controller.page = page 
-#         stats_view = StatisticsView(page, controller)
-#         page.add(stats_view.build()) # Llamar a build() para obtener el control
-#         page.run_task(controller.initialize_statistics) # Ejecutar la inicialización
-#         page.update()
-#
-#     ft.app(target=main) 
