@@ -6,6 +6,8 @@ from gym_manager.views.module_views import (
     MembersView, PaymentsView, ReportsView,
     PaymentMethodsView, UsersView, BackupsView
 )
+from gym_manager.views.statistics_view import StatisticsView
+from gym_manager.controllers.statistics_controller import StatisticsController
 
 class HomeView:
     def __init__(self, page: ft.Page, user_rol: str, user_name: str = "Usuario"):
@@ -117,7 +119,8 @@ class HomeView:
     def handle_route_change(self, index: int):
         # Limpiar el contenido actual
         self.main_content.content = None
-        
+        previous_title = self.section_title # Guardar título anterior por si acaso
+
         # Título de sección según el índice
         if index == 0:  # Dashboard
             self.section_title = "Dashboard"
@@ -137,11 +140,16 @@ class HomeView:
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
-            self.page.update()
         elif index == 3:  # Informes y Estadísticas
             self.section_title = "Informes y Estadísticas"
-            view = ReportsView(self.page)
-            self.main_content.content = view.get_content()
+            
+            stats_controller = StatisticsController(view=None, page=self.page)
+            stats_view = StatisticsView(page=self.page, controller=stats_controller)
+            stats_controller.view = stats_view # Asignar la vista al controlador
+            stats_controller._initialize_event_handlers() # Llamar aquí
+            
+            self.main_content.content = stats_view.build()
+            self.page.run_task(stats_controller.initialize_statistics)
         elif index == 4:  # Métodos de Pago
             self.section_title = "Métodos de Pago"
             view = PaymentMethodsView(self.page)
