@@ -10,19 +10,26 @@ from dotenv import load_dotenv
 
 def main():
     def init(page: ft.Page):
-        # Cargar variables de entorno
-        load_dotenv()
-        
-        # Configuración de la base de datos MySQL
-        DB_USER = os.getenv('DB_USER', 'root')
-        DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')  # Asegúrate de que esta es tu contraseña
-        DB_HOST = os.getenv('DB_HOST', 'localhost')
-        DB_PORT = os.getenv('DB_PORT', '3306')
-        DB_NAME = os.getenv('DB_NAME', 'gym_manager')
-        
-        DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-        print(f"Conectando a la base de datos: {DATABASE_URL}")
-        
+        # Cargar variables de entorno desde .env.dev si existe, si no, .env
+        if os.path.exists('.env.dev'):
+            load_dotenv('.env.dev')
+        else:
+            load_dotenv()
+
+        # Usar DATABASE_URL si está definida (Railway)
+        DATABASE_URL = os.getenv('DATABASE_URL')
+        if DATABASE_URL:
+            print(f"Conectando a la base de datos (DATABASE_URL): {DATABASE_URL}")
+        else:
+            # Configuración de la base de datos MySQL por variables separadas
+            DB_USER = os.getenv('DB_USER', 'root')
+            DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
+            DB_HOST = os.getenv('DB_HOST', 'localhost')
+            DB_PORT = os.getenv('DB_PORT', '3306')
+            DB_NAME = os.getenv('DB_NAME', 'gym_manager')
+            DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+            print(f"Conectando a la base de datos: {DATABASE_URL}")
+
         engine = create_engine(
             DATABASE_URL,
             pool_size=5,
@@ -31,19 +38,16 @@ def main():
             pool_recycle=1800,
             echo=True  # Esto mostrará todas las consultas SQL
         )
-        
+
         try:
             # Probar la conexión
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT COUNT(*) FROM usuarios"))
                 count = result.scalar()
                 print(f"Conexión exitosa. Total de usuarios en la base de datos: {count}")
-                
-                # Mostrar un usuario de ejemplo
                 result = conn.execute(text("SELECT * FROM usuarios LIMIT 1"))
                 user = result.fetchone()
                 if user:
-                    # Convertir el resultado a un diccionario usando el método correcto
                     user_dict = {key: value for key, value in zip(result.keys(), user)}
                     print(f"Usuario de ejemplo encontrado:")
                     print(f"  ID: {user_dict.get('id_usuario')}")
@@ -55,15 +59,10 @@ def main():
             import traceback
             print(traceback.format_exc())
             return
-        
-        # Crear el controlador de autenticación
+
         SessionLocal = sessionmaker(bind=engine)
         db_session = SessionLocal()
-        
-        # Establecer la sesión de la base de datos
         set_db_session(db_session)
-
-        # Iniciar la vista de login
         auth_controller = AuthController(db_session)
         login_view = LoginView(page, auth_controller)
 
@@ -71,4 +70,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
