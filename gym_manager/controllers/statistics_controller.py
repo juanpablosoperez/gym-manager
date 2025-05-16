@@ -92,7 +92,6 @@ class StatisticsController:
         end_date = self.view.end_date_picker.value
         membership_status = self.view.membership_status_dropdown.value
 
-        # Filtrar datos según el tipo de informe
         if report_type == "Informe de Pagos":
             filters = {}
             if start_date:
@@ -106,6 +105,20 @@ class StatisticsController:
             self._show_report_confirmation_dialog(
                 f"¿Deseas exportar {count} pagos a PDF? El archivo se guardará en tu carpeta de Descargas.",
                 lambda _: self._export_payments_to_pdf(payments)
+            )
+        elif report_type == "Informe de Miembros":
+            filters = {}
+            if start_date:
+                filters['fecha_registro_desde'] = start_date
+            if end_date:
+                filters['fecha_registro_hasta'] = end_date
+            if membership_status and membership_status != "Todos":
+                filters['status'] = True if membership_status == "Activa" else False
+            miembros = self.member_controller.get_members(filters)
+            count = len(miembros)
+            self._show_report_confirmation_dialog(
+                f"¿Deseas exportar {count} miembros a PDF? El archivo se guardará en tu carpeta de Descargas.",
+                lambda _: self._export_members_to_pdf(miembros)
             )
         else:
             self.page.snack_bar = ft.SnackBar(
@@ -209,6 +222,102 @@ class StatisticsController:
                     table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#E2EFDA'))
                 else:
                     table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#FFD9D9'))
+            table.setStyle(table_style)
+            elements.append(table)
+
+            # Pie de página
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(footer)
+
+            doc.build(elements)
+            self._close_report_dialog()
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Archivo PDF guardado en: {filepath}"),
+                bgcolor=ft.colors.GREEN,
+                open=True,
+            )
+            self.page.update()
+        except Exception as e:
+            self._close_report_dialog()
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Error al generar PDF: {str(e)}"),
+                bgcolor=ft.colors.RED,
+                open=True,
+            )
+            self.page.update()
+
+    def _export_members_to_pdf(self, miembros):
+        try:
+            downloads_path = str(Path.home() / "Downloads")
+            filename = f"informe_miembros_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(downloads_path, filename)
+
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=landscape(letter),
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                alignment=1
+            )
+
+            elements = []
+            title = Paragraph("Informe de Miembros", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 20))
+
+            # Tabla de datos (sin Documento ni Tipo de membresía)
+            data = [["Nombre", "Apellido", "Email", "Fecha de registro", "Estado"]]
+            for m in miembros:
+                data.append([
+                    m.nombre,
+                    m.apellido,
+                    m.correo_electronico or "",
+                    m.fecha_registro.strftime("%d/%m/%Y") if m.fecha_registro else "",
+                    "Activo" if m.estado else "Inactivo"
+                ])
+
+            table = Table(data, colWidths=[1.5*inch, 2.5*inch, 2.2*inch, 1.5*inch, 1.2*inch])
+            table_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+                ('ALIGN', (2, 1), (2, -1), 'LEFT'),
+                ('ALIGN', (3, 1), (3, -1), 'CENTER'),
+                ('ALIGN', (4, 1), (4, -1), 'CENTER'),
+            ])
             table.setStyle(table_style)
             elements.append(table)
 
