@@ -1,6 +1,7 @@
 import flet as ft
 from datetime import datetime, timedelta
 from gym_manager.controllers.member_controller import MemberController
+from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.navigation import db_session  # Importar la sesión global
 # Importa aquí tus modelos o servicios necesarios. Ejemplo:
 # from gym_manager.models.member_model import Member
@@ -14,6 +15,7 @@ class StatisticsController:
         self.page = page
         self.current_year = datetime.now().year
         self.member_controller = MemberController(db_session)  # Usar la sesión global
+        self.payment_controller = PaymentController(db_session)
         # self.member_service = MemberService() # Ejemplo
         # self.payment_service = PaymentService() # Ejemplo
         # NO llamar a _initialize_event_handlers() aquí
@@ -51,7 +53,8 @@ class StatisticsController:
             active_members_count = self.member_controller.get_active_members_count()
             self.view.active_members_today_card.content.controls[1].controls[0].value = str(active_members_count)
 
-            current_month_payments = 125000.00
+            # Obtener la suma de pagos del mes actual
+            current_month_payments = self.payment_controller.get_current_month_payments_sum()
             self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${current_month_payments:,.2f}"
 
             expired_memberships_count = 10 # Dummy
@@ -63,6 +66,7 @@ class StatisticsController:
             print(f"Error al cargar datos de resumen: {str(e)}")
             # En caso de error, mostrar valores por defecto
             self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
+            self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
 
     async def load_charts_data(self):
         """Carga y configura los datos para los gráficos."""
