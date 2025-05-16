@@ -60,13 +60,17 @@ class StatisticsController:
             expired_memberships_count = 10 # Dummy
             self.view.expired_memberships_card.content.controls[1].controls[0].value = str(expired_memberships_count)
 
-            annual_income = 750000.00 # Dummy
+            # Obtener la suma de pagos del año actual
+            annual_income = self.payment_controller.get_current_year_payments_sum()
             self.view.total_annual_income_card.content.controls[1].controls[0].value = f"${annual_income:,.2f}"
+            # Actualizar el texto del año en la descripción
+            self.view.total_annual_income_card.content.controls[1].controls[1].value = f"Ingresos {self.current_year}"
         except Exception as e:
             print(f"Error al cargar datos de resumen: {str(e)}")
             # En caso de error, mostrar valores por defecto
             self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
             self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
+            self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
 
     async def load_charts_data(self):
         """Carga y configura los datos para los gráficos."""

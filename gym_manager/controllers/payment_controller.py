@@ -142,3 +142,20 @@ class PaymentController:
         except Exception as e:
             print(f"Error al obtener suma de pagos mensuales: {str(e)}")
             return 0
+
+    def get_current_year_payments_sum(self):
+        """
+        Obtiene la suma total de los pagos del año actual
+        """
+        try:
+            current_year = datetime.now().year
+            
+            total = self.db_session.query(func.sum(Pago.monto)).filter(
+                extract('year', Pago.fecha_pago) == current_year,
+                Pago.estado == True  # Solo pagos activos
+            ).scalar() or 0
+            
+            return total
+        except Exception as e:
+            print(f"Error al obtener suma de pagos anuales: {str(e)}")
+            return 0
