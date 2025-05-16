@@ -1,5 +1,6 @@
 from gym_manager.models.member import Miembro
 from datetime import datetime
+from sqlalchemy import func
 
 class MemberController:
     def __init__(self, db_session=None):
@@ -102,4 +103,17 @@ class MemberController:
             return True, "Miembro eliminado exitosamente"
         except Exception as e:
             self.db_session.rollback()
-            return False, str(e) 
+            return False, str(e)
+
+    def get_active_members_count(self):
+        """
+        Obtiene el conteo total de miembros activos
+        """
+        try:
+            count = self.db_session.query(func.count(Miembro.id_miembro)).filter(
+                Miembro.estado == True
+            ).scalar()
+            return count or 0
+        except Exception as e:
+            print(f"Error al contar miembros activos: {str(e)}")
+            return 0 
