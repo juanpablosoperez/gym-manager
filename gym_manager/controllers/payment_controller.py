@@ -4,6 +4,7 @@ from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
 from gym_manager.utils.database import session_scope
 from sqlalchemy.exc import DBAPIError, PendingRollbackError
+from sqlalchemy import func, extract
 
 class PaymentController:
     def __init__(self, db_session=None):
@@ -122,3 +123,22 @@ class PaymentController:
                 'pending_payments': 0,
                 'monthly_total': 0
             }
+
+    def get_current_month_payments_sum(self):
+        """
+        Obtiene la suma total de los pagos del mes actual
+        """
+        try:
+            current_month = datetime.now().month
+            current_year = datetime.now().year
+            
+            total = self.db_session.query(func.sum(Pago.monto)).filter(
+                extract('month', Pago.fecha_pago) == current_month,
+                extract('year', Pago.fecha_pago) == current_year,
+                Pago.estado == True  # Solo pagos activos
+            ).scalar() or 0
+            
+            return total
+        except Exception as e:
+            print(f"Error al obtener suma de pagos mensuales: {str(e)}")
+            return 0
