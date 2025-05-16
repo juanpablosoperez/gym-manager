@@ -3,6 +3,13 @@ from datetime import datetime, timedelta
 from gym_manager.controllers.member_controller import MemberController
 from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.navigation import db_session  # Importar la sesión global
+from pathlib import Path
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import os
 # Importa aquí tus modelos o servicios necesarios. Ejemplo:
 # from gym_manager.models.member_model import Member
 # from gym_manager.models.payment_model import Payment
@@ -85,15 +92,157 @@ class StatisticsController:
         end_date = self.view.end_date_picker.value
         membership_status = self.view.membership_status_dropdown.value
 
-        print(f"Generando informe: {report_type}")
-        print(f"Desde: {start_date}, Hasta: {end_date}, Estado: {membership_status}")
-        
-        self.page.show_snack_bar(
-            ft.SnackBar(
-                ft.Text(f"Informe '{report_type}' generado con éxito (simulado)."),
+        # Filtrar datos según el tipo de informe
+        if report_type == "Informe de Pagos":
+            filters = {}
+            if start_date:
+                filters['date_from'] = start_date
+            if end_date:
+                filters['date_to'] = end_date
+            if membership_status and membership_status != "Todos":
+                filters['membership_status'] = membership_status
+            payments = self.payment_controller.get_payments(filters)
+            count = len(payments)
+            self._show_report_confirmation_dialog(
+                f"¿Deseas exportar {count} pagos a PDF? El archivo se guardará en tu carpeta de Descargas.",
+                lambda _: self._export_payments_to_pdf(payments)
+            )
+        else:
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Tipo de informe '{report_type}' aún no implementado."),
                 open=True,
             )
+            self.page.update()
+
+    def _show_report_confirmation_dialog(self, message, on_confirm):
+        """Muestra un diálogo de confirmación antes de exportar el informe."""
+        self.report_dialog = ft.AlertDialog(
+            title=ft.Text("Confirmar Exportación", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Text(message, size=16),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=lambda e: self._close_report_dialog(),
+                    style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87)
+                ),
+                ft.ElevatedButton(
+                    "Exportar",
+                    on_click=on_confirm,
+                    style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_900, color=ft.colors.WHITE)
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
         )
+        self.page.overlay.append(self.report_dialog)
+        self.report_dialog.open = True
+        self.page.update()
+
+    def _close_report_dialog(self):
+        if hasattr(self, 'report_dialog'):
+            self.report_dialog.open = False
+            self.page.update()
+
+    def _export_payments_to_pdf(self, payments):
+        """Exporta los pagos a PDF (lógica copiada y adaptada de payment_view.py)."""
+        try:
+            downloads_path = str(Path.home() / "Downloads")
+            filename = f"informe_pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(downloads_path, filename)
+
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=landscape(letter),
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                alignment=1
+            )
+
+            elements = []
+            title = Paragraph("Informe de Pagos", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 20))
+
+            # Tabla de datos
+            data = [["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]]
+            for payment in payments:
+                data.append([
+                    f"{payment.miembro.nombre} {payment.miembro.apellido}",
+                    payment.fecha_pago.strftime("%d/%m/%Y"),
+                    f"${payment.monto:,.2f}",
+                    payment.metodo_pago.descripcion,
+                    payment.referencia if payment.referencia else "",
+                    "Pagado" if payment.estado == 1 else "Cancelado"
+                ])
+
+            table = Table(data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.5*inch, 2.5*inch, 1.2*inch])
+            table_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
+                ('ALIGN', (4, 1), (4, -1), 'LEFT'),
+            ])
+            for i, payment in enumerate(payments, 1):
+                if payment.estado == 1:
+                    table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#E2EFDA'))
+                else:
+                    table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#FFD9D9'))
+            table.setStyle(table_style)
+            elements.append(table)
+
+            # Pie de página
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(footer)
+
+            doc.build(elements)
+            self._close_report_dialog()
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Archivo PDF guardado en: {filepath}"),
+                bgcolor=ft.colors.GREEN,
+                open=True,
+            )
+            self.page.update()
+        except Exception as e:
+            self._close_report_dialog()
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Error al generar PDF: {str(e)}"),
+                bgcolor=ft.colors.RED,
+                open=True,
+            )
+            self.page.update()
 
     async def handle_report_filter_change(self, e):
         print(f"Filtro de informe cambiado: {e.control.label} = {e.control.value}")

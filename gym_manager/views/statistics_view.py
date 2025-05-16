@@ -37,14 +37,14 @@ class StatisticsView: # Eliminar la herencia de UserControl
 
         self.start_date_button = ft.ElevatedButton(
             "Fecha de Inicio", icon=ft.icons.CALENDAR_MONTH,
-            on_click=lambda _: self.start_date_picker.pick_date(),
+            on_click=lambda _: self._open_date_picker(self.start_date_picker),
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), padding=12)
         )
         self.start_date_text = ft.Text("No seleccionada", weight=ft.FontWeight.BOLD)
         
         self.end_date_button = ft.ElevatedButton(
             "Fecha de Fin", icon=ft.icons.CALENDAR_MONTH,
-            on_click=lambda _: self.end_date_picker.pick_date(),
+            on_click=lambda _: self._open_date_picker(self.end_date_picker),
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), padding=12)
         )
         self.end_date_text = ft.Text("No seleccionada", weight=ft.FontWeight.BOLD)
@@ -138,6 +138,10 @@ class StatisticsView: # Eliminar la herencia de UserControl
             margin=ft.margin.symmetric(vertical=10),
             height=350 
         )
+
+    def _open_date_picker(self, picker):
+        picker.open = True
+        self.page.update()
 
     def build(self):
         self.start_date_picker.on_change = lambda e: self._update_date_text(self.start_date_text, self.start_date_picker.value)
