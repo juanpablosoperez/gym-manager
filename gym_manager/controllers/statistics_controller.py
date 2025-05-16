@@ -57,7 +57,8 @@ class StatisticsController:
             current_month_payments = self.payment_controller.get_current_month_payments_sum()
             self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${current_month_payments:,.2f}"
 
-            expired_memberships_count = 10 # Dummy
+            # Obtener el conteo de membresías vencidas
+            expired_memberships_count = self.member_controller.get_expired_memberships_count()
             self.view.expired_memberships_card.content.controls[1].controls[0].value = str(expired_memberships_count)
 
             # Obtener la suma de pagos del año actual
@@ -70,6 +71,7 @@ class StatisticsController:
             # En caso de error, mostrar valores por defecto
             self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
             self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
+            self.view.expired_memberships_card.content.controls[1].controls[0].value = "0"
             self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
 
     async def load_charts_data(self):

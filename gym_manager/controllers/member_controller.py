@@ -1,6 +1,7 @@
 from gym_manager.models.member import Miembro
-from datetime import datetime
-from sqlalchemy import func
+from gym_manager.models.payment import Pago
+from datetime import datetime, timedelta
+from sqlalchemy import func, and_
 
 class MemberController:
     def __init__(self, db_session=None):
@@ -116,4 +117,36 @@ class MemberController:
             return count or 0
         except Exception as e:
             print(f"Error al contar miembros activos: {str(e)}")
+            return 0
+
+    def get_expired_memberships_count(self):
+        """
+        Obtiene el conteo de membresías vencidas (último pago hace más de 30 días)
+        """
+        try:
+            # Obtener la fecha límite (30 días atrás)
+            fecha_limite = datetime.now() - timedelta(days=30)
+            
+            # Subconsulta para obtener el último pago de cada miembro
+            subquery = self.db_session.query(
+                Pago.id_miembro,
+                func.max(Pago.fecha_pago).label('ultima_fecha_pago')
+            ).filter(
+                Pago.estado == True  # Solo pagos activos
+            ).group_by(Pago.id_miembro).subquery()
+            
+            # Contar miembros cuyo último pago fue antes de la fecha límite
+            count = self.db_session.query(func.count(Miembro.id_miembro)).join(
+                subquery,
+                Miembro.id_miembro == subquery.c.id_miembro
+            ).filter(
+                and_(
+                    Miembro.estado == True,  # Solo miembros activos
+                    subquery.c.ultima_fecha_pago < fecha_limite
+                )
+            ).scalar()
+            
+            return count or 0
+        except Exception as e:
+            print(f"Error al contar membresías vencidas: {str(e)}")
             return 0 
