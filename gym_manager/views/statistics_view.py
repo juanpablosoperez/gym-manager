@@ -19,8 +19,6 @@ class StatisticsView: # Eliminar la herencia de UserControl
             options=[
                 ft.dropdown.Option("Informe de Miembros"),
                 ft.dropdown.Option("Informe de Pagos"),
-                ft.dropdown.Option("Informe de Ingresos Mensuales"),
-                ft.dropdown.Option("Informe por Método de Pago"),
             ],
             expand=True, border_radius=8, content_padding=12
         )
@@ -53,11 +51,16 @@ class StatisticsView: # Eliminar la herencia de UserControl
             label="Estado de Membresía",
             hint_text="Seleccione un estado",
             options=[
-                ft.dropdown.Option("Todos"), ft.dropdown.Option("Activa"),
-                ft.dropdown.Option("Vencida"), ft.dropdown.Option("Suspendida"),
-                ft.dropdown.Option("Baja"),
+                ft.dropdown.Option("Todos"),
+                ft.dropdown.Option("Activo"),
+                ft.dropdown.Option("Inactivo"),
             ],
-            expand=True, border_radius=8, content_padding=12
+            expand=True, 
+            border_radius=8, 
+            content_padding=ft.padding.symmetric(horizontal=24, vertical=20),
+            label_style=ft.TextStyle(size=15, weight=ft.FontWeight.W_500),
+            text_style=ft.TextStyle(size=15),
+            width=200
         )
 
         self.generate_report_button = ft.ElevatedButton(
