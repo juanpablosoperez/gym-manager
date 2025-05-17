@@ -1,6 +1,8 @@
 import flet as ft
 # from flet.user_control import UserControl # Ya no es necesario
 from datetime import datetime
+import plotly.graph_objs as go
+from flet.plotly_chart import PlotlyChart
 
 class StatisticsView: # Eliminar la herencia de UserControl
     def __init__(self, page: ft.Page, controller):
@@ -176,12 +178,10 @@ class StatisticsView: # Eliminar la herencia de UserControl
                     ft.Column(
                         [self.generate_report_button],
                         col={"xs": 12, "sm": 12, "md": 2},
-                        # Alinear el botón al final de la columna (verticalmente) y al final (derecha) horizontalmente
-                        # O podrías usar ft.MainAxisAlignment.CENTER y ft.CrossAxisAlignment.CENTER si se prefiere centrado
-                        alignment=ft.MainAxisAlignment.CENTER, # Centra el botón verticalmente en el espacio de la columna
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH # Hace que el botón ocupe el ancho de la columna
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH
                     )
-                ], spacing=15, run_spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER) # Alinear items verticalmente al centro en la fila
+                ], spacing=15, run_spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
             ], spacing=15),
             padding=20, margin=ft.margin.only(bottom=25, left=5, right=5),
             border_radius=12, bgcolor=ft.colors.WHITE,
@@ -198,14 +198,50 @@ class StatisticsView: # Eliminar la herencia de UserControl
             ], spacing=10, run_spacing=10
         )
 
+        # --- Gráficos con datos de ejemplo ---
+        # Ingresos por Mes
+        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        ingresos = [1200, 1500, 1800, 1700, 2000, 2100, 2200, 1900, 2300, 2500, 2400, 2600]
+        fig_ingresos = go.Figure(
+            data=[go.Bar(x=meses, y=ingresos, marker_color="#1F4E78")],
+            layout=go.Layout(title="Ingresos por Mes", xaxis_title="Mes", yaxis_title="Ingresos ($)")
+        )
+        chart_ingresos = ft.Container(PlotlyChart(fig_ingresos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+
+        # Distribución de Métodos de Pago
+        metodos = ["Efectivo", "Tarjeta", "Transferencia"]
+        valores = [3500, 4200, 1800]
+        fig_metodos = go.Figure(
+            data=[go.Pie(labels=metodos, values=valores, hole=0.3)],
+            layout=go.Layout(title="Distribución de Métodos de Pago")
+        )
+        chart_metodos = ft.Container(PlotlyChart(fig_metodos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+
+        # Nuevos Miembros por Mes
+        nuevos = [5, 8, 6, 7, 10, 12, 9, 11, 8, 7, 6, 10]
+        fig_nuevos = go.Figure(
+            data=[go.Scatter(x=meses, y=nuevos, mode="lines+markers", line=dict(color="#4CAF50"))],
+            layout=go.Layout(title="Nuevos Miembros por Mes", xaxis_title="Mes", yaxis_title="Cantidad")
+        )
+        chart_nuevos = ft.Container(PlotlyChart(fig_nuevos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+
+        # Membresías Activas por Tipo
+        tipos = ["Mensual", "Trimestral", "Anual"]
+        activos = [40, 15, 25]
+        fig_tipos = go.Figure(
+            data=[go.Bar(x=tipos, y=activos, marker_color="#FF9800")],
+            layout=go.Layout(title="Membresías Activas por Tipo", xaxis_title="Tipo", yaxis_title="Cantidad")
+        )
+        chart_tipos = ft.Container(PlotlyChart(fig_tipos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+
         charts_section = ft.Column([
                 ft.ResponsiveRow([
-                    ft.Column([self.income_bar_chart], col={"xs": 12, "md": 6}),
-                    ft.Column([self.payment_method_pie_chart], col={"xs": 12, "md": 6}),
+                    ft.Column([chart_ingresos], col={"xs": 12, "md": 6}),
+                    ft.Column([chart_metodos], col={"xs": 12, "md": 6}),
                 ], spacing=10, run_spacing=10),
                 ft.ResponsiveRow([
-                    ft.Column([self.new_members_line_chart], col={"xs": 12, "md": 6}),
-                    ft.Column([self.active_memberships_by_type_chart], col={"xs": 12, "md": 6}),
+                    ft.Column([chart_nuevos], col={"xs": 12, "md": 6}),
+                    ft.Column([chart_tipos], col={"xs": 12, "md": 6}),
                 ], spacing=10, run_spacing=10),
             ], spacing=10
         )
@@ -219,9 +255,7 @@ class StatisticsView: # Eliminar la herencia de UserControl
                 charts_section
             ], spacing=20),
             padding=ft.padding.all(15),
-            # No necesita fondo propio si la página es blanca y las cards tienen su fondo
         )
-        
         return ft.Container(
             content=ft.Column(
                 controls=[
