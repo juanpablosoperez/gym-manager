@@ -113,12 +113,13 @@ class StatisticsController:
             if end_date:
                 filters['fecha_registro_hasta'] = end_date
             if membership_status and membership_status != "Todos":
-                filters['status'] = True if membership_status == "Activa" else False
+                filters['status'] = True if membership_status == "Activo" else False
             miembros = self.member_controller.get_members(filters)
             count = len(miembros)
+            status_text = f" ({membership_status.lower()}s)" if membership_status != "Todos" else ""
             self._show_report_confirmation_dialog(
-                f"¿Deseas exportar {count} miembros a PDF? El archivo se guardará en tu carpeta de Descargas.",
-                lambda _: self._export_members_to_pdf(miembros)
+                f"¿Deseas exportar {count} miembros{status_text} a PDF? El archivo se guardará en tu carpeta de Descargas.",
+                lambda _: self._export_members_to_pdf(miembros, membership_status)
             )
         else:
             self.page.snack_bar = ft.SnackBar(
@@ -257,10 +258,11 @@ class StatisticsController:
             )
             self.page.update()
 
-    def _export_members_to_pdf(self, miembros):
+    def _export_members_to_pdf(self, miembros, membership_status="Todos"):
         try:
             downloads_path = str(Path.home() / "Downloads")
-            filename = f"informe_miembros_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            status_suffix = f"_{membership_status.lower()}" if membership_status != "Todos" else ""
+            filename = f"informe_miembros{status_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(downloads_path, filename)
 
             doc = SimpleDocTemplate(
@@ -282,11 +284,12 @@ class StatisticsController:
             )
 
             elements = []
-            title = Paragraph("Informe de Miembros", title_style)
+            status_text = f" - {membership_status}" if membership_status != "Todos" else ""
+            title = Paragraph(f"Informe de Miembros{status_text}", title_style)
             elements.append(title)
             elements.append(Spacer(1, 20))
 
-            # Tabla de datos (sin Documento ni Tipo de membresía)
+            # Tabla de datos
             data = [["Nombre", "Apellido", "Email", "Fecha de registro", "Estado"]]
             for m in miembros:
                 data.append([
@@ -318,6 +321,12 @@ class StatisticsController:
                 ('ALIGN', (3, 1), (3, -1), 'CENTER'),
                 ('ALIGN', (4, 1), (4, -1), 'CENTER'),
             ])
+            # Colorear el estado según sea activo o inactivo
+            for i, miembro in enumerate(miembros, 1):
+                if miembro.estado:
+                    table_style.add('BACKGROUND', (4, i), (4, i), colors.HexColor('#E2EFDA'))
+                else:
+                    table_style.add('BACKGROUND', (4, i), (4, i), colors.HexColor('#FFD9D9'))
             table.setStyle(table_style)
             elements.append(table)
 
