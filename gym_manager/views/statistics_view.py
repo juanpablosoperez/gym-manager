@@ -198,41 +198,41 @@ class StatisticsView: # Eliminar la herencia de UserControl
             ], spacing=10, run_spacing=10
         )
 
-        # --- Gráficos con datos de ejemplo ---
-        # Ingresos por Mes
-        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-        ingresos = [1200, 1500, 1800, 1700, 2000, 2100, 2200, 1900, 2300, 2500, 2400, 2600]
+        # --- Gráficos ---
+        # Ingresos por Mes (datos reales)
+        data_ingresos = self.controller.get_monthly_income_data()
         fig_ingresos = go.Figure(
-            data=[go.Bar(x=meses, y=ingresos, marker_color="#1F4E78")],
-            layout=go.Layout(title="Ingresos por Mes", xaxis_title="Mes", yaxis_title="Ingresos ($)")
+            data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")],
+            layout=go.Layout(title="Ingresos por Mes", xaxis_title="Mes", yaxis_title="Ingresos ($)", height=400)
         )
-        chart_ingresos = ft.Container(PlotlyChart(fig_ingresos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_ingresos = ft.Container(PlotlyChart(fig_ingresos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
-        # Distribución de Métodos de Pago
+        # Distribución de Métodos de Pago (mock)
         metodos = ["Efectivo", "Tarjeta", "Transferencia"]
         valores = [3500, 4200, 1800]
         fig_metodos = go.Figure(
             data=[go.Pie(labels=metodos, values=valores, hole=0.3)],
-            layout=go.Layout(title="Distribución de Métodos de Pago")
+            layout=go.Layout(title="Distribución de Métodos de Pago", height=400)
         )
-        chart_metodos = ft.Container(PlotlyChart(fig_metodos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_metodos = ft.Container(PlotlyChart(fig_metodos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
-        # Nuevos Miembros por Mes
+        # Nuevos Miembros por Mes (mock)
         nuevos = [5, 8, 6, 7, 10, 12, 9, 11, 8, 7, 6, 10]
+        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
         fig_nuevos = go.Figure(
             data=[go.Scatter(x=meses, y=nuevos, mode="lines+markers", line=dict(color="#4CAF50"))],
-            layout=go.Layout(title="Nuevos Miembros por Mes", xaxis_title="Mes", yaxis_title="Cantidad")
+            layout=go.Layout(title="Nuevos Miembros por Mes", xaxis_title="Mes", yaxis_title="Cantidad", height=400)
         )
-        chart_nuevos = ft.Container(PlotlyChart(fig_nuevos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_nuevos = ft.Container(PlotlyChart(fig_nuevos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
-        # Membresías Activas por Tipo
+        # Membresías Activas por Tipo (mock)
         tipos = ["Mensual", "Trimestral", "Anual"]
         activos = [40, 15, 25]
         fig_tipos = go.Figure(
             data=[go.Bar(x=tipos, y=activos, marker_color="#FF9800")],
-            layout=go.Layout(title="Membresías Activas por Tipo", xaxis_title="Tipo", yaxis_title="Cantidad")
+            layout=go.Layout(title="Membresías Activas por Tipo", xaxis_title="Tipo", yaxis_title="Cantidad", height=400)
         )
-        chart_tipos = ft.Container(PlotlyChart(fig_tipos, expand=True), height=350, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_tipos = ft.Container(PlotlyChart(fig_tipos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
         charts_section = ft.Column([
                 ft.ResponsiveRow([

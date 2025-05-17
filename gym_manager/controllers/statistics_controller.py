@@ -368,4 +368,14 @@ class StatisticsController:
     async def handle_card_click(self, card_name: str):
         print(f"Tarjeta '{card_name}' clickeada.")
 
+    def get_monthly_income_data(self):
+        """Devuelve un diccionario con la suma de ingresos por mes del año actual."""
+        pagos = self.payment_controller.get_payments({'year': self.current_year})
+        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        ingresos = [0]*12
+        for pago in pagos:
+            mes = pago.fecha_pago.month - 1
+            ingresos[mes] += pago.monto
+        return {"meses": meses, "ingresos": ingresos}
+
 # No __main__ aquí. 
