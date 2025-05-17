@@ -207,27 +207,30 @@ class StatisticsView: # Eliminar la herencia de UserControl
         )
         chart_ingresos = ft.Container(PlotlyChart(fig_ingresos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
-        # Distribución de Métodos de Pago (mock)
-        metodos = ["Efectivo", "Tarjeta", "Transferencia"]
-        valores = [3500, 4200, 1800]
+        # Distribución de Métodos de Pago (datos reales)
+        data_metodos = self.controller.get_payment_methods_distribution()
+        metodos = list(data_metodos.keys())
+        valores = list(data_metodos.values())
         fig_metodos = go.Figure(
             data=[go.Pie(labels=metodos, values=valores, hole=0.3)],
             layout=go.Layout(title="Distribución de Métodos de Pago", height=400)
         )
         chart_metodos = ft.Container(PlotlyChart(fig_metodos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
-        # Nuevos Miembros por Mes (mock)
-        nuevos = [5, 8, 6, 7, 10, 12, 9, 11, 8, 7, 6, 10]
-        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        # Nuevos Miembros por Mes (datos reales)
+        data_nuevos = self.controller.get_new_members_per_month()
+        meses = data_nuevos["meses"]
+        nuevos = data_nuevos["nuevos"]
         fig_nuevos = go.Figure(
             data=[go.Scatter(x=meses, y=nuevos, mode="lines+markers", line=dict(color="#4CAF50"))],
             layout=go.Layout(title="Nuevos Miembros por Mes", xaxis_title="Mes", yaxis_title="Cantidad", height=400)
         )
         chart_nuevos = ft.Container(PlotlyChart(fig_nuevos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
 
-        # Membresías Activas por Tipo (mock)
-        tipos = ["Mensual", "Trimestral", "Anual"]
-        activos = [40, 15, 25]
+        # Membresías Activas por Tipo (datos reales)
+        data_tipos = self.controller.get_active_memberships_by_type()
+        tipos = list(data_tipos.keys())
+        activos = list(data_tipos.values())
         fig_tipos = go.Figure(
             data=[go.Bar(x=tipos, y=activos, marker_color="#FF9800")],
             layout=go.Layout(title="Membresías Activas por Tipo", xaxis_title="Tipo", yaxis_title="Cantidad", height=400)

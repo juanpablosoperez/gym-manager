@@ -378,4 +378,33 @@ class StatisticsController:
             ingresos[mes] += pago.monto
         return {"meses": meses, "ingresos": ingresos}
 
+    def get_payment_methods_distribution(self):
+        """Devuelve un diccionario con la suma de pagos por método de pago del año actual."""
+        pagos = self.payment_controller.get_payments({'year': self.current_year})
+        distribucion = {}
+        for pago in pagos:
+            metodo = pago.metodo_pago.descripcion
+            distribucion[metodo] = distribucion.get(metodo, 0) + pago.monto
+        return distribucion
+
+    def get_new_members_per_month(self):
+        """Devuelve un diccionario con la cantidad de nuevos miembros por mes del año actual."""
+        miembros = self.member_controller.get_members({'year': self.current_year})
+        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        nuevos = [0]*12
+        for m in miembros:
+            if m.fecha_registro and m.fecha_registro.year == self.current_year:
+                mes = m.fecha_registro.month - 1
+                nuevos[mes] += 1
+        return {"meses": meses, "nuevos": nuevos}
+
+    def get_active_memberships_by_type(self):
+        """Devuelve un diccionario con la cantidad de miembros activos por tipo de membresía."""
+        miembros = self.member_controller.get_members({'status': True})
+        tipos = {}
+        for m in miembros:
+            tipo = getattr(m, 'tipo_membresia', 'Sin tipo')
+            tipos[tipo] = tipos.get(tipo, 0) + 1
+        return tipos
+
 # No __main__ aquí. 
