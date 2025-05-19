@@ -203,39 +203,160 @@ class StatisticsView: # Eliminar la herencia de UserControl
         data_ingresos = self.controller.get_monthly_income_data()
         fig_ingresos = go.Figure(
             data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")],
-            layout=go.Layout(title="Ingresos por Mes", xaxis_title="Mes", yaxis_title="Ingresos ($)", height=400)
+            layout=go.Layout(
+                title=dict(
+                    text="Ingresos por Mes",
+                    font=dict(size=24, family="Arial", color="black")
+                ),
+                xaxis=dict(
+                    title=dict(
+                        text="Mes",
+                        font=dict(size=18, family="Arial")
+                    ),
+                    tickfont=dict(size=18)
+                ),
+                yaxis=dict(
+                    title=dict(
+                        text="Ingresos ($)",
+                        font=dict(size=18, family="Arial")
+                    ),
+                    tickfont=dict(size=18)
+                ),
+                width=800,
+                height=600,
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
         )
-        chart_ingresos = ft.Container(PlotlyChart(fig_ingresos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_ingresos = ft.Container(
+            PlotlyChart(fig_ingresos, expand=True), 
+            bgcolor=ft.colors.WHITE, 
+            border_radius=12, 
+            padding=20, 
+            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
+            margin=ft.margin.symmetric(vertical=10)
+        )
 
         # Distribución de Métodos de Pago (datos reales)
         data_metodos = self.controller.get_payment_methods_distribution()
         metodos = list(data_metodos.keys())
         valores = list(data_metodos.values())
         fig_metodos = go.Figure(
-            data=[go.Pie(labels=metodos, values=valores, hole=0.3)],
-            layout=go.Layout(title="Distribución de Métodos de Pago", height=400)
+            data=[go.Pie(
+                labels=metodos, 
+                values=valores, 
+                hole=0.3,
+                textfont=dict(size=18)
+            )],
+            layout=go.Layout(
+                title=dict(
+                    text="Distribución de Métodos de Pago",
+                    font=dict(size=24, family="Arial", color="black")
+                ),
+                legend=dict(
+                    font=dict(size=18)
+                ),
+                width=800,
+                height=600,
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
         )
-        chart_metodos = ft.Container(PlotlyChart(fig_metodos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_metodos = ft.Container(
+            PlotlyChart(fig_metodos, expand=True), 
+            bgcolor=ft.colors.WHITE, 
+            border_radius=12, 
+            padding=20, 
+            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
+            margin=ft.margin.symmetric(vertical=10)
+        )
 
         # Nuevos Miembros por Mes (datos reales)
         data_nuevos = self.controller.get_new_members_per_month()
         meses = data_nuevos["meses"]
         nuevos = data_nuevos["nuevos"]
         fig_nuevos = go.Figure(
-            data=[go.Scatter(x=meses, y=nuevos, mode="lines+markers", line=dict(color="#4CAF50"))],
-            layout=go.Layout(title="Nuevos Miembros por Mes", xaxis_title="Mes", yaxis_title="Cantidad", height=400)
+            data=[go.Scatter(
+                x=meses, 
+                y=nuevos, 
+                mode="lines+markers", 
+                line=dict(color="#4CAF50"),
+                textfont=dict(size=18)
+            )],
+            layout=go.Layout(
+                title=dict(
+                    text="Nuevos Miembros por Mes",
+                    font=dict(size=24, family="Arial", color="black")
+                ),
+                xaxis=dict(
+                    title=dict(
+                        text="Mes",
+                        font=dict(size=18, family="Arial")
+                    ),
+                    tickfont=dict(size=18)
+                ),
+                yaxis=dict(
+                    title=dict(
+                        text="Cantidad",
+                        font=dict(size=18, family="Arial")
+                    ),
+                    tickfont=dict(size=18)
+                ),
+                width=800,
+                height=600,
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
         )
-        chart_nuevos = ft.Container(PlotlyChart(fig_nuevos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_nuevos = ft.Container(
+            PlotlyChart(fig_nuevos, expand=True), 
+            bgcolor=ft.colors.WHITE, 
+            border_radius=12, 
+            padding=20, 
+            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
+            margin=ft.margin.symmetric(vertical=10)
+        )
 
         # Membresías Activas por Tipo (datos reales)
         data_tipos = self.controller.get_active_memberships_by_type()
         tipos = list(data_tipos.keys())
         activos = list(data_tipos.values())
         fig_tipos = go.Figure(
-            data=[go.Bar(x=tipos, y=activos, marker_color="#FF9800")],
-            layout=go.Layout(title="Membresías Activas por Tipo", xaxis_title="Tipo", yaxis_title="Cantidad", height=400)
+            data=[go.Bar(
+                x=tipos, 
+                y=activos, 
+                marker_color="#FF9800",
+                textfont=dict(size=18)
+            )],
+            layout=go.Layout(
+                title=dict(
+                    text="Membresías Activas por Tipo",
+                    font=dict(size=24, family="Arial", color="black")
+                ),
+                xaxis=dict(
+                    title=dict(
+                        text="Tipo",
+                        font=dict(size=18, family="Arial")
+                    ),
+                    tickfont=dict(size=18)
+                ),
+                yaxis=dict(
+                    title=dict(
+                        text="Cantidad",
+                        font=dict(size=18, family="Arial")
+                    ),
+                    tickfont=dict(size=18)
+                ),
+                width=800,
+                height=600,
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
         )
-        chart_tipos = ft.Container(PlotlyChart(fig_tipos, expand=True), height=420, bgcolor=ft.colors.WHITE, border_radius=12, padding=20, shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), margin=ft.margin.symmetric(vertical=10))
+        chart_tipos = ft.Container(
+            PlotlyChart(fig_tipos, expand=True), 
+            bgcolor=ft.colors.WHITE, 
+            border_radius=12, 
+            padding=20, 
+            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
+            margin=ft.margin.symmetric(vertical=10)
+        )
 
         charts_section = ft.Column([
                 ft.ResponsiveRow([
