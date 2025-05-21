@@ -1,19 +1,25 @@
 import flet as ft
 from gym_manager.components.header import create_header
 from gym_manager.components.sidebar import create_sidebar
-from gym_manager.utils.navigation import navigate_to_login
+from gym_manager.utils.navigation import navigate_to_login, db_session
 from gym_manager.views.module_views import (
     MembersView, PaymentsView, ReportsView,
     PaymentMethodsView, UsersView, BackupsView
 )
 from gym_manager.views.statistics_view import StatisticsView
 from gym_manager.controllers.statistics_controller import StatisticsController
+from gym_manager.controllers.payment_controller import PaymentController
+from gym_manager.controllers.member_controller import MemberController
+from datetime import datetime, timedelta
 
 class HomeView:
     def __init__(self, page: ft.Page, user_rol: str, user_name: str = "Usuario"):
         self.page = page
         self.user_rol = user_rol
         self.user_name = user_name
+        # Inicializar controladores
+        self.payment_controller = PaymentController(db_session)
+        self.member_controller = MemberController(db_session)
         # Inicializar el snackbar
         self.snack = ft.SnackBar(content=ft.Text(""))
         self.page.overlay.append(self.snack)
@@ -49,7 +55,7 @@ class HomeView:
         self.main_content = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("¡Bienvenido al Sistema!", size=32, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"¡Bienvenido, {self.user_name}! 👋", size=32, weight=ft.FontWeight.BOLD),
                     ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
                     ft.Container(height=20),
                     self.create_stats_row(),
@@ -83,12 +89,46 @@ class HomeView:
         self.page.update()
 
     def create_stats_row(self):
+        # Obtener datos reales de pagos de hoy
+        hoy = datetime.now()
+        inicio_dia = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+        fin_dia = hoy.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        pagos_hoy = self.payment_controller.get_payments({
+            'date_from': inicio_dia,
+            'date_to': fin_dia
+        })
+        # Filtrar solo pagos activos y sumar sus montos
+        total_pagos_hoy = sum(
+            pago.monto for pago in pagos_hoy 
+            if pago.estado == True  # Solo pagos activos
+        )
+
+        # Obtener nuevos miembros del mes actual
+        inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0)
+        fin_mes = (inicio_mes.replace(month=inicio_mes.month + 1) if inicio_mes.month < 12 
+                  else inicio_mes.replace(year=inicio_mes.year + 1, month=1)) - timedelta(days=1)
+        nuevos_miembros = self.member_controller.get_members({
+            'fecha_registro_desde': inicio_mes,
+            'fecha_registro_hasta': fin_mes
+        })
+        total_nuevos = len(nuevos_miembros)
+
+        # Obtener membresías que vencen esta semana
+        inicio_semana = datetime.now().replace(hour=0, minute=0, second=0)
+        fin_semana = inicio_semana + timedelta(days=7)
+        vencimientos = self.member_controller.get_expired_memberships_count()
+
+        # Obtener ingresos totales del mes actual
+        ingresos_mes = self.payment_controller.get_current_month_payments_sum()
+        nombre_mes = datetime.now().strftime("%B").capitalize()
+
         return ft.Row(
             controls=[
-                self.create_stat_card("Total Miembros", "150", ft.icons.PEOPLE, ft.colors.BLUE),
-                self.create_stat_card("Activos Hoy", "45", ft.icons.FITNESS_CENTER, ft.colors.GREEN),
-                self.create_stat_card("Pagos Pendientes", "12", ft.icons.PAYMENT, ft.colors.ORANGE),
-                self.create_stat_card("Rutinas Activas", "34", ft.icons.SCHEDULE, ft.colors.PURPLE),
+                self.create_stat_card("💳 Pagos hoy", f"${total_pagos_hoy:,.2f}", ft.icons.PAYMENT, ft.colors.BLUE),
+                self.create_stat_card("🧍‍♂️ Nuevos miembros este mes", str(total_nuevos), ft.icons.PEOPLE, ft.colors.GREEN),
+                self.create_stat_card("📅 Vencimientos esta semana", str(vencimientos), ft.icons.CALENDAR_TODAY, ft.colors.ORANGE),
+                self.create_stat_card("📈 Ingresos en " + nombre_mes, f"${ingresos_mes:,.2f}", ft.icons.TRENDING_UP, ft.colors.PURPLE),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
@@ -126,7 +166,7 @@ class HomeView:
             self.section_title = "Dashboard"
             self.main_content.content = ft.Column(
                 controls=[
-                    ft.Text("¡Bienvenido al Sistema!", size=32, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"¡Bienvenido, {self.user_name}! 👋", size=32, weight=ft.FontWeight.BOLD),
                     ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
                     ft.Container(height=20),
                     self.create_stats_row(),
