@@ -69,6 +69,8 @@ class HomeView:
                         expand=True,
                     ),
                 ],
+                scroll=ft.ScrollMode.ADAPTIVE,  # Agregar scroll adaptativo
+                spacing=0,  # Controlar espaciado con márgenes de los hijos
             ),
             expand=True,
             padding=ft.padding.all(20),
@@ -320,6 +322,8 @@ class HomeView:
                         expand=True,
                     ),
                 ],
+                scroll=ft.ScrollMode.ADAPTIVE,  # Agregar scroll adaptativo aquí también
+                spacing=0,  # Controlar espaciado con márgenes de los hijos
             )
         elif index == 1:  # Gestión de Miembros
             self.section_title = "Gestión de Miembros"
