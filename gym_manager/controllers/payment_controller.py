@@ -30,6 +30,19 @@ class PaymentController:
                     query = query.join(MetodoPago).filter(
                         MetodoPago.descripcion == filters['payment_method']
                     )
+                
+                # Ordenamiento
+                if filters.get('order_by'):
+                    order_column = getattr(Pago, filters['order_by'], None)
+                    if order_column is not None:
+                        if filters.get('order_direction') == 'desc':
+                            query = query.order_by(order_column.desc())
+                        else:
+                            query = query.order_by(order_column.asc())
+                
+                # Límite de resultados
+                if filters.get('limit'):
+                    query = query.limit(filters['limit'])
             
             return query.all()
         except (DBAPIError, PendingRollbackError):

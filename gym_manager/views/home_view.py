@@ -59,6 +59,15 @@ class HomeView:
                     ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
                     ft.Container(height=20),
                     self.create_stats_row(),
+                    ft.Container(height=30),  # Espacio entre las cards y las tablas
+                    ft.Row(
+                        controls=[
+                            self.create_recent_members_table(),
+                            ft.Container(width=20),  # Espacio entre tablas
+                            self.create_recent_payments_table(),
+                        ],
+                        expand=True,
+                    ),
                 ],
             ),
             expand=True,
@@ -156,6 +165,137 @@ class HomeView:
             padding=20,
         )
 
+    def create_recent_members_table(self):
+        # Obtener los últimos 5 miembros registrados
+        miembros_recientes = self.member_controller.get_members({
+            'limit': 5,
+            'order_by': 'fecha_registro',
+            'order_direction': 'desc'
+        })
+
+        # Crear la tabla
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("Miembros Recientes", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Column(
+                        controls=[
+                            ft.DataTable(
+                                columns=[
+                                    ft.DataColumn(ft.Text("Nombre", weight=ft.FontWeight.BOLD)),
+                                    ft.DataColumn(ft.Text("Fecha de Alta", weight=ft.FontWeight.BOLD)),
+                                    ft.DataColumn(ft.Text("Tipo de Membresía", weight=ft.FontWeight.BOLD)),
+                                ],
+                                rows=[
+                                    ft.DataRow(
+                                        cells=[
+                                            ft.DataCell(ft.Text(f"{miembro.nombre} {miembro.apellido}")),
+                                            ft.DataCell(ft.Text(miembro.fecha_registro.strftime("%d/%m/%Y"))),
+                                            ft.DataCell(ft.Text(miembro.tipo_membresia or "No especificado")),
+                                        ]
+                                    ) for miembro in miembros_recientes
+                                ],
+                                border=ft.border.all(1, ft.colors.GREY_300),
+                                border_radius=10,
+                                vertical_lines=ft.border.all(1, ft.colors.GREY_300),
+                                horizontal_lines=ft.border.all(1, ft.colors.GREY_300),
+                                column_spacing=50,
+                                heading_row_color=ft.colors.GREY_100,
+                                heading_text_style=ft.TextStyle(
+                                    size=14,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=ft.colors.GREY_800,
+                                ),
+                                data_row_color=ft.colors.WHITE,
+                                data_text_style=ft.TextStyle(
+                                    size=14,
+                                    color=ft.colors.GREY_800,
+                                ),
+                            ),
+                        ],
+                        scroll=ft.ScrollMode.AUTO,
+                        height=300,
+                    ),
+                ],
+                spacing=10,
+            ),
+            padding=ft.padding.all(20),
+            bgcolor=ft.colors.WHITE,
+            border_radius=10,
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=10,
+                color=ft.colors.GREY_300,
+            ),
+        )
+
+    def create_recent_payments_table(self):
+        # Obtener los últimos 5 pagos
+        pagos_recientes = self.payment_controller.get_payments({
+            'limit': 5,
+            'order_by': 'fecha_pago',
+            'order_direction': 'desc'
+        })
+
+        # Crear la tabla
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("Últimos Pagos", size=20, weight=ft.FontWeight.BOLD),
+                    ft.Column(
+                        controls=[
+                            ft.DataTable(
+                                columns=[
+                                    ft.DataColumn(ft.Text("Cliente", weight=ft.FontWeight.BOLD)),
+                                    ft.DataColumn(ft.Text("Fecha", weight=ft.FontWeight.BOLD)),
+                                    ft.DataColumn(ft.Text("Monto", weight=ft.FontWeight.BOLD)),
+                                    ft.DataColumn(ft.Text("Método", weight=ft.FontWeight.BOLD)),
+                                ],
+                                rows=[
+                                    ft.DataRow(
+                                        cells=[
+                                            ft.DataCell(ft.Text(f"{pago.miembro.nombre} {pago.miembro.apellido}")),
+                                            ft.DataCell(ft.Text(pago.fecha_pago.strftime("%d/%m/%Y"))),
+                                            ft.DataCell(ft.Text(f"${pago.monto:,.2f}")),
+                                            ft.DataCell(ft.Text(pago.metodo_pago.descripcion)),
+                                        ]
+                                    ) for pago in pagos_recientes
+                                ],
+                                border=ft.border.all(1, ft.colors.GREY_300),
+                                border_radius=10,
+                                vertical_lines=ft.border.all(1, ft.colors.GREY_300),
+                                horizontal_lines=ft.border.all(1, ft.colors.GREY_300),
+                                column_spacing=50,
+                                heading_row_color=ft.colors.GREY_100,
+                                heading_text_style=ft.TextStyle(
+                                    size=14,
+                                    weight=ft.FontWeight.BOLD,
+                                    color=ft.colors.GREY_800,
+                                ),
+                                data_row_color=ft.colors.WHITE,
+                                data_text_style=ft.TextStyle(
+                                    size=14,
+                                    color=ft.colors.GREY_800,
+                                ),
+                            ),
+                        ],
+                        scroll=ft.ScrollMode.AUTO,
+                        height=300,
+                    ),
+                ],
+                spacing=10,
+            ),
+            padding=ft.padding.all(20),
+            bgcolor=ft.colors.WHITE,
+            border_radius=10,
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=10,
+                color=ft.colors.GREY_300,
+            ),
+            expand=True,  # Para que ocupe el espacio disponible
+        )
+
     def handle_route_change(self, index: int):
         # Limpiar el contenido actual
         self.main_content.content = None
@@ -170,6 +310,15 @@ class HomeView:
                     ft.Text("Selecciona una opción del menú para comenzar.", size=16, color=ft.colors.GREY_700),
                     ft.Container(height=20),
                     self.create_stats_row(),
+                    ft.Container(height=30),  # Espacio entre las cards y las tablas
+                    ft.Row(
+                        controls=[
+                            self.create_recent_members_table(),
+                            ft.Container(width=20),  # Espacio entre tablas
+                            self.create_recent_payments_table(),
+                        ],
+                        expand=True,
+                    ),
                 ],
             )
         elif index == 1:  # Gestión de Miembros
