@@ -1,0 +1,379 @@
+import os
+import logging
+from datetime import datetime
+from pathlib import Path
+from sqlalchemy.orm import Session
+from sqlalchemy import text, create_engine
+from gym_manager.models.backup import Backup
+import traceback
+from typing import List, Optional, Tuple
+from dotenv import load_dotenv
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class BackupService:
+    """
+    Servicio para gestionar los backups de la base de datos.
+    
+    Este servicio maneja la creación, restauración y gestión de backups
+    de la base de datos MySQL.
+    """
+    
+    def __init__(self, db_session: Session):
+        self.db_session = db_session
+        # Obtener la ruta absoluta del directorio del proyecto
+        project_root = Path(__file__).parent.parent.parent
+        self.backup_dir = project_root / "backups"
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Configurar el logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        
+        # Crear manejador de archivo
+        handler = logging.FileHandler('backup.log')
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        
+        # Cargar variables de entorno
+        load_dotenv()
+        
+        # Configuración de la base de datos
+        self.DATABASE_URL = self._get_database_url()
+        self.engine = create_engine(self.DATABASE_URL)
+        
+        # Limpiar backups antiguos
+        self._clean_old_backups()
+
+    def _get_database_url(self) -> str:
+        """Construye la URL de la base de datos a partir de las variables de entorno."""
+        DB_USER = os.getenv('DB_USER', 'root')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
+        DB_HOST = os.getenv('DB_HOST', 'localhost')
+        DB_PORT = os.getenv('DB_PORT', '3306')
+        DB_NAME = os.getenv('DB_NAME', 'gym_manager')
+        
+        return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+    def _clean_old_backups(self, max_backups: int = 10):
+        """
+        Elimina los backups antiguos manteniendo solo los últimos max_backups.
+        
+        Args:
+            max_backups (int): Número máximo de backups a mantener
+        """
+        try:
+            backups = self.get_backups()
+            if len(backups) > max_backups:
+                self.logger.info(f"[Cleanup] Limpiando backups antiguos (máximo: {max_backups})")
+                for backup in backups[max_backups:]:
+                    self.delete_backup(backup.id)
+                self.logger.info(f"[Cleanup] Se eliminaron {len(backups) - max_backups} backups antiguos")
+        except Exception as e:
+            self.logger.error(f"[Cleanup] Error limpiando backups antiguos: {str(e)}")
+
+    def create_backup(self, description: str = None, created_by: str = None) -> Backup:
+        """
+        Crea un nuevo backup de la base de datos.
+        
+        Args:
+            description (str, optional): Descripción del backup
+            created_by (str, optional): Usuario que crea el backup
+            
+        Returns:
+            Backup: Objeto Backup creado
+            
+        Raises:
+            Exception: Si hay un error al crear el backup
+        """
+        self.logger.info("[Backup] Iniciando creación de backup...")
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_name = f"backup_{timestamp}.sql"
+        backup_path = self.backup_dir / backup_name
+
+        try:
+            backup = Backup(
+                name=backup_name,
+                file_path=str(backup_path),
+                size_mb=0,
+                status='in_progress',
+                description=description,
+                created_by=created_by
+            )
+            self.db_session.add(backup)
+            self.db_session.commit()
+
+            self._write_backup_file(backup_path)
+
+            # Validación final del archivo
+            if not backup_path.exists() or backup_path.stat().st_size == 0:
+                error_msg = "[Backup] El archivo está vacío o no se creó correctamente"
+                self.logger.error(error_msg)
+                backup.status = 'failed'
+                backup.error_message = error_msg
+                self.db_session.commit()
+                raise Exception(error_msg)
+
+            # Guardar tamaño final y estado
+            backup.size_mb = backup_path.stat().st_size / (1024 * 1024)
+            backup.status = 'completed'
+            self.db_session.commit()
+
+            self.logger.info(f"[Backup] Backup {backup_name} creado correctamente ({backup.size_mb:.2f} MB)")
+            return backup
+
+        except Exception as e:
+            self.logger.error(f"[Backup] Error al crear backup: {str(e)}")
+            if 'backup' in locals():
+                backup.status = 'failed'
+                backup.error_message = str(e)
+                self.db_session.commit()
+            raise
+
+    def _write_backup_file(self, backup_path: Path):
+        """Escribe el archivo de backup con la estructura y datos de la base de datos."""
+        with open(backup_path, 'w', encoding='utf-8') as f:
+            f.write("-- Backup generado por Gym Manager\n")
+            f.write("SET FOREIGN_KEY_CHECKS=0;\n\n")
+
+            with self.engine.connect() as conn:
+                tables = [row[0] for row in conn.execute(text("SHOW TABLES"))]
+
+                for table in tables:
+                    self.logger.info(f"[Backup] Procesando tabla: {table}")
+
+                    # Estructura de la tabla
+                    create_stmt = conn.execute(text(f"SHOW CREATE TABLE {table}")).fetchone()[1]
+                    f.write(f"-- Estructura de la tabla {table}\n")
+                    f.write(f"DROP TABLE IF EXISTS {table};\n")
+                    f.write(f"{create_stmt};\n\n")
+
+                    # Datos
+                    result = conn.execute(text(f"SELECT * FROM {table}"))
+                    rows = result.fetchall()
+                    columns = result.keys()
+
+                    if rows:
+                        self.logger.info(f"[Backup] {len(rows)} filas encontradas en {table}")
+                        f.write(f"-- Datos de la tabla {table}\n")
+
+                        for row in rows:
+                            values = []
+                            for val in row:
+                                if val is None:
+                                    values.append("NULL")
+                                elif isinstance(val, (int, float)):
+                                    values.append(str(val))
+                                else:
+                                    escaped = str(val).replace("'", "''")
+                                    values.append(f"'{escaped}'")
+                            
+                            values_str = ', '.join(values)
+                            columns_str = ', '.join(columns)
+                            f.write(f"INSERT INTO {table} ({columns_str}) VALUES ({values_str});\n")
+                        f.write("\n")
+                    else:
+                        self.logger.info(f"[Backup] Tabla {table} vacía")
+
+    def get_backups(self) -> list[Backup]:
+        """
+        Obtiene la lista de todos los backups.
+        
+        Returns:
+            list[Backup]: Lista de objetos Backup
+        """
+        return self.db_session.query(Backup).order_by(Backup.created_at.desc()).all()
+
+    def delete_backup(self, backup_id: int) -> bool:
+        """
+        Elimina un backup específico.
+        
+        Args:
+            backup_id (int): ID del backup a eliminar
+            
+        Returns:
+            bool: True si la eliminación fue exitosa
+            
+        Raises:
+            Exception: Si hay un error al eliminar el backup
+        """
+        self.logger.info(f"[Delete] Iniciando eliminación de backup ID: {backup_id}")
+        
+        backup = self.db_session.query(Backup).get(backup_id)
+        if not backup:
+            raise Exception("Backup no encontrado")
+                
+        try:
+            # Eliminar archivo físico
+            backup_path = Path(backup.file_path)
+            if not backup_path.is_absolute():
+                backup_path = self.backup_dir / backup_path.name
+                
+            if backup_path.exists():
+                try:
+                    backup_path.unlink()
+                    self.logger.info(f"[Delete] Archivo físico eliminado: {backup_path}")
+                except Exception as e:
+                    self.logger.error(f"[Delete] Error eliminando archivo físico {backup_path}: {str(e)}")
+                    raise Exception(f"No se pudo eliminar el archivo físico: {str(e)}")
+            else:
+                self.logger.warning(f"[Delete] El archivo físico no existe: {backup_path}")
+            
+            # Eliminar registro de la base de datos
+            self.db_session.delete(backup)
+            self.db_session.commit()
+            
+            self.logger.info(f"[Delete] Backup eliminado exitosamente: {backup.name}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"[Delete] Error al eliminar backup: {str(e)}")
+            self.db_session.rollback()
+            raise
+
+    def restore_backup(self, backup_id: int) -> bool:
+        """
+        Restaura un backup específico.
+        
+        Args:
+            backup_id (int): ID del backup a restaurar
+            
+        Returns:
+            bool: True si la restauración fue exitosa
+            
+        Raises:
+            Exception: Si hay un error al restaurar el backup
+        """
+        self.logger.info(f"[Restore] Iniciando restauración para backup ID: {backup_id}")
+
+        backup = self.db_session.query(Backup).get(backup_id)
+        if not backup:
+            raise Exception("Backup no encontrado")
+
+        if not backup.is_completed:
+            raise Exception("El backup no está completo o falló")
+
+        backup_path = Path(backup.file_path)
+        if not backup_path.is_absolute():
+            backup_path = self.backup_dir / backup_path.name
+
+        if not backup_path.exists():
+            raise Exception("El archivo de backup no existe")
+
+        if backup_path.stat().st_size == 0:
+            raise Exception("El archivo de backup está vacío")
+
+        try:
+            self._execute_restore(backup_path)
+            return True
+        except Exception as e:
+            self.logger.error(f"[Restore] [ERROR] Fallo durante la restauración. Se realizó rollback. Detalles: {str(e)}")
+            self.logger.debug(traceback.format_exc())
+            raise
+
+    def _execute_restore(self, backup_path: Path):
+        """Ejecuta la restauración del backup."""
+        with open(backup_path, 'r', encoding='utf-8') as f:
+            sql_commands = f.read()
+
+        create_commands = []
+        insert_commands = []
+
+        for command in sql_commands.split(';'):
+            command = command.strip()
+            if not command or command.startswith('--'):
+                continue
+
+            if command.upper().startswith('CREATE TABLE'):
+                create_commands.append(command)
+            elif command.upper().startswith('INSERT'):
+                insert_commands.append(command)
+            elif command.upper().startswith('DROP TABLE'):
+                create_commands.insert(0, command)
+
+        if not create_commands:
+            raise Exception("El backup no contiene comandos CREATE")
+
+        total_commands = len(create_commands) + len(insert_commands)
+        self.logger.info(f"[Restore] Total de comandos a ejecutar: {total_commands}")
+
+        with self.engine.begin() as conn:
+            self.logger.info("[Restore] Iniciando restauración dentro de una transacción")
+            conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+            
+            # Limpiar tablas existentes
+            self._truncate_tables(conn)
+            
+            # Crear tablas
+            self._create_tables(conn, create_commands)
+            
+            # Insertar datos
+            self._insert_data(conn, insert_commands)
+            
+            conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+            self.logger.info("[Restore] Claves foráneas reactivadas")
+
+    def _truncate_tables(self, conn):
+        """Trunca las tablas existentes."""
+        tablas = [
+            'comprobantes_pago', 'pagos', 'rutinas',
+            'miembros', 'metodos_pago', 'usuarios',
+            'cuota_mensual', 'backups'
+        ]
+        
+        self.logger.info("[Restore] Iniciando limpieza de tablas...")
+        for tabla in tablas:
+            try:
+                conn.execute(text(f"TRUNCATE TABLE {tabla}"))
+                self.logger.info(f"[Restore] [OK] Tabla {tabla} vaciada")
+            except Exception as e:
+                self.logger.warning(f"[Restore] [WARN] Error vaciando tabla {tabla}: {str(e)}")
+
+    def _create_tables(self, conn, create_commands):
+        """Crea las tablas del backup."""
+        self.logger.info("[Restore] Iniciando creación de tablas...")
+        for i, cmd in enumerate(create_commands, 1):
+            try:
+                conn.execute(text(cmd))
+                self.logger.info(f"[Restore] [OK] Tabla {i}/{len(create_commands)} creada")
+            except Exception as e:
+                self.logger.error(f"[Restore] [ERROR] Error en CREATE TABLE: {str(e)}")
+                raise
+
+    def _insert_data(self, conn, insert_commands):
+        """Inserta los datos del backup."""
+        self.logger.info("[Restore] Iniciando inserción de datos...")
+        insert_count = 0
+        total_inserts = len(insert_commands)
+        
+        for i, cmd in enumerate(insert_commands, 1):
+            try:
+                conn.execute(text(cmd))
+                insert_count += 1
+                if i % 10 == 0 or i == total_inserts:
+                    self.logger.info(f"[Restore] Progreso: {i}/{total_inserts} registros insertados ({(i/total_inserts)*100:.1f}%)")
+            except Exception as e:
+                self.logger.error(f"[Restore] [ERROR] Error en INSERT {i}/{total_inserts}: {str(e)}")
+                raise
+
+    def get_backup(self, backup_id: int) -> Backup:
+        """
+        Obtiene un backup específico.
+        
+        Args:
+            backup_id (int): ID del backup a obtener
+            
+        Returns:
+            Backup: Objeto Backup solicitado
+            
+        Raises:
+            Exception: Si el backup no existe
+        """
+        backup = self.db_session.query(Backup).get(backup_id)
+        if not backup:
+            raise Exception("Backup no encontrado")
+        return backup 
