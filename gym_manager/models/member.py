@@ -1,10 +1,10 @@
-from sqlalchemy import Column, Integer, String, Date, Text, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Date, ForeignKey, Boolean, Text, DateTime
 from sqlalchemy.orm import relationship
-from gym_manager.models import Base
+from gym_manager.models.base import Base
 
 class Miembro(Base):
-    __tablename__ = "miembros"
-
+    __tablename__ = 'miembros'
+    
     id_miembro = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(String(50), nullable=False)
     apellido = Column(String(50), nullable=False)
@@ -18,10 +18,9 @@ class Miembro(Base):
     telefono = Column(String(20), nullable=True)
     fecha_registro = Column(DateTime, nullable=False)
     informacion_medica = Column(Text, nullable=True)
-
+    
     # Relaciones
-    rutinas = relationship("Rutina", back_populates="miembro", cascade="all, delete-orphan")
     pagos = relationship("Pago", back_populates="miembro", cascade="all, delete-orphan")
-
+    
     def __repr__(self):
         return f"<Miembro(id_miembro={self.id_miembro}, nombre={self.nombre}, apellido={self.apellido})>" 

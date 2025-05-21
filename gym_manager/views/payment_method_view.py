@@ -1,11 +1,13 @@
 import flet as ft
+from gym_manager.views.module_views import ModuleView
+from gym_manager.utils.database import get_db_session
+from gym_manager.models.payment_method import MetodoPago
 from gym_manager.controllers.payment_method_controller import PaymentMethodController
-from gym_manager.utils.navigation import db_session
 
-class PaymentMethodView:
+class PaymentMethodView(ModuleView):
     def __init__(self, page: ft.Page):
-        self.page = page
-        self.payment_method_controller = PaymentMethodController(db_session)
+        super().__init__(page, "Gestión de Métodos de Pago")
+        self.payment_method_controller = PaymentMethodController(get_db_session())
         self.setup_payment_method_view()
         self.setup_history_modal()
         self.load_data()

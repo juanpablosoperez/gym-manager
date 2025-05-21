@@ -1,5 +1,6 @@
 from gym_manager.models.member import Miembro
 from datetime import datetime
+from sqlalchemy.exc import SQLAlchemyError
 
 class MemberController:
     def __init__(self, db_session=None):
@@ -9,23 +10,32 @@ class MemberController:
         """
         Obtiene la lista de miembros con filtros opcionales
         """
-        query = self.db_session.query(Miembro)
-        
-        if filters:
-            if filters.get('search'):
-                search = f"%{filters['search']}%"
-                query = query.filter(
-                    (Miembro.nombre.ilike(search)) |
-                    (Miembro.apellido.ilike(search)) |
-                    (Miembro.documento.ilike(search)) |
-                    (Miembro.correo_electronico.ilike(search))
-                )
-            if filters.get('status') is not None:
-                query = query.filter(Miembro.estado == filters['status'])
-            if filters.get('membership_type'):
-                query = query.filter(Miembro.tipo_membresia == filters['membership_type'])
-        
-        return query.all()
+        try:
+            query = self.db_session.query(Miembro)
+            
+            if filters:
+                if filters.get('search'):
+                    search = f"%{filters['search']}%"
+                    query = query.filter(
+                        (Miembro.nombre.ilike(search)) |
+                        (Miembro.apellido.ilike(search)) |
+                        (Miembro.documento.ilike(search)) |
+                        (Miembro.correo_electronico.ilike(search))
+                    )
+                if filters.get('status') is not None:
+                    query = query.filter(Miembro.estado == filters['status'])
+                if filters.get('membership_type'):
+                    query = query.filter(Miembro.tipo_membresia == filters['membership_type'])
+            
+            return query.all()
+        except SQLAlchemyError as e:
+            print(f"Error de base de datos: {str(e)}")
+            # Intentar reconectar
+            try:
+                self.db_session.rollback()
+            except:
+                pass
+            raise Exception("Error al conectar con la base de datos. Por favor, intente nuevamente.")
 
     def create_member(self, member_data):
         """
