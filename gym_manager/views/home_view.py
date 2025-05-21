@@ -248,7 +248,7 @@ class HomeView:
                         controls=[
                             ft.DataTable(
                                 columns=[
-                                    ft.DataColumn(ft.Text("Cliente", weight=ft.FontWeight.BOLD)),
+                                    ft.DataColumn(ft.Text("Nombre", weight=ft.FontWeight.BOLD)),
                                     ft.DataColumn(ft.Text("Fecha", weight=ft.FontWeight.BOLD)),
                                     ft.DataColumn(ft.Text("Monto", weight=ft.FontWeight.BOLD)),
                                     ft.DataColumn(ft.Text("Método", weight=ft.FontWeight.BOLD)),
