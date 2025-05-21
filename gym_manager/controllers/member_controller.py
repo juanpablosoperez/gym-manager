@@ -26,6 +26,23 @@ class MemberController:
                 query = query.filter(Miembro.estado == filters['status'])
             if filters.get('membership_type'):
                 query = query.filter(Miembro.tipo_membresia == filters['membership_type'])
+            if filters.get('fecha_registro_desde'):
+                query = query.filter(Miembro.fecha_registro >= filters['fecha_registro_desde'])
+            if filters.get('fecha_registro_hasta'):
+                query = query.filter(Miembro.fecha_registro <= filters['fecha_registro_hasta'])
+            
+            # Ordenamiento
+            if filters.get('order_by'):
+                order_column = getattr(Miembro, filters['order_by'], None)
+                if order_column is not None:
+                    if filters.get('order_direction') == 'desc':
+                        query = query.order_by(order_column.desc())
+                    else:
+                        query = query.order_by(order_column.asc())
+            
+            # Límite de resultados
+            if filters.get('limit'):
+                query = query.limit(filters['limit'])
         
         return query.all()
 
