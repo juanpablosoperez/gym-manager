@@ -1,16 +1,21 @@
 import flet as ft
 from datetime import datetime
 from gym_manager.controllers.member_controller import MemberController
-from gym_manager.utils.navigation import db_session
+from gym_manager.controllers.routine_controller import RoutineController
+from gym_manager.utils.database import get_db_session
 from gym_manager.services.excel_utils import export_members_to_excel, export_members_to_pdf
 import os
 import subprocess
+import tempfile
+from gym_manager.views.module_views import ModuleView
+from gym_manager.models.member import Miembro
 
-class MembersView:
+class MembersView(ModuleView):
     def __init__(self, page: ft.Page):
-        self.page = page
-        self.member_controller = MemberController(db_session)
-        self.db_session = db_session
+        super().__init__(page, "Gestión de Miembros")
+        self.member_controller = MemberController(get_db_session())
+        self.routine_controller = RoutineController()
+        self.db_session = get_db_session()
         
         # Inicializar referencias
         self.new_member_name = ft.Ref[ft.TextField]()
@@ -142,7 +147,6 @@ class MembersView:
         self.members_table = ft.DataTable(
             columns=[
                 ft.DataColumn(ft.Text("Nombre", size=18, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Documento", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Email", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Teléfono", size=18, weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Membresía", size=18, weight=ft.FontWeight.BOLD)),
@@ -343,8 +347,17 @@ class MembersView:
         """
         Carga los datos de miembros
         """
-        members = self.member_controller.get_members()
-        self.update_members_table(members)
+        try:
+            members = self.member_controller.get_members()
+            self.update_members_table(members)
+        except Exception as e:
+            print(f"Error al cargar datos: {str(e)}")
+            self.show_message(f"Error al cargar los datos: {str(e)}", ft.colors.RED)
+            # Intentar reconectar
+            try:
+                self.db_session.rollback()
+            except:
+                pass
 
     def update_members_table(self, members):
         """
@@ -355,9 +368,18 @@ class MembersView:
             self.members_table.rows.append(
                 ft.DataRow(cells=[
                     ft.DataCell(ft.Text(f"{member.nombre} {member.apellido}")),
-                    ft.DataCell(ft.Text(member.documento)),
                     ft.DataCell(ft.Text(member.correo_electronico)),
-                    ft.DataCell(ft.Text(member.telefono or "-")),
+                    ft.DataCell(
+                        ft.Row([
+                            ft.Text(member.telefono or "-"),
+                            ft.IconButton(
+                                icon=ft.icons.PHONE_ANDROID,
+                                icon_color=ft.colors.GREEN,
+                                tooltip="Abrir WhatsApp",
+                                on_click=lambda e, m=member: self.open_whatsapp(m)
+                            ) if member.telefono else None,
+                        ])
+                    ),
                     ft.DataCell(ft.Text(member.tipo_membresia)),
                     ft.DataCell(
                         ft.Container(
@@ -389,6 +411,18 @@ class MembersView:
                                 icon_color=ft.colors.GREEN,
                                 tooltip="Ver detalles",
                                 on_click=lambda e, m=member: self.view_member_details(m)
+                            ),
+                            ft.IconButton(
+                                icon=ft.icons.FITNESS_CENTER,
+                                icon_color=ft.colors.PURPLE,
+                                tooltip="Asignar Rutina",
+                                on_click=lambda e, m=member: self.show_assign_routine_modal(m)
+                            ),
+                            ft.IconButton(
+                                icon=ft.icons.LIST_ALT,
+                                icon_color=ft.colors.ORANGE,
+                                tooltip="Ver Rutinas",
+                                on_click=lambda e, m=member: self.view_member_routines(m)
                             ),
                         ])
                     ),
@@ -824,6 +858,172 @@ class MembersView:
         )
         self.page.snack_bar.open = True
         self.page.update()
+
+    def open_whatsapp(self, member):
+        """
+        Abre WhatsApp con el número de teléfono del miembro
+        """
+        if member.telefono:
+            # Eliminar cualquier carácter no numérico del teléfono
+            phone = ''.join(filter(str.isdigit, member.telefono))
+            # Asegurarse de que el número tenga el formato correcto para WhatsApp
+            if phone.startswith('0'):
+                phone = phone[1:]
+            if not phone.startswith('54'):
+                phone = '54' + phone
+            # Abrir WhatsApp Web con el número
+            import webbrowser
+            webbrowser.open(f'https://wa.me/{phone}')
+
+    def show_assign_routine_modal(self, member):
+        self.selected_member = member
+        # Obtener rutinas no asignadas
+        rutinas_disponibles = self.routine_controller.get_routines({'unassigned': True})
+        self.assign_routine_dropdown = ft.Ref[ft.Dropdown]()
+        self.assign_routine_modal = ft.AlertDialog(
+            title=ft.Text(f"Asignar Rutina a {member.nombre} {member.apellido}", size=26, weight=ft.FontWeight.BOLD),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Dropdown(
+                        label="Seleccionar Rutina",
+                        ref=self.assign_routine_dropdown,
+                        options=[ft.dropdown.Option(str(r.id_rutina), r.nombre) for r in rutinas_disponibles],
+                        width=400,
+                    ),
+                ]),
+                width=500,
+                padding=20,
+            ),
+            actions=[
+                ft.TextButton("Cancelar", on_click=self.close_assign_routine_modal),
+                ft.ElevatedButton(
+                    "Asignar",
+                    icon=ft.icons.SAVE,
+                    on_click=self.assign_routine,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE,
+                        color=ft.colors.WHITE,
+                    ),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        if self.assign_routine_modal not in self.page.overlay:
+            self.page.overlay.append(self.assign_routine_modal)
+        self.assign_routine_modal.open = True
+        self.page.update()
+
+    def assign_routine(self, e):
+        rutina_id = self.assign_routine_dropdown.current.value
+        if not rutina_id:
+            self.show_message("Seleccione una rutina", ft.colors.RED)
+            return
+        success, message = self.routine_controller.update_routine(int(rutina_id), {'id_miembro': self.selected_member.id_miembro})
+        if success:
+            self.show_message("Rutina asignada exitosamente", ft.colors.GREEN)
+            self.close_assign_routine_modal(e)
+        else:
+            self.show_message(f"Error al asignar la rutina: {message}", ft.colors.RED)
+
+    def view_member_routines(self, member):
+        routines = self.routine_controller.get_member_routines(member.id_miembro)
+        routines_list = ft.Column([
+            ft.Text(f"Rutinas de {member.nombre} {member.apellido}", size=20, weight=ft.FontWeight.BOLD),
+            ft.Container(height=20),
+        ])
+        if routines:
+            for routine in routines:
+                routines_list.controls.append(
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Icon(
+                                        ft.icons.PICTURE_AS_PDF if routine.documento_rutina and routine.nombre and routine.nombre.lower().endswith('.pdf') else ft.icons.TABLE_VIEW,
+                                        color=ft.colors.BLUE
+                                    ),
+                                    ft.Text(routine.nombre, size=16, weight=ft.FontWeight.BOLD),
+                                ]),
+                                ft.Text(f"Nivel: {routine.nivel_dificultad}"),
+                                ft.Text(f"Descripción: {routine.descripcion or 'Sin descripción'}"),
+                                ft.Text(f"Fecha: {routine.fecha_horario.strftime('%d/%m/%Y %H:%M') if routine.fecha_horario else '-'}"),
+                                ft.Row([
+                                    ft.ElevatedButton(
+                                        "Descargar",
+                                        icon=ft.icons.DOWNLOAD,
+                                        on_click=lambda e, r=routine: self.download_routine(r)
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.icons.DELETE,
+                                        icon_color=ft.colors.RED,
+                                        tooltip="Eliminar",
+                                        on_click=lambda e, r=routine: self.delete_routine(r)
+                                    ),
+                                ]),
+                            ]),
+                            padding=20,
+                        ),
+                        margin=10,
+                    )
+                )
+        else:
+            routines_list.controls.append(
+                ft.Text("No hay rutinas asignadas", size=16, color=ft.colors.GREY)
+            )
+        self.routines_modal = ft.AlertDialog(
+            title=ft.Text("Rutinas Asignadas", size=26, weight=ft.FontWeight.BOLD),
+            content=ft.Container(
+                content=routines_list,
+                width=600,
+                height=400,
+                padding=20,
+            ),
+            actions=[
+                ft.TextButton("Cerrar", on_click=lambda e: self.close_routines_modal()),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        if self.routines_modal not in self.page.overlay:
+            self.page.overlay.append(self.routines_modal)
+        self.routines_modal.open = True
+        self.page.update()
+
+    def close_routines_modal(self):
+        """
+        Cierra el modal de rutinas
+        """
+        self.routines_modal.open = False
+        self.page.update()
+
+    def download_routine(self, routine):
+        try:
+            import tempfile, os, webbrowser
+            with tempfile.TemporaryDirectory() as temp_dir:
+                ext = '.pdf' if routine.nombre and routine.nombre.lower().endswith('.pdf') else '.xlsx'
+                file_path = os.path.join(temp_dir, (routine.nombre or f"rutina_{routine.id_rutina}") + ext)
+                with open(file_path, 'wb') as f:
+                    f.write(routine.documento_rutina)
+                webbrowser.open(file_path)
+            self.show_message("Archivo descargado exitosamente", ft.colors.GREEN)
+        except Exception as e:
+            self.show_message(f"Error al descargar el archivo: {str(e)}", ft.colors.RED)
+
+    def delete_routine(self, routine):
+        """
+        Elimina una rutina
+        """
+        success, message = self.routine_controller.delete_routine(routine.id_rutina)
+        if success:
+            self.show_message(message, ft.colors.GREEN)
+            self.close_routines_modal()
+            self.view_member_routines(routine.miembro)
+        else:
+            self.show_message(message, ft.colors.RED)
+
+    def close_assign_routine_modal(self, e=None):
+        if hasattr(self, 'assign_routine_modal'):
+            self.assign_routine_modal.open = False
+            self.page.update()
 
 # Para probar directamente:
 if __name__ == "__main__":
