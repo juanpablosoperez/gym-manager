@@ -1,5 +1,7 @@
 import flet as ft
 from gym_manager.views.member_view import MembersView as MembersViewImpl
+from gym_manager.utils.navigation import db_session
+from gym_manager.views.backup_view import BackupView as BackupViewImpl
 
 class ModuleView:
     def __init__(self, page: ft.Page, title: str):
@@ -68,4 +70,10 @@ class UsersView(ModuleView):
 
 class BackupsView(ModuleView):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Gestión de Backups") 
+        super().__init__(page, "Gestión de Backups")
+        # Obtener la ruta de la base de datos
+        db_path = db_session.get_bind().url.database
+        # Crear la vista de backup con los argumentos necesarios
+        self.backup_view = BackupViewImpl(page, db_path, db_session)
+        self.content = self.backup_view.get_content()
+        self.page.update() 

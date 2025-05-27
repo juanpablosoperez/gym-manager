@@ -11,6 +11,7 @@ from gym_manager.models.routine import Rutina
 from gym_manager.models.payment_method import MetodoPago
 from gym_manager.models.payment import Pago
 from gym_manager.models.payment_receipt import ComprobantePago
+from gym_manager.models.backup import Backup
 
 def init_db(database_url):
     engine = create_engine(database_url)

@@ -8,6 +8,7 @@ from gym_manager.models.backup import Backup
 import traceback
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
+from sqlalchemy.orm import sessionmaker
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +18,7 @@ class BackupService:
     """
     Servicio para gestionar los backups de la base de datos.
     
-    Este servicio maneja la creación, restauración y gestión de backups
+    Este servicio maneja la creación y gestión de backups
     de la base de datos MySQL.
     """
     
@@ -141,7 +142,8 @@ class BackupService:
             f.write("SET FOREIGN_KEY_CHECKS=0;\n\n")
 
             with self.engine.connect() as conn:
-                tables = [row[0] for row in conn.execute(text("SHOW TABLES"))]
+                # Obtener todas las tablas excepto 'backups'
+                tables = [row[0] for row in conn.execute(text("SHOW TABLES")) if row[0] != 'backups']
 
                 for table in tables:
                     self.logger.info(f"[Backup] Procesando tabla: {table}")
@@ -234,131 +236,6 @@ class BackupService:
             self.logger.error(f"[Delete] Error al eliminar backup: {str(e)}")
             self.db_session.rollback()
             raise
-
-    def restore_backup(self, backup_id: int) -> bool:
-        """
-        Restaura un backup específico.
-        
-        Args:
-            backup_id (int): ID del backup a restaurar
-            
-        Returns:
-            bool: True si la restauración fue exitosa
-            
-        Raises:
-            Exception: Si hay un error al restaurar el backup
-        """
-        self.logger.info(f"[Restore] Iniciando restauración para backup ID: {backup_id}")
-
-        backup = self.db_session.query(Backup).get(backup_id)
-        if not backup:
-            raise Exception("Backup no encontrado")
-
-        if not backup.is_completed:
-            raise Exception("El backup no está completo o falló")
-
-        backup_path = Path(backup.file_path)
-        if not backup_path.is_absolute():
-            backup_path = self.backup_dir / backup_path.name
-
-        if not backup_path.exists():
-            raise Exception("El archivo de backup no existe")
-
-        if backup_path.stat().st_size == 0:
-            raise Exception("El archivo de backup está vacío")
-
-        try:
-            self._execute_restore(backup_path)
-            return True
-        except Exception as e:
-            self.logger.error(f"[Restore] [ERROR] Fallo durante la restauración. Se realizó rollback. Detalles: {str(e)}")
-            self.logger.debug(traceback.format_exc())
-            raise
-
-    def _execute_restore(self, backup_path: Path):
-        """Ejecuta la restauración del backup."""
-        with open(backup_path, 'r', encoding='utf-8') as f:
-            sql_commands = f.read()
-
-        create_commands = []
-        insert_commands = []
-
-        for command in sql_commands.split(';'):
-            command = command.strip()
-            if not command or command.startswith('--'):
-                continue
-
-            if command.upper().startswith('CREATE TABLE'):
-                create_commands.append(command)
-            elif command.upper().startswith('INSERT'):
-                insert_commands.append(command)
-            elif command.upper().startswith('DROP TABLE'):
-                create_commands.insert(0, command)
-
-        if not create_commands:
-            raise Exception("El backup no contiene comandos CREATE")
-
-        total_commands = len(create_commands) + len(insert_commands)
-        self.logger.info(f"[Restore] Total de comandos a ejecutar: {total_commands}")
-
-        with self.engine.begin() as conn:
-            self.logger.info("[Restore] Iniciando restauración dentro de una transacción")
-            conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-            
-            # Limpiar tablas existentes
-            self._truncate_tables(conn)
-            
-            # Crear tablas
-            self._create_tables(conn, create_commands)
-            
-            # Insertar datos
-            self._insert_data(conn, insert_commands)
-            
-            conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-            self.logger.info("[Restore] Claves foráneas reactivadas")
-
-    def _truncate_tables(self, conn):
-        """Trunca las tablas existentes."""
-        tablas = [
-            'comprobantes_pago', 'pagos', 'rutinas',
-            'miembros', 'metodos_pago', 'usuarios',
-            'cuota_mensual', 'backups'
-        ]
-        
-        self.logger.info("[Restore] Iniciando limpieza de tablas...")
-        for tabla in tablas:
-            try:
-                conn.execute(text(f"TRUNCATE TABLE {tabla}"))
-                self.logger.info(f"[Restore] [OK] Tabla {tabla} vaciada")
-            except Exception as e:
-                self.logger.warning(f"[Restore] [WARN] Error vaciando tabla {tabla}: {str(e)}")
-
-    def _create_tables(self, conn, create_commands):
-        """Crea las tablas del backup."""
-        self.logger.info("[Restore] Iniciando creación de tablas...")
-        for i, cmd in enumerate(create_commands, 1):
-            try:
-                conn.execute(text(cmd))
-                self.logger.info(f"[Restore] [OK] Tabla {i}/{len(create_commands)} creada")
-            except Exception as e:
-                self.logger.error(f"[Restore] [ERROR] Error en CREATE TABLE: {str(e)}")
-                raise
-
-    def _insert_data(self, conn, insert_commands):
-        """Inserta los datos del backup."""
-        self.logger.info("[Restore] Iniciando inserción de datos...")
-        insert_count = 0
-        total_inserts = len(insert_commands)
-        
-        for i, cmd in enumerate(insert_commands, 1):
-            try:
-                conn.execute(text(cmd))
-                insert_count += 1
-                if i % 10 == 0 or i == total_inserts:
-                    self.logger.info(f"[Restore] Progreso: {i}/{total_inserts} registros insertados ({(i/total_inserts)*100:.1f}%)")
-            except Exception as e:
-                self.logger.error(f"[Restore] [ERROR] Error en INSERT {i}/{total_inserts}: {str(e)}")
-                raise
 
     def get_backup(self, backup_id: int) -> Backup:
         """
