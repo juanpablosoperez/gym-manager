@@ -76,11 +76,8 @@ class RoutineController:
                     search = f"%{filters['search']}%"
                     query = query.filter(Rutina.nombre.ilike(search))
 
-                if filters.get('difficulty'):
-                    query = query.filter(Rutina.nivel_dificultad == filters['difficulty'])
-
-                if filters.get('type'):
-                    query = query.filter(Rutina.tipo == filters['type'])
+                if filters.get('nivel_dificultad'):
+                    query = query.filter(Rutina.nivel_dificultad == filters['nivel_dificultad'])
 
             return query.all()
         finally:

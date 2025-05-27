@@ -18,9 +18,11 @@ class Miembro(Base):
     telefono = Column(String(20), nullable=True)
     fecha_registro = Column(DateTime, nullable=False)
     informacion_medica = Column(Text, nullable=True)
+    id_rutina = Column(Integer, ForeignKey('rutinas.id_rutina'), nullable=True)
     
     # Relaciones
     pagos = relationship("Pago", back_populates="miembro", cascade="all, delete-orphan")
+    rutina = relationship("Rutina", foreign_keys=[id_rutina])
     
     def __repr__(self):
         return f"<Miembro(id_miembro={self.id_miembro}, nombre={self.nombre}, apellido={self.apellido})>" 
