@@ -93,6 +93,21 @@ class RoutineController:
         finally:
             session.close()
 
+    def count_members_assigned_to_routine(self, routine_id: int):
+        """
+        Cuenta cuántos miembros tienen asignada una rutina específica por su ID.
+        """
+        session = get_db_session()
+        try:
+            from gym_manager.models.member import Miembro  # Importar Miembro aquí para evitar dependencia circular si la hay
+            count = session.query(Miembro).filter(Miembro.id_rutina == routine_id).count()
+            return count
+        except Exception as e:
+            print(f"Error al contar miembros asignados a rutina {routine_id}: {str(e)}")
+            return 0
+        finally:
+            session.close()
+
     def create_routine(self, routine_data: dict):
         """
         Crea una nueva rutina
