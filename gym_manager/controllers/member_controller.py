@@ -2,6 +2,7 @@ from gym_manager.models.member import Miembro
 from gym_manager.models.payment import Pago
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_
+from sqlalchemy.exc import SQLAlchemyError
 
 class MemberController:
     def __init__(self, db_session=None):
@@ -11,40 +12,49 @@ class MemberController:
         """
         Obtiene la lista de miembros con filtros opcionales
         """
-        query = self.db_session.query(Miembro)
-        
-        if filters:
-            if filters.get('search'):
-                search = f"%{filters['search']}%"
-                query = query.filter(
-                    (Miembro.nombre.ilike(search)) |
-                    (Miembro.apellido.ilike(search)) |
-                    (Miembro.documento.ilike(search)) |
-                    (Miembro.correo_electronico.ilike(search))
-                )
-            if filters.get('status') is not None:
-                query = query.filter(Miembro.estado == filters['status'])
-            if filters.get('membership_type'):
-                query = query.filter(Miembro.tipo_membresia == filters['membership_type'])
-            if filters.get('fecha_registro_desde'):
-                query = query.filter(Miembro.fecha_registro >= filters['fecha_registro_desde'])
-            if filters.get('fecha_registro_hasta'):
-                query = query.filter(Miembro.fecha_registro <= filters['fecha_registro_hasta'])
+        try:
+            query = self.db_session.query(Miembro)
             
-            # Ordenamiento
-            if filters.get('order_by'):
-                order_column = getattr(Miembro, filters['order_by'], None)
-                if order_column is not None:
-                    if filters.get('order_direction') == 'desc':
-                        query = query.order_by(order_column.desc())
-                    else:
-                        query = query.order_by(order_column.asc())
+            if filters:
+                if filters.get('search'):
+                    search = f"%{filters['search']}%"
+                    query = query.filter(
+                        (Miembro.nombre.ilike(search)) |
+                        (Miembro.apellido.ilike(search)) |
+                        (Miembro.documento.ilike(search)) |
+                        (Miembro.correo_electronico.ilike(search))
+                    )
+                if filters.get('status') is not None:
+                    query = query.filter(Miembro.estado == filters['status'])
+                if filters.get('membership_type'):
+                    query = query.filter(Miembro.tipo_membresia == filters['membership_type'])
+                if filters.get('fecha_registro_desde'):
+                    query = query.filter(Miembro.fecha_registro >= filters['fecha_registro_desde'])
+                if filters.get('fecha_registro_hasta'):
+                    query = query.filter(Miembro.fecha_registro <= filters['fecha_registro_hasta'])
+                
+                # Ordenamiento
+                if filters.get('order_by'):
+                    order_column = getattr(Miembro, filters['order_by'], None)
+                    if order_column is not None:
+                        if filters.get('order_direction') == 'desc':
+                            query = query.order_by(order_column.desc())
+                        else:
+                            query = query.order_by(order_column.asc())
+                
+                # Límite de resultados
+                if filters.get('limit'):
+                    query = query.limit(filters['limit'])
             
-            # Límite de resultados
-            if filters.get('limit'):
-                query = query.limit(filters['limit'])
-        
-        return query.all()
+            return query.all()
+        except SQLAlchemyError as e:
+            print(f"Error de base de datos: {str(e)}")
+            # Intentar reconectar
+            try:
+                self.db_session.rollback()
+            except:
+                pass
+            raise Exception("Error al conectar con la base de datos. Por favor, intente nuevamente.")
 
     def create_member(self, member_data):
         """

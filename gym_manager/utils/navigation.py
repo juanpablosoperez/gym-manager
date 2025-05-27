@@ -1,16 +1,28 @@
 import flet as ft
 from gym_manager.utils.database import get_db_session, cleanup_db_session
+import os
+from dotenv import load_dotenv
+import logging
 
-# Crear una sesión global de base de datos
-db_session = get_db_session()
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def set_db_session(session):
-    global db_session
-    db_session = session
+# Cargar variables de entorno
+load_dotenv('.env.dev')
+
+def init_db():
+    """Inicializa la base de datos"""
+    try:
+        from gym_manager.models import Base
+        from gym_manager.utils.database import engine
+        Base.metadata.create_all(engine)
+        logger.info("Base de datos inicializada exitosamente")
+    except Exception as e:
+        logger.error(f"Error al inicializar la base de datos: {str(e)}")
+        raise
 
 def navigate_to_login(page: ft.Page):
-    global db_session
-    
     # Limpiar la página actual
     page.clean()
     
@@ -29,8 +41,8 @@ def navigate_to_login(page: ft.Page):
     from gym_manager.controllers.auth_controller import AuthController
     from gym_manager.views.login_view import LoginView
     
-    # Crear y mostrar vista de login con la sesión existente
-    auth_controller = AuthController(db_session)
+    # Crear y mostrar vista de login
+    auth_controller = AuthController(get_db_session())
     LoginView(page, auth_controller)
 
 def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
