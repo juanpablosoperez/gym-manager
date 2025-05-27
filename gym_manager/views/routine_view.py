@@ -152,7 +152,7 @@ class RoutinesView(ModuleView):
             margin=ft.margin.symmetric(horizontal=0, vertical=0),
             alignment=ft.alignment.top_left,
         )
-
+        
         # Cargar datos iniciales
         self.load_data()
 
@@ -188,21 +188,51 @@ class RoutinesView(ModuleView):
         """
         Carga los datos iniciales de la vista y actualiza la UI
         """
+        print("[DEBUG - Rutinas] Iniciando load_data")
         try:
+            print("[DEBUG - Rutinas] Llamando a routine_controller.get_routines()")
             rutinas = self.routine_controller.get_routines()
+            print(f"[DEBUG - Rutinas] routine_controller.get_routines() devolvió {len(rutinas)} rutinas")
+            
+            if not rutinas:
+                print("[DEBUG - Rutinas] No se encontraron rutinas")
+                self.show_message("No hay rutinas registradas", ft.colors.ORANGE)
+            
+            print("[DEBUG - Rutinas] Llamando a update_routines_table")
             self.update_routines_table(rutinas)
+            print("[DEBUG - Rutinas] Llamando a page.update()")
             self.page.update()
+            print("[DEBUG - Rutinas] load_data finalizado")
+            
         except Exception as ex:
+            print(f"[DEBUG - Rutinas] Excepción en load_data: {str(ex)}")
             self.show_message(f"Error al cargar las rutinas: {str(ex)}", ft.colors.RED)
 
     def update_routines_table(self, rutinas):
         """
         Actualiza la tabla con las rutinas
         """
+        print(f"[DEBUG - Rutinas] Actualizando tabla con {len(rutinas)} rutinas")
         self.routines_table.rows.clear()
+        
+        if not rutinas:
+            print("[DEBUG - Rutinas] No hay rutinas para mostrar")
+            self.routines_table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("No hay rutinas registradas", italic=True)),
+                        ft.DataCell(ft.Text("")),
+                        ft.DataCell(ft.Text("")),
+                        ft.DataCell(ft.Text("")),
+                        ft.DataCell(ft.Text("")),
+                    ]
+                )
+            )
+            self.page.update()
+            return
+
         for rutina in rutinas:
-            # Contar miembros asignados
-            miembros_asignados = 1 if rutina.id_miembro else 0
+            print(f"[DEBUG - Rutinas] Procesando rutina: {rutina.nombre}")
             
             self.routines_table.rows.append(
                 ft.DataRow(
@@ -213,10 +243,10 @@ class RoutinesView(ModuleView):
                         ft.DataCell(
                             ft.Container(
                                 content=ft.Text(
-                                    str(miembros_asignados),
+                                    "0",
                                     color=ft.colors.WHITE
                                 ),
-                                bgcolor=ft.colors.BLUE if miembros_asignados > 0 else ft.colors.GREY,
+                                bgcolor=ft.colors.GREY,
                                 border_radius=8,
                                 padding=ft.padding.symmetric(horizontal=12, vertical=6),
                                 alignment=ft.alignment.center,
@@ -247,6 +277,7 @@ class RoutinesView(ModuleView):
                     ]
                 )
             )
+        print("[DEBUG - Rutinas] Tabla actualizada exitosamente")
         self.page.update()
 
     def show_new_routine_modal(self, e):
@@ -362,7 +393,6 @@ class RoutinesView(ModuleView):
                 'documento_rutina': file_content,
                 'fecha_creacion': now,
                 'fecha_horario': now,
-                'id_miembro': None
             }
             print(f"[DEBUG] routine_data a guardar: {routine_data}")
             success, message = self.routine_controller.create_routine(routine_data)
