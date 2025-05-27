@@ -2,32 +2,40 @@ from datetime import datetime
 from gym_manager.models.payment import Pago
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
+from sqlalchemy.exc import SQLAlchemyError
+import logging
 
 class PaymentController:
     def __init__(self, db_session=None):
         self.db_session = db_session
+        self.logger = logging.getLogger(__name__)
 
     def get_payments(self, filters=None):
         """
         Obtiene la lista de pagos con filtros opcionales
         """
-        query = self.db_session.query(Pago)
-        
-        if filters:
-            if filters.get('member_name'):
-                query = query.join(Miembro).filter(
-                    Miembro.nombre.ilike(f"%{filters['member_name']}%")
-                )
-            if filters.get('date_from'):
-                query = query.filter(Pago.fecha_pago >= filters['date_from'])
-            if filters.get('date_to'):
-                query = query.filter(Pago.fecha_pago <= filters['date_to'])
-            if filters.get('payment_method'):
-                query = query.join(MetodoPago).filter(
-                    MetodoPago.descripcion == filters['payment_method']
-                )
-        
-        return query.all()
+        try:
+            query = self.db_session.query(Pago)
+            
+            if filters:
+                if filters.get('member_name'):
+                    query = query.join(Miembro).filter(
+                        Miembro.nombre.ilike(f"%{filters['member_name']}%")
+                    )
+                if filters.get('date_from'):
+                    query = query.filter(Pago.fecha_pago >= filters['date_from'])
+                if filters.get('date_to'):
+                    query = query.filter(Pago.fecha_pago <= filters['date_to'])
+                if filters.get('payment_method'):
+                    query = query.join(MetodoPago).filter(
+                        MetodoPago.descripcion == filters['payment_method']
+                    )
+            
+            return query.all()
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener pagos: {str(e)}")
+            self.db_session.rollback()
+            raise
 
     def create_payment(self, payment_data):
         """
@@ -45,9 +53,14 @@ class PaymentController:
             self.db_session.add(new_payment)
             self.db_session.commit()
             return True, "Pago registrado exitosamente"
-        except Exception as e:
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al crear pago: {str(e)}")
             self.db_session.rollback()
-            return False, str(e)
+            return False, f"Error al crear el pago: {str(e)}"
+        except Exception as e:
+            self.logger.error(f"Error inesperado al crear pago: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error inesperado: {str(e)}"
 
     def update_payment(self, payment_id, payment_data):
         """
@@ -57,15 +70,22 @@ class PaymentController:
             payment = self.db_session.query(Pago).filter_by(id_pago=payment_id).first()
             if not payment:
                 return False, "Pago no encontrado"
-            
-            for key, value in payment_data.items():
-                setattr(payment, key, value)
-            
+
+            payment.fecha_pago = payment_data['fecha_pago']
+            payment.monto = payment_data['monto']
+            payment.referencia = payment_data.get('referencia')
+            payment.id_metodo_pago = payment_data['id_metodo_pago']
+
             self.db_session.commit()
             return True, "Pago actualizado exitosamente"
-        except Exception as e:
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al actualizar pago: {str(e)}")
             self.db_session.rollback()
-            return False, str(e)
+            return False, f"Error al actualizar el pago: {str(e)}"
+        except Exception as e:
+            self.logger.error(f"Error inesperado al actualizar pago: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error inesperado: {str(e)}"
 
     def delete_payment(self, payment_id):
         """
@@ -75,13 +95,18 @@ class PaymentController:
             payment = self.db_session.query(Pago).filter_by(id_pago=payment_id).first()
             if not payment:
                 return False, "Pago no encontrado"
-            
+
             self.db_session.delete(payment)
             self.db_session.commit()
             return True, "Pago eliminado exitosamente"
-        except Exception as e:
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al eliminar pago: {str(e)}")
             self.db_session.rollback()
-            return False, str(e)
+            return False, f"Error al eliminar el pago: {str(e)}"
+        except Exception as e:
+            self.logger.error(f"Error inesperado al eliminar pago: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error inesperado: {str(e)}"
 
     def get_payment_summary(self):
         """
