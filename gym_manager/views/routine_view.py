@@ -234,6 +234,9 @@ class RoutinesView(ModuleView):
         for rutina in rutinas:
             print(f"[DEBUG - Rutinas] Procesando rutina: {rutina.nombre}")
             
+            # Contar miembros asignados
+            miembros_asignados = self.routine_controller.count_members_assigned_to_routine(rutina.id_rutina)
+            
             self.routines_table.rows.append(
                 ft.DataRow(
                     cells=[
@@ -243,10 +246,10 @@ class RoutinesView(ModuleView):
                         ft.DataCell(
                             ft.Container(
                                 content=ft.Text(
-                                    "0",
+                                    str(miembros_asignados),
                                     color=ft.colors.WHITE
                                 ),
-                                bgcolor=ft.colors.GREY,
+                                bgcolor=ft.colors.BLUE if miembros_asignados > 0 else ft.colors.GREY,
                                 border_radius=8,
                                 padding=ft.padding.symmetric(horizontal=12, vertical=6),
                                 alignment=ft.alignment.center,
