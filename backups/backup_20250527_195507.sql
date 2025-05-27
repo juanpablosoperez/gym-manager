@@ -86,11 +86,11 @@ CREATE TABLE `usuarios` (
   `contraseña` varchar(100) NOT NULL,
   `estado` tinyint(1) NOT NULL,
   PRIMARY KEY (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Datos de la tabla usuarios
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (3, 'yoel', 'junges', 'admin', '$2b$12$pR4Ykf2./7kdulRJHgTLV.aBQ06t51LKpQKZ6mvWVUB3VxzsRq6Sy', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (4, 'facu', 'abba', 'admin', '$2b$12$jDdkufti8RZPNJcgf7Xeieb7wgsnAV8ugDJhAUMVLTs7ZXPQCZ/PK', 1);
 INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (5, 'franco', 'cristhen', 'admin', '$2b$12$zq/iQwXyZazJaVSaYeT/H.hHyB4lC4byrASn6fS4cogECF5GLd8S.', 1);
 INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (6, 'juan pablo', 'soperez', 'admin', '$2b$12$3UF4tCMkfsb5Zo8DsIB/Ze9H2.K87Rkj51k973ElZLx/K1MQ7Xh.i', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (16, 'yoel', 'junges', 'admin', '$2b$12$elVeTeLDvv8HMwdW3qUWfeG3pCq7F4vlc1iRRjQEbA7LF9ZR95I2i', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (17, 'nico', 'kapes', 'admin', '$2b$12$8Z6ljdLqXD38uM3WbDijKuBBPnqpqP2dM9HyVylqaEMeUiS0XLKK.', 1);
 
