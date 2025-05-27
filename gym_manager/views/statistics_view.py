@@ -406,4 +406,3 @@ class StatisticsView: # Eliminar la herencia de UserControl
         # Si se vuelve más complejo, el controlador podría manejar estos cambios de texto.
         self.page.update() # Necesario para que el texto de la fecha se actualice visualmente.
 
-

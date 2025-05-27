@@ -4,7 +4,7 @@ from gym_manager.components.sidebar import create_sidebar
 from gym_manager.utils.navigation import navigate_to_login, db_session
 from gym_manager.views.module_views import (
     MembersView, PaymentsView, ReportsView,
-    PaymentMethodsView, UsersView, BackupsView
+    PaymentMethodsView, UsersView, BackupsView, RoutinesView
 )
 from gym_manager.views.statistics_view import StatisticsView
 from gym_manager.controllers.statistics_controller import StatisticsController
@@ -329,10 +329,15 @@ class HomeView:
             self.section_title = "Gestión de Miembros"
             view = MembersView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 2:  # Gestión de Pagos
+        elif index == 2:  # Gestión de Rutinas
+            self.section_title = "Gestión de Rutinas"
+            view = RoutinesView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 3:  # Gestión de Pagos
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
+<<<<<<< HEAD
         elif index == 3:  # Informes y Estadísticas
             self.section_title = "Informes y Estadísticas"
             
@@ -344,14 +349,21 @@ class HomeView:
             self.main_content.content = stats_view.build()
             self.page.run_task(stats_controller.initialize_statistics)
         elif index == 4:  # Métodos de Pago
+=======
+        elif index == 4:  # Informes y Estadísticas
+            self.section_title = "Informes y Estadísticas"
+            view = ReportsView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 5:  # Métodos de Pago
+>>>>>>> facu/rutina
             self.section_title = "Métodos de Pago"
             view = PaymentMethodsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 5:  # Gestión de Usuarios
+        elif index == 6:  # Gestión de Usuarios
             self.section_title = "Gestión de Usuarios"
             view = UsersView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 6:  # Gestión de Backups
+        elif index == 7:  # Gestión de Backups
             self.section_title = "Gestión de Backups"
             view = BackupsView(self.page)
             self.main_content.content = view.get_content()

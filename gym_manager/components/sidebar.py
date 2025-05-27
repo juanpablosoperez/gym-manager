@@ -4,6 +4,7 @@ def create_sidebar(page: ft.Page, on_item_selected=None):
     menu_items = [
         {"icon": ft.icons.DASHBOARD_OUTLINED, "text": "Dashboard", "selected_icon": ft.icons.DASHBOARD},
         {"icon": ft.icons.PEOPLE_OUTLINE, "text": "Miembros", "selected_icon": ft.icons.PEOPLE},
+        {"icon": ft.icons.FITNESS_CENTER_OUTLINED, "text": "Rutinas", "selected_icon": ft.icons.FITNESS_CENTER},
         {"icon": ft.icons.PAYMENTS_OUTLINED, "text": "Pagos", "selected_icon": ft.icons.PAYMENTS},
         {"icon": ft.icons.ANALYTICS_OUTLINED, "text": "Estadísticas", "selected_icon": ft.icons.ANALYTICS},
         {"icon": ft.icons.CREDIT_CARD_OUTLINED, "text": "Métodos de Pago", "selected_icon": ft.icons.CREDIT_CARD},

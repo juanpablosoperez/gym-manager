@@ -1,11 +1,13 @@
 import flet as ft
+from gym_manager.views.module_views import ModuleView
+from gym_manager.models.payment import Pago
 from gym_manager.controllers.payment_controller import PaymentController
+from gym_manager.utils.database import get_db_session
 from gym_manager.controllers.monthly_fee_controller import MonthlyFeeController
 from datetime import datetime, timedelta
 from gym_manager.utils.navigation import db_session
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
-from gym_manager.models.payment import Pago
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import os
@@ -13,12 +15,12 @@ from pathlib import Path
 from gym_manager.models.monthly_fee import CuotaMensual
 from gym_manager.utils.database import session_scope
 
-class PaymentsView:
+class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
-        self.page = page
-        self.payment_controller = PaymentController(db_session)
-        self.monthly_fee_controller = MonthlyFeeController(db_session)
-        self.db_session = db_session
+        super().__init__(page, "Gestión de Pagos")
+        self.payment_controller = PaymentController(get_db_session())
+        self.monthly_fee_controller = MonthlyFeeController(get_db_session())
+        self.db_session = get_db_session()
         self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
         self.setup_payment_view()
         self.load_data()
