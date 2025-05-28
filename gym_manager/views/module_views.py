@@ -61,7 +61,19 @@ class ReportsView(ModuleView):
     def __init__(self, page: ft.Page):
         super().__init__(page, "Informes y Estadísticas")
         from gym_manager.views.statistics_view import StatisticsView as StatisticsViewImpl
-        self.statistics_view = StatisticsViewImpl(page)
+        from gym_manager.controllers.statistics_controller import StatisticsController
+        
+        # Primero creamos la vista
+        self.statistics_view = StatisticsViewImpl(page, None)
+        # Luego creamos el controlador con la vista
+        self.statistics_controller = StatisticsController(self.statistics_view, page)
+        # Asignamos el controlador a la vista
+        self.statistics_view.controller = self.statistics_controller
+        # Inicializamos los manejadores de eventos
+        self.statistics_controller._initialize_event_handlers()
+        # Cargamos los datos iniciales
+        self.page.loop.create_task(self.statistics_controller.initialize_statistics())
+        
         self.content = self.statistics_view.get_content()
         self.page.update()
 

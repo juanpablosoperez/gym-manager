@@ -1,13 +1,12 @@
 import flet as ft
-# from flet.user_control import UserControl # Ya no es necesario
+from gym_manager.views.module_views import ModuleView
 from datetime import datetime
 import plotly.graph_objs as go
 from flet.plotly_chart import PlotlyChart
 
-class StatisticsView: # Eliminar la herencia de UserControl
+class StatisticsView(ModuleView):
     def __init__(self, page: ft.Page, controller):
-        # super().__init__() # Eliminar llamada al super de UserControl
-        self.page = page
+        super().__init__(page, "Informes y Estadísticas")
         self.controller = controller
         current_year = datetime.now().year
 
@@ -405,4 +404,7 @@ class StatisticsView: # Eliminar la herencia de UserControl
         # Por ahora, la actualización de estos textos la maneja la interacción directa.
         # Si se vuelve más complejo, el controlador podría manejar estos cambios de texto.
         self.page.update() # Necesario para que el texto de la fecha se actualice visualmente.
+
+    def get_content(self):
+        return self.build()
 

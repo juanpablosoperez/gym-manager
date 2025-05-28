@@ -5,7 +5,7 @@ from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.database import get_db_session
 from gym_manager.controllers.monthly_fee_controller import MonthlyFeeController
 from datetime import datetime, timedelta
-from gym_manager.utils.navigation import db_session
+from gym_manager.utils.navigation import navigate_to_login
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
 import openpyxl
