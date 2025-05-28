@@ -1,7 +1,8 @@
 import flet as ft
 from gym_manager.components.header import create_header
 from gym_manager.components.sidebar import create_sidebar
-from gym_manager.utils.navigation import navigate_to_login, db_session
+from gym_manager.utils.navigation import navigate_to_login
+from gym_manager.utils.database import get_db_session
 from gym_manager.views.module_views import (
     MembersView, PaymentsView, ReportsView,
     PaymentMethodsView, UsersView, BackupsView, RoutinesView
@@ -17,13 +18,19 @@ class HomeView:
         self.page = page
         self.user_rol = user_rol
         self.user_name = user_name
-        # Inicializar controladores
-        self.payment_controller = PaymentController(db_session)
-        self.member_controller = MemberController(db_session)
+        # Inicializar controladores con nuevas sesiones
+        self.db_session = get_db_session()
+        self.payment_controller = PaymentController(self.db_session)
+        self.member_controller = MemberController(self.db_session)
         # Inicializar el snackbar
         self.snack = ft.SnackBar(content=ft.Text(""))
         self.page.overlay.append(self.snack)
         self.setup_page()
+
+    def __del__(self):
+        """Cleanup cuando se destruye la instancia"""
+        if hasattr(self, 'db_session'):
+            self.db_session.close()
 
     def setup_page(self):
         self.page.title = "Gym Manager - Home"
@@ -337,25 +344,11 @@ class HomeView:
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
-<<<<<<< HEAD
-        elif index == 3:  # Informes y Estadísticas
-            self.section_title = "Informes y Estadísticas"
-            
-            stats_controller = StatisticsController(view=None, page=self.page)
-            stats_view = StatisticsView(page=self.page, controller=stats_controller)
-            stats_controller.view = stats_view # Asignar la vista al controlador
-            stats_controller._initialize_event_handlers() # Llamar aquí
-            
-            self.main_content.content = stats_view.build()
-            self.page.run_task(stats_controller.initialize_statistics)
-        elif index == 4:  # Métodos de Pago
-=======
         elif index == 4:  # Informes y Estadísticas
             self.section_title = "Informes y Estadísticas"
             view = ReportsView(self.page)
             self.main_content.content = view.get_content()
         elif index == 5:  # Métodos de Pago
->>>>>>> facu/rutina
             self.section_title = "Métodos de Pago"
             view = PaymentMethodsView(self.page)
             self.main_content.content = view.get_content()

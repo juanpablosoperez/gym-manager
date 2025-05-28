@@ -2,7 +2,7 @@ import flet as ft
 from datetime import datetime, timedelta
 from gym_manager.controllers.member_controller import MemberController
 from gym_manager.controllers.payment_controller import PaymentController
-from gym_manager.utils.navigation import db_session  # Importar la sesión global
+from gym_manager.utils.database import get_db_session
 from pathlib import Path
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
@@ -21,8 +21,8 @@ class StatisticsController:
         self.view = view
         self.page = page
         self.current_year = datetime.now().year
-        self.member_controller = MemberController(db_session)  # Usar la sesión global
-        self.payment_controller = PaymentController(db_session)
+        self.member_controller = MemberController(get_db_session())  # Usar la sesión global
+        self.payment_controller = PaymentController(get_db_session())
         # self.member_service = MemberService() # Ejemplo
         # self.payment_service = PaymentService() # Ejemplo
         # NO llamar a _initialize_event_handlers() aquí

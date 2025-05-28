@@ -63,8 +63,8 @@ def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
         from gym_manager.views.home_view import HomeView
         # Crear y mostrar vista de home
         HomeView(page, user_rol, user_name)
-    except ImportError as e:
-        print(f"Error al importar HomeView: {e}")
+    except Exception as e:
+        logger.error(f"Error al cargar la vista principal: {str(e)}")
         # Mostrar mensaje de error en la página
         page.add(ft.Text("Error al cargar la vista principal", color=ft.colors.RED))
         page.update()
