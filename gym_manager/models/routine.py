@@ -8,7 +8,7 @@ class Rutina(Base):
     id_rutina = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(String(100), nullable=False)
     descripcion = Column(Text)
-    documento_rutina = Column(LargeBinary)
+    documento_rutina = Column(LargeBinary(16777216))  # 16MB en bytes
     nivel_dificultad = Column(String(20), nullable=False)
     fecha_creacion = Column(DateTime)
     fecha_horario = Column(DateTime)
