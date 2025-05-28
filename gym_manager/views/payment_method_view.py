@@ -420,123 +420,136 @@ class PaymentMethodView(ModuleView):
         """
         Actualiza la tabla de métodos de pago
         """
-        self.methods_table.rows.clear()
-        
-        if not methods:
-            # Mostrar mensaje cuando no hay métodos
-            self.methods_table.rows.append(
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(
-                            ft.Container(
-                                content=ft.Column(
-                                    controls=[
-                                        ft.Icon(name=ft.icons.PAYMENT, size=48, color=ft.colors.GREY_400),
-                                        ft.Text(
-                                            "No se encontraron métodos de pago",
-                                            size=20,
-                                            weight=ft.FontWeight.BOLD,
-                                            color=ft.colors.GREY_700
-                                        ),
-                                        ft.Text(
-                                            "Agrega tu primer método de pago usando el botón 'Agregar Método de Pago'",
-                                            size=16,
-                                            color=ft.colors.GREY_600
-                                        ),
-                                    ],
-                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                                    spacing=10,
-                                ),
-                                padding=40,
-                                alignment=ft.alignment.center,
-                            )
-                        ),
-                        ft.DataCell(ft.Container()),
-                        ft.DataCell(ft.Container()),
-                    ]
-                )
-            )
-        else:
-            for method in methods:
-                estado_texto = "Activo" if method.estado else "Inactivo"
-                color_estado = ft.colors.BLUE_900 if method.estado else ft.colors.GREY_600
-                bg_color = ft.colors.BLUE_100 if method.estado else ft.colors.GREY_100
-                
+        try:
+            self.methods_table.rows.clear()
+            
+            if not methods:
+                # Mostrar mensaje cuando no hay métodos
                 self.methods_table.rows.append(
                     ft.DataRow(
                         cells=[
                             ft.DataCell(
-                                ft.Text(method.descripcion)
-                            ),
-                            ft.DataCell(
                                 ft.Container(
-                                    content=ft.Text(
-                                        estado_texto,
-                                        color=color_estado
+                                    content=ft.Column(
+                                        controls=[
+                                            ft.Icon(name=ft.icons.PAYMENT, size=48, color=ft.colors.GREY_400),
+                                            ft.Text(
+                                                "No se encontraron métodos de pago",
+                                                size=20,
+                                                weight=ft.FontWeight.BOLD,
+                                                color=ft.colors.GREY_700
+                                            ),
+                                            ft.Text(
+                                                "Agrega tu primer método de pago usando el botón 'Agregar Método de Pago'",
+                                                size=16,
+                                                color=ft.colors.GREY_600
+                                            ),
+                                        ],
+                                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                        spacing=10,
                                     ),
-                                    bgcolor=bg_color,
-                                    border_radius=8,
-                                    padding=5,
+                                    padding=40,
+                                    alignment=ft.alignment.center,
                                 )
                             ),
-                            ft.DataCell(
-                                ft.Row(
-                                    controls=[
-                                        ft.IconButton(
-                                            icon=ft.icons.HISTORY,
-                                            icon_color=ft.colors.AMBER_700,
-                                            tooltip="Ver historial de uso",
-                                            on_click=lambda e, m=method: self.show_history_modal(m)
-                                        ),
-                                        ft.IconButton(
-                                            icon=ft.icons.EDIT,
-                                            icon_color=ft.colors.BLUE,
-                                            tooltip="Editar",
-                                            on_click=lambda e, m=method: self.edit_method(m)
-                                        ),
-                                        ft.IconButton(
-                                            icon=ft.icons.TOGGLE_ON if method.estado else ft.icons.TOGGLE_OFF,
-                                            icon_color=ft.colors.GREEN if method.estado else ft.colors.GREY_600,
-                                            tooltip="Activar" if not method.estado else "Desactivar",
-                                            on_click=lambda e, m=method: self.toggle_method_status(m)
-                                        ),
-                                        ft.IconButton(
-                                            icon=ft.icons.DELETE,
-                                            icon_color=ft.colors.RED,
-                                            tooltip="Eliminar",
-                                            on_click=lambda e, m=method: self.delete_method(m)
-                                        ),
-                                    ],
-                                    spacing=0,
-                                )
-                            ),
+                            ft.DataCell(ft.Container()),
+                            ft.DataCell(ft.Container()),
                         ]
                     )
                 )
-        self.page.update()
+            else:
+                for method in methods:
+                    try:
+                        estado_texto = "Activo" if method['estado'] else "Inactivo"
+                        color_estado = ft.colors.BLUE_900 if method['estado'] else ft.colors.GREY_600
+                        bg_color = ft.colors.BLUE_100 if method['estado'] else ft.colors.GREY_100
+                        
+                        self.methods_table.rows.append(
+                            ft.DataRow(
+                                cells=[
+                                    ft.DataCell(
+                                        ft.Text(method['descripcion'])
+                                    ),
+                                    ft.DataCell(
+                                        ft.Container(
+                                            content=ft.Text(
+                                                estado_texto,
+                                                color=color_estado
+                                            ),
+                                            bgcolor=bg_color,
+                                            border_radius=8,
+                                            padding=5,
+                                        )
+                                    ),
+                                    ft.DataCell(
+                                        ft.Row(
+                                            controls=[
+                                                ft.IconButton(
+                                                    icon=ft.icons.HISTORY,
+                                                    icon_color=ft.colors.AMBER_700,
+                                                    tooltip="Ver historial de uso",
+                                                    on_click=lambda e, m=method: self.show_history_modal(m)
+                                                ),
+                                                ft.IconButton(
+                                                    icon=ft.icons.EDIT,
+                                                    icon_color=ft.colors.BLUE,
+                                                    tooltip="Editar",
+                                                    on_click=lambda e, m=method: self.edit_method(m)
+                                                ),
+                                                ft.IconButton(
+                                                    icon=ft.icons.TOGGLE_ON if method['estado'] else ft.icons.TOGGLE_OFF,
+                                                    icon_color=ft.colors.GREEN if method['estado'] else ft.colors.GREY_600,
+                                                    tooltip="Activar" if not method['estado'] else "Desactivar",
+                                                    on_click=lambda e, m=method: self.toggle_method_status(m)
+                                                ),
+                                                ft.IconButton(
+                                                    icon=ft.icons.DELETE,
+                                                    icon_color=ft.colors.RED,
+                                                    tooltip="Eliminar",
+                                                    on_click=lambda e, m=method: self.delete_method(m)
+                                                ),
+                                            ],
+                                            spacing=0,
+                                        )
+                                    ),
+                                ]
+                            )
+                        )
+                    except Exception as e:
+                        print(f"Error al procesar método de pago: {str(e)}")
+                        continue
+        except Exception as e:
+            print(f"Error al actualizar la tabla: {str(e)}")
+            self.show_message("Error al cargar los métodos de pago", ft.colors.RED)
+        finally:
+            self.page.update()
 
     def update_stats_cards(self, methods):
         """
         Actualiza la tarjeta del método más utilizado
         """
-        # Encontrar el método más utilizado
-        most_used_method = None
-        max_payments = 0
-        for method in methods:
-            payment_count = len(method.pagos)
-            if payment_count > max_payments:
-                max_payments = payment_count
-                most_used_method = method
+        try:
+            # Encontrar el método más utilizado
+            most_used_method = None
+            max_payments = 0
+            for method in methods:
+                payment_count = len(method['pagos'])
+                if payment_count > max_payments:
+                    max_payments = payment_count
+                    most_used_method = method
 
-        # Actualizar tarjeta del método más utilizado
-        if most_used_method:
-            self.most_used_card.content.controls[0].controls[1].controls[1].value = most_used_method.descripcion
-            self.most_used_card.content.controls[0].controls[1].controls[2].value = f"{max_payments} pagos"
-        else:
-            self.most_used_card.content.controls[0].controls[1].controls[1].value = "N/A"
-            self.most_used_card.content.controls[0].controls[1].controls[2].value = "0 pagos"
+            # Actualizar tarjeta del método más utilizado
+            if most_used_method:
+                self.most_used_card.content.controls[0].controls[1].controls[1].value = most_used_method['descripcion']
+                self.most_used_card.content.controls[0].controls[1].controls[2].value = f"{max_payments} pagos"
+            else:
+                self.most_used_card.content.controls[0].controls[1].controls[1].value = "N/A"
+                self.most_used_card.content.controls[0].controls[1].controls[2].value = "0 pagos"
 
-        self.page.update()
+            self.page.update()
+        except Exception as e:
+            print(f"Error al actualizar estadísticas: {str(e)}")
+            self.show_message("Error al actualizar estadísticas", ft.colors.RED)
 
     def show_new_method_modal(self, e):
         """
@@ -580,8 +593,8 @@ class PaymentMethodView(ModuleView):
         Abre el modal para editar un método de pago
         """
         self.selected_method = method
-        self.edit_method_name_field.value = method.descripcion
-        self.edit_method_status_switch.value = method.estado
+        self.edit_method_name_field.value = method['descripcion']
+        self.edit_method_status_switch.value = method['estado']
         self.edit_method_modal.open = True
         self.page.update()
 
@@ -611,7 +624,7 @@ class PaymentMethodView(ModuleView):
         }
 
         success, message = self.payment_method_controller.update_payment_method(
-            self.selected_method.id_metodo_pago,
+            self.selected_method['id_metodo_pago'],
             method_data
         )
 
@@ -647,7 +660,7 @@ class PaymentMethodView(ModuleView):
             return
 
         success, message = self.payment_method_controller.delete_payment_method(
-            self.selected_method_to_delete.id_metodo_pago
+            self.selected_method_to_delete['id_metodo_pago']
         )
 
         if success:
@@ -661,17 +674,55 @@ class PaymentMethodView(ModuleView):
         """
         Aplica los filtros de búsqueda
         """
-        filters = {}
-        
-        if self.search_field.value:
-            filters['search'] = self.search_field.value
-        
-        if self.status_filter.value and self.status_filter.value != "Todos":
-            filters['status'] = self.status_filter.value == "Activo"
-        
-        methods = self.payment_method_controller.get_payment_methods(filters)
-        self.update_methods_table(methods)
-        self.update_stats_cards(methods)
+        try:
+            filters = {}
+            
+            if self.search_field.value:
+                filters['search'] = self.search_field.value
+            
+            if self.status_filter.value and self.status_filter.value != "Todos":
+                filters['status'] = self.status_filter.value == "Activo"
+            
+            methods = self.payment_method_controller.get_payment_methods(filters)
+            self.update_methods_table(methods)
+            self.update_stats_cards(methods)
+        except Exception as e:
+            self.show_message(f"Error al aplicar filtros: {str(e)}", ft.colors.RED)
+            # Limpiar la tabla y mostrar mensaje de error
+            self.methods_table.rows.clear()
+            self.methods_table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Icon(name=ft.icons.ERROR_OUTLINE, size=48, color=ft.colors.RED_400),
+                                        ft.Text(
+                                            "Error al cargar los datos",
+                                            size=20,
+                                            weight=ft.FontWeight.BOLD,
+                                            color=ft.colors.RED_700
+                                        ),
+                                        ft.Text(
+                                            "Por favor, intente nuevamente",
+                                            size=16,
+                                            color=ft.colors.GREY_600
+                                        ),
+                                    ],
+                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=10,
+                                ),
+                                padding=40,
+                                alignment=ft.alignment.center,
+                            )
+                        ),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                    ]
+                )
+            )
+            self.page.update()
 
     def clear_filters(self, e):
         """
@@ -698,11 +749,11 @@ class PaymentMethodView(ModuleView):
         Cambia el estado de un método de pago (activo/inactivo)
         """
         method_data = {
-            'estado': not method.estado
+            'estado': not method['estado']
         }
 
         success, message = self.payment_method_controller.update_payment_method(
-            method.id_metodo_pago,
+            method['id_metodo_pago'],
             method_data
         )
 
@@ -716,29 +767,40 @@ class PaymentMethodView(ModuleView):
             self.show_message(message, ft.colors.RED)
 
     def show_history_modal(self, method):
-        # Obtener todos los métodos para calcular el total de pagos
-        all_methods = self.payment_method_controller.get_payment_methods()
-        total_pagos = sum(len(m.pagos) for m in all_methods)
-        pagos = method.pagos[-5:] if len(method.pagos) > 0 else []
-        total_acumulado = sum(p.monto for p in method.pagos)
-        porcentaje = (len(method.pagos) / total_pagos * 100) if total_pagos > 0 else 0
-        # Actualizar contenido del modal
-        stats_text = f"Total acumulado: ${total_acumulado:,.2f} | Cantidad de pagos: {len(method.pagos)} | % del total: {porcentaje:.1f}%"
-        pagos_rows = [
-            ft.DataRow(cells=[
-                ft.DataCell(ft.Text(p.fecha_pago.strftime("%d/%m/%Y"))),
-                ft.DataCell(ft.Text(f"${p.monto:,.2f}")),
-                ft.DataCell(ft.Text(f"{p.miembro.nombre} {p.miembro.apellido}")),
-            ]) for p in pagos
-        ]
-        # Buscar los controles por key
-        for c in self.history_modal.content.controls:
-            if hasattr(c, 'key') and c.key == "stats":
-                c.value = stats_text
-            if hasattr(c, 'key') and c.key == "pagos_table":
-                c.rows = pagos_rows
-        self.history_modal.open = True
-        self.page.update()
+        try:
+            # Obtener todos los métodos para calcular el total de pagos
+            all_methods = self.payment_method_controller.get_payment_methods()
+            total_pagos = sum(len(m['pagos']) for m in all_methods)
+            pagos = method['pagos'][-5:] if len(method['pagos']) > 0 else []
+            total_acumulado = sum(p['monto'] for p in method['pagos'])
+            porcentaje = (len(method['pagos']) / total_pagos * 100) if total_pagos > 0 else 0
+
+            # Actualizar contenido del modal
+            stats_text = f"Total acumulado: ${total_acumulado:,.2f} | Cantidad de pagos: {len(method['pagos'])} | % del total: {porcentaje:.1f}%"
+            
+            pagos_rows = []
+            for pago in pagos:
+                miembro_nombre = f"{pago['miembro']['nombre']} {pago['miembro']['apellido']}" if pago['miembro'] else "N/A"
+                pagos_rows.append(
+                    ft.DataRow(cells=[
+                        ft.DataCell(ft.Text(pago['fecha_pago'].strftime("%d/%m/%Y"))),
+                        ft.DataCell(ft.Text(f"${pago['monto']:,.2f}")),
+                        ft.DataCell(ft.Text(miembro_nombre)),
+                    ])
+                )
+
+            # Buscar los controles por key
+            for c in self.history_modal.content.controls:
+                if hasattr(c, 'key') and c.key == "stats":
+                    c.value = stats_text
+                if hasattr(c, 'key') and c.key == "pagos_table":
+                    c.rows = pagos_rows
+
+            self.history_modal.open = True
+            self.page.update()
+        except Exception as e:
+            print(f"Error al mostrar historial: {str(e)}")
+            self.show_message("Error al cargar el historial de pagos", ft.colors.RED)
 
     def close_history_modal(self, e):
         self.history_modal.open = False
