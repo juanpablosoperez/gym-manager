@@ -2,8 +2,7 @@
 SET FOREIGN_KEY_CHECKS=0;
 
 -- Estructura de la tabla comprobantes_pago
-DROP TABLE IF EXISTS comprobantes_pago;
-CREATE TABLE `comprobantes_pago` (
+CREATE TABLE IF NOT EXISTS `comprobantes_pago` (
   `id_comprobante` int NOT NULL AUTO_INCREMENT,
   `contenido` blob NOT NULL,
   `fecha_emision` datetime NOT NULL,
@@ -14,8 +13,7 @@ CREATE TABLE `comprobantes_pago` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Estructura de la tabla metodos_pago
-DROP TABLE IF EXISTS metodos_pago;
-CREATE TABLE `metodos_pago` (
+CREATE TABLE IF NOT EXISTS `metodos_pago` (
   `id_metodo_pago` int NOT NULL AUTO_INCREMENT,
   `descripcion` varchar(50) NOT NULL,
   `estado` tinyint(1) NOT NULL,
@@ -23,8 +21,7 @@ CREATE TABLE `metodos_pago` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Estructura de la tabla miembros
-DROP TABLE IF EXISTS miembros;
-CREATE TABLE `miembros` (
+CREATE TABLE IF NOT EXISTS `miembros` (
   `id_miembro` int NOT NULL AUTO_INCREMENT,
   `nombre` varchar(50) NOT NULL,
   `apellido` varchar(50) NOT NULL,
@@ -44,8 +41,7 @@ CREATE TABLE `miembros` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Estructura de la tabla pagos
-DROP TABLE IF EXISTS pagos;
-CREATE TABLE `pagos` (
+CREATE TABLE IF NOT EXISTS `pagos` (
   `id_pago` int NOT NULL AUTO_INCREMENT,
   `fecha_pago` datetime NOT NULL,
   `monto` float NOT NULL,
@@ -61,8 +57,7 @@ CREATE TABLE `pagos` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Estructura de la tabla rutinas
-DROP TABLE IF EXISTS rutinas;
-CREATE TABLE `rutinas` (
+CREATE TABLE IF NOT EXISTS `rutinas` (
   `id_rutina` int NOT NULL AUTO_INCREMENT,
   `nombre` varchar(100) NOT NULL,
   `descripcion` text,
@@ -77,8 +72,7 @@ CREATE TABLE `rutinas` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Estructura de la tabla usuarios
-DROP TABLE IF EXISTS usuarios;
-CREATE TABLE `usuarios` (
+CREATE TABLE IF NOT EXISTS `usuarios` (
   `id_usuario` int NOT NULL AUTO_INCREMENT,
   `nombre` varchar(50) NOT NULL,
   `apellido` varchar(50) NOT NULL,
@@ -86,14 +80,15 @@ CREATE TABLE `usuarios` (
   `contraseña` varchar(100) NOT NULL,
   `estado` tinyint(1) NOT NULL,
   PRIMARY KEY (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Datos de la tabla usuarios
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (4, 'facu', 'abba', 'admin', '$2b$12$jDdkufti8RZPNJcgf7Xeieb7wgsnAV8ugDJhAUMVLTs7ZXPQCZ/PK', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (5, 'franco', 'cristhen', 'admin', '$2b$12$zq/iQwXyZazJaVSaYeT/H.hHyB4lC4byrASn6fS4cogECF5GLd8S.', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (6, 'juan pablo', 'soperez', 'admin', '$2b$12$3UF4tCMkfsb5Zo8DsIB/Ze9H2.K87Rkj51k973ElZLx/K1MQ7Xh.i', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (16, 'yoel', 'junges', 'admin', '$2b$12$elVeTeLDvv8HMwdW3qUWfeG3pCq7F4vlc1iRRjQEbA7LF9ZR95I2i', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (17, 'nico', 'kapes', 'admin', '$2b$12$8Z6ljdLqXD38uM3WbDijKuBBPnqpqP2dM9HyVylqaEMeUiS0XLKK.', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (18, 'loco', 'loco', 'admin', '$2b$12$b1xJKsgpxVURkwkJm0wDNOMnze134ZZXwRk7f8z/Em.XQsnk.U6vm', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (19, 'loco1', 'loco1', 'admin', '$2b$12$f5lrCm1oT8CSyEmD9TmNVeHasiZZXivh7V6C9cDSySChZszk4JLpC', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (31, 'admin', 'sdfsf', 'admin', '$2b$12$aqV8s4NQwLNaE/VooUkpi.K8tgIdyHstPsF1HuUYzxNCZtfN3k06u', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (32, 'admin1', 'dggs', 'admin', '$2b$12$5HbBvSzDQE9C9Q5kjQkAiOPYF2LKSum0CROaQEMNvLe.5elT7laqi', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (35, 'yoel', 'junges', 'admin', '$2b$12$9aoJOAhF5yrqPWsrx4/0hep0vt4YNMN0a22ZNTSIXuvwbiaWuwsIi', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (36, 'facu', 'asasd', 'admin', '$2b$12$1a.0JIwakzP6HJDeMcPmjuwkNlx5G49JsIMidLvYxi4DL6K6XeMvm', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (37, 'assdasd', 'afsaf', 'admin', '$2b$12$/.QuDBxBMb94k0KPpzuz2.esgnM/tJMndt/qMHeuX3J7i5DrJb08.', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (38, 'asfsafssf', 'asfasfasf', 'admin', '$2b$12$nmaj7YDwzKmKxwE3zKdecOdOZ9pH3v3E.qhHUezOdZqlwZgg9FWFS', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (39, 'dsgdsgds', 'sgdgsdgsd', 'admin', '$2b$12$djmxcNR7OIIFUW3WlbwL3Or7Htnx9eRygexF/4S8OyW2AF03VwlBq', 1);
+INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (40, 'sdgdsgsdgsdg', 'sdgdsgdsg', 'admin', '$2b$12$TGeJABZcI1toCLsMBMkMOeSqbPrlQOlyikQdT63go5gFN9qZB4kOG', 1);
 

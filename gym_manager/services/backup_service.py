@@ -34,7 +34,7 @@ class BackupService:
         self.logger.setLevel(logging.INFO)
         
         # Crear manejador de archivo
-        handler = logging.FileHandler('backup.log')
+        handler = logging.FileHandler('logs/backup.log')
         handler.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
@@ -150,12 +150,28 @@ class BackupService:
 
                     # Estructura de la tabla
                     create_stmt = conn.execute(text(f"SHOW CREATE TABLE {table}")).fetchone()[1]
+                    # Modificar el CREATE TABLE para usar IF NOT EXISTS
+                    create_stmt = create_stmt.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
                     f.write(f"-- Estructura de la tabla {table}\n")
-                    f.write(f"DROP TABLE IF EXISTS {table};\n")
                     f.write(f"{create_stmt};\n\n")
 
                     # Datos
-                    result = conn.execute(text(f"SELECT * FROM {table}"))
+                    # Obtener la clave primaria de la tabla
+                    primary_key = None
+                    try:
+                        result = conn.execute(text(f"SHOW KEYS FROM {table} WHERE Key_name = 'PRIMARY'"))
+                        primary_key = result.fetchone()
+                        if primary_key:
+                            primary_key = primary_key[4]  # El nombre de la columna está en el índice 4
+                    except Exception as e:
+                        self.logger.warning(f"[Backup] No se pudo obtener la clave primaria de {table}: {str(e)}")
+
+                    # Construir la consulta con ORDER BY si hay clave primaria
+                    query = f"SELECT * FROM {table}"
+                    if primary_key:
+                        query += f" ORDER BY {primary_key}"
+                    
+                    result = conn.execute(text(query))
                     rows = result.fetchall()
                     columns = result.keys()
 
