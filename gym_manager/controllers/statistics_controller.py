@@ -116,10 +116,10 @@ class StatisticsController:
                 filters['status'] = True if membership_status == "Activo" else False
             miembros = self.member_controller.get_members(filters)
             count = len(miembros)
-            status_text = f" ({membership_status.lower()}s)" if membership_status != "Todos" else ""
+            status_text = f" ({membership_status.lower()}s)" if membership_status and membership_status != "Todos" else ""
             self._show_report_confirmation_dialog(
                 f"¿Deseas exportar {count} miembros{status_text} a PDF? El archivo se guardará en tu carpeta de Descargas.",
-                lambda _: self._export_members_to_pdf(miembros, membership_status)
+                lambda _: self._export_members_to_pdf(miembros, membership_status or "Todos")
             )
         else:
             self.page.snack_bar = ft.SnackBar(
