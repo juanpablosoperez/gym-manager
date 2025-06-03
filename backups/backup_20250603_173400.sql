@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   `contraseña` varchar(100) NOT NULL,
   `estado` tinyint(1) NOT NULL,
   PRIMARY KEY (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Datos de la tabla usuarios
 INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (31, 'admin', 'sdfsf', 'admin', '$2b$12$aqV8s4NQwLNaE/VooUkpi.K8tgIdyHstPsF1HuUYzxNCZtfN3k06u', 1);
@@ -91,5 +91,4 @@ INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VA
 INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (38, 'asfsafssf', 'asfasfasf', 'admin', '$2b$12$nmaj7YDwzKmKxwE3zKdecOdOZ9pH3v3E.qhHUezOdZqlwZgg9FWFS', 1);
 INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (39, 'dsgdsgds', 'sgdgsdgsd', 'admin', '$2b$12$djmxcNR7OIIFUW3WlbwL3Or7Htnx9eRygexF/4S8OyW2AF03VwlBq', 1);
 INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (40, 'sdgdsgsdgsdg', 'sdgdsgdsg', 'admin', '$2b$12$TGeJABZcI1toCLsMBMkMOeSqbPrlQOlyikQdT63go5gFN9qZB4kOG', 1);
-INSERT INTO usuarios (id_usuario, nombre, apellido, rol, contraseña, estado) VALUES (41, 'dvddd', 'dddddd', 'admin', '$2b$12$ThVHxm8q8ldPvsF0eMJym.ot3pamH7uG.AKowfijswSs3zAIbnU5u', 1);
 
