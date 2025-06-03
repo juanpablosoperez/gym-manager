@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 
 # Local imports
 from gym_manager.views.login_view import LoginView
+from gym_manager.utils.navigation import init_db, navigate_to_login, set_db_session
 from gym_manager.controllers.auth_controller import AuthController
 from gym_manager.models import Base
-from gym_manager.utils.navigation import set_db_session
 
 # Configurar logging
 logging.basicConfig(
@@ -25,26 +25,24 @@ logger = logging.getLogger(__name__)
 
 def main(page: ft.Page):
     # Cargar variables de entorno
-    load_dotenv()
+    load_dotenv('.env.dev')
     
     # Configurar la página
     page.title = "Gym Manager"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
+    page.spacing = 0
     page.window_width = 1200
     page.window_height = 800
     page.window_resizable = True
     page.window_maximizable = True
     page.window_minimizable = True
     
-    # Configuración de la base de datos MySQL
-    DB_USER = os.getenv('DB_USER', 'root')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
-    DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_PORT = os.getenv('DB_PORT', '3306')
-    DB_NAME = os.getenv('DB_NAME', 'gym_manager')
-    
-    DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    # Configuración de la base de datos
+    DATABASE_URL = os.getenv('DATABASE_URL')
+    if not DATABASE_URL:
+        logger.error("No se encontró la variable de entorno DATABASE_URL")
+        return
     
     # Inicializar la base de datos
     engine = create_engine(
@@ -52,7 +50,7 @@ def main(page: ft.Page):
         pool_size=5,
         max_overflow=10,
         pool_timeout=30,
-        pool_recycle=1800
+        pool_recycle=3600
     )
     
     try:
@@ -106,4 +104,3 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     ft.app(target=main)
-

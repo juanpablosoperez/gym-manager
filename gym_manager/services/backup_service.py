@@ -40,23 +40,40 @@ class BackupService:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         
-        # Cargar variables de entorno
-        load_dotenv()
+        # Cargar variables de entorno del archivo .env.dev
+        env_path = project_root / '.env.dev'
+        load_dotenv(env_path, override=True)  # Forzar la sobrescritura de variables
         
         # Configuración de la base de datos
-        self.DATABASE_URL = self._get_database_url()
-        self.engine = create_engine(self.DATABASE_URL)
+        self.DATABASE_URL = os.getenv('DATABASE_URL')
+        if not self.DATABASE_URL:
+            raise Exception("No se encontró la variable de entorno DATABASE_URL")
+            
+        self.logger.info(f"[Backup] Usando base de datos: {self.DATABASE_URL}")
+        
+        # Crear engine con la misma configuración que el sistema principal
+        self.engine = create_engine(
+            self.DATABASE_URL,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_recycle=3600
+        )
         
         # Limpiar backups antiguos
         self._clean_old_backups()
 
     def _get_database_url(self) -> str:
         """Construye la URL de la base de datos a partir de las variables de entorno."""
-        DB_USER = os.getenv('DB_USER', 'root')
-        DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
-        DB_HOST = os.getenv('DB_HOST', 'localhost')
-        DB_PORT = os.getenv('DB_PORT', '3306')
-        DB_NAME = os.getenv('DB_NAME', 'gym_manager')
+        # No necesitamos cargar el .env.dev aquí porque ya se cargó en el constructor
+        DB_USER = os.getenv('DB_USER')
+        DB_PASSWORD = os.getenv('DB_PASSWORD')
+        DB_HOST = os.getenv('DB_HOST')
+        DB_PORT = os.getenv('DB_PORT')
+        DB_NAME = os.getenv('DB_NAME')
+        
+        if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
+            raise Exception("Faltan variables de entorno necesarias para la conexión a la base de datos")
         
         return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
@@ -206,7 +223,7 @@ class BackupService:
         """
         return self.db_session.query(Backup).order_by(Backup.created_at.desc()).all()
 
-    def delete_backup(self, backup_id: int) -> bool:
+    def delete_backup(self, backup_id: int) -> Tuple[bool, str]:
         """
         Elimina un backup específico.
         
@@ -214,7 +231,9 @@ class BackupService:
             backup_id (int): ID del backup a eliminar
             
         Returns:
-            bool: True si la eliminación fue exitosa
+            Tuple[bool, str]: (éxito, mensaje)
+            - éxito: True si la eliminación fue exitosa
+            - mensaje: Mensaje descriptivo del resultado
             
         Raises:
             Exception: Si hay un error al eliminar el backup
@@ -223,7 +242,7 @@ class BackupService:
         
         backup = self.db_session.query(Backup).get(backup_id)
         if not backup:
-            raise Exception("Backup no encontrado")
+            return False, "Backup no encontrado"
                 
         try:
             # Eliminar archivo físico
@@ -237,7 +256,7 @@ class BackupService:
                     self.logger.info(f"[Delete] Archivo físico eliminado: {backup_path}")
                 except Exception as e:
                     self.logger.error(f"[Delete] Error eliminando archivo físico {backup_path}: {str(e)}")
-                    raise Exception(f"No se pudo eliminar el archivo físico: {str(e)}")
+                    return False, f"No se pudo eliminar el archivo físico: {str(e)}"
             else:
                 self.logger.warning(f"[Delete] El archivo físico no existe: {backup_path}")
             
@@ -246,12 +265,12 @@ class BackupService:
             self.db_session.commit()
             
             self.logger.info(f"[Delete] Backup eliminado exitosamente: {backup.name}")
-            return True
+            return True, "Backup eliminado exitosamente"
             
         except Exception as e:
             self.logger.error(f"[Delete] Error al eliminar backup: {str(e)}")
             self.db_session.rollback()
-            raise
+            return False, f"Error al eliminar backup: {str(e)}"
 
     def get_backup(self, backup_id: int) -> Backup:
         """

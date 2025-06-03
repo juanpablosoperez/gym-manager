@@ -1,12 +1,14 @@
 import flet as ft
-from gym_manager.utils.navigation import db_session
-from gym_manager.models.user import Usuario
 from gym_manager.views.module_views import ModuleView
+from gym_manager.utils.database import get_db_session
+from gym_manager.models.user import Usuario
+from gym_manager.controllers.user_controller import UserController
 
 
 class UsersView(ModuleView):
     def __init__(self, page: ft.Page):
         super().__init__(page, "Gestión de Usuarios")
+        self.user_controller = UserController()
         self.setup_confirm_dialog()
         self.load_data()
 
@@ -320,7 +322,7 @@ class UsersView(ModuleView):
         Carga los datos iniciales de la vista
         """
         try:
-            usuarios = db_session.query(Usuario).all()
+            usuarios = self.user_controller.get_users()
             self.update_users_table(usuarios)
         except Exception as ex:
             self.show_message(f"Error al cargar los usuarios: {str(ex)}", ft.colors.RED)
@@ -481,36 +483,39 @@ class UsersView(ModuleView):
             if self.usuario_editando:
                 # Validar que no se intente cambiar el rol del último admin
                 if self.usuario_editando.rol == "admin" and self.rol.value != "admin":
-                    admins = db_session.query(Usuario).filter_by(rol="admin", estado=True).all()
+                    admins = [u for u in self.user_controller.get_users() if u.rol == "admin" and u.estado]
                     if len(admins) <= 1:
                         self.show_message("No se puede cambiar el rol del último administrador activo", ft.colors.RED)
                         return
 
                 # Actualizar usuario existente
-                self.usuario_editando.nombre = self.nombre.value.strip()
-                self.usuario_editando.apellido = self.apellido.value.strip()
-                self.usuario_editando.rol = self.rol.value
-                if self.contrasena.value:
-                    self.usuario_editando.set_password(self.contrasena.value)
+                success, message = self.user_controller.update_user(
+                    self.usuario_editando.id_usuario,
+                    nombre=self.nombre.value.strip(),
+                    apellido=self.apellido.value.strip(),
+                    rol=self.rol.value,
+                    contraseña=self.contrasena.value if self.contrasena.value else None
+                )
+                if not success:
+                    raise Exception(message)
                 mensaje = "Usuario actualizado exitosamente"
             else:
                 # Crear nuevo usuario
-                nuevo_usuario = Usuario(
+                success, message = self.user_controller.create_user(
                     nombre=self.nombre.value.strip(),
                     apellido=self.apellido.value.strip(),
                     rol=self.rol.value,
                     contraseña=self.contrasena.value
                 )
-                db_session.add(nuevo_usuario)
+                if not success:
+                    raise Exception(message)
                 mensaje = "Usuario guardado exitosamente"
 
-            db_session.commit()
             self.show_message(mensaje, ft.colors.GREEN)
             self.cancelar_formulario(e)
             self.load_data()
 
         except Exception as ex:
-            db_session.rollback()
             self.show_message(f"Error al guardar: {str(ex)}", ft.colors.RED)
 
         self.page.update()
@@ -587,13 +592,16 @@ class UsersView(ModuleView):
         """
         if self.usuario_a_toggle:
             try:
-                self.usuario_a_toggle.estado = not self.usuario_a_toggle.estado
-                db_session.commit()
-                mensaje = "Usuario activado" if self.usuario_a_toggle.estado else "Usuario desactivado"
+                success, message = self.user_controller.update_user(
+                    self.usuario_a_toggle.id_usuario,
+                    estado=not self.usuario_a_toggle.estado
+                )
+                if not success:
+                    raise Exception(message)
+                mensaje = "Usuario activado" if not self.usuario_a_toggle.estado else "Usuario desactivado"
                 self.show_message(mensaje, ft.colors.GREEN)
                 self.load_data()
             except Exception as ex:
-                db_session.rollback()
                 self.show_message(f"Error al cambiar estado: {str(ex)}", ft.colors.RED)
             finally:
                 self.close_confirm_dialog(e)
@@ -611,19 +619,21 @@ class UsersView(ModuleView):
         Aplica los filtros seleccionados
         """
         try:
-            query = db_session.query(Usuario)
+            usuarios = self.user_controller.get_users()
+            usuarios_filtrados = []
 
             # Filtrar por rol
             if self.filtro_rol.value != "Todos":
-                query = query.filter(Usuario.rol == self.filtro_rol.value)
+                usuarios_filtrados = [u for u in usuarios if u.rol == self.filtro_rol.value]
+            else:
+                usuarios_filtrados = usuarios
 
             # Filtrar por estado
             if self.filtro_estado.value == "Activos":
-                query = query.filter(Usuario.estado == True)
+                usuarios_filtrados = [u for u in usuarios_filtrados if u.estado]
             elif self.filtro_estado.value == "Inactivos":
-                query = query.filter(Usuario.estado == False)
+                usuarios_filtrados = [u for u in usuarios_filtrados if not u.estado]
 
-            usuarios_filtrados = query.all()
             self.update_users_table(usuarios_filtrados)
         except Exception as ex:
             self.show_message(f"Error al aplicar filtros: {str(ex)}", ft.colors.RED)

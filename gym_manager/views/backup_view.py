@@ -247,50 +247,43 @@ class BackupView(BaseView):
             self._set_buttons_state(True)
 
     def create_backup(self, e):
-        """Crea un nuevo backup en un hilo separado"""
+        """Crea un nuevo backup"""
         try:
-            # Deshabilitar botones durante la creación
+            # Deshabilitar botones durante el backup
             self._set_buttons_state(False)
             
             def backup_thread():
                 try:
-                    # Crear backup con descripción y usuario
-                    backup = self.backup_service.create_backup(
-                        description="Backup manual",
-                        created_by="admin"  # TODO: Obtener usuario actual
-                    )
-                    
-                    if backup.is_completed:
-                        self.show_message("Backup creado exitosamente", ft.colors.GREEN)
-                        # Actualizar la lista de backups inmediatamente después de crear uno nuevo
-                        self.load_backups()
-                        self.page.update()
-                    else:
-                        self.show_message(f"Error al crear backup: {backup.error_message}", ft.colors.RED)
+                    backup = self.backup_service.create_backup()
+                    self.show_message(f"Backup creado exitosamente: {backup.name}", ft.colors.GREEN)
+                    self.load_backups()  # Recargar la lista de backups
                 except Exception as e:
+                    logger.error(f"Error al crear backup: {str(e)}")
+                    logger.error(traceback.format_exc())
                     self.show_message(f"Error al crear backup: {str(e)}", ft.colors.RED)
                 finally:
-                    # Habilitar botones después de la creación
                     self._set_buttons_state(True)
                     self.page.update()
             
             # Iniciar backup en un hilo separado
             self.current_backup_thread = threading.Thread(target=backup_thread)
             self.current_backup_thread.start()
+            
         except Exception as e:
-            self.show_message(f"Error al iniciar el proceso de backup: {str(e)}", ft.colors.RED)
+            self._handle_error("Error al crear backup", e)
             self._set_buttons_state(True)
 
     def delete_backup(self, backup_id: int):
-        """Elimina un backup específico"""
+        """Elimina un backup"""
         try:
-            if self.backup_service.delete_backup(backup_id):
+            success, message = self.backup_service.delete_backup(backup_id)
+            if success:
                 self.show_message("Backup eliminado exitosamente", ft.colors.GREEN)
                 self.load_backups()
             else:
-                self.show_message("Error al eliminar el backup", ft.colors.RED)
+                self.show_message(f"Error al eliminar backup: {message}", ft.colors.RED)
         except Exception as e:
-            self.show_message(f"Error al eliminar el backup: {str(e)}", ft.colors.RED)
+            self._handle_error("Error al eliminar backup", e)
 
     def _set_buttons_state(self, enabled: bool):
         """Habilita o deshabilita los botones de la interfaz"""
@@ -299,24 +292,21 @@ class BackupView(BaseView):
             for cell in row.cells:
                 if isinstance(cell.content, ft.Row):
                     for button in cell.content.controls:
-                        if isinstance(button, ft.IconButton):
-                            button.disabled = not enabled
+                        button.disabled = not enabled
         self.page.update()
 
     def _handle_error(self, message: str, error: Exception):
-        """Maneja los errores de la interfaz"""
-        logger.error(f"{message}: {str(error)}")
-        self.show_message(f"{message}: {str(error)}", ft.colors.RED)
+        """Maneja los errores mostrando un mensaje y registrándolos"""
+        error_msg = f"{message}: {str(error)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        self.show_message(error_msg, ft.colors.RED)
 
     def show_message(self, content, bgcolor: str):
         """Muestra un mensaje en la interfaz"""
-        try:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text(content),
-                bgcolor=bgcolor
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-        except Exception as e:
-            print(f"Error mostrando mensaje: {str(e)}")
-            print(traceback.format_exc()) 
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(content),
+            bgcolor=bgcolor
+        )
+        self.page.snack_bar.open = True
+        self.page.update()
