@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, Float, DateTime
-from gym_manager.services.database import Base
+from gym_manager.models import Base
 
 class CuotaMensual(Base):
     __tablename__ = 'cuota_mensual'

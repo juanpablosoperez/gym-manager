@@ -1,5 +1,7 @@
 from gym_manager.models.member import Miembro
-from datetime import datetime
+from gym_manager.models.payment import Pago
+from datetime import datetime, timedelta
+from sqlalchemy import func, and_
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 
@@ -8,16 +10,49 @@ class MemberController:
         self.db_session = db_session
         self.logger = logging.getLogger(__name__)
 
-    def get_members(self):
+    def get_members(self, filters=None):
         """
-        Obtiene la lista de todos los miembros
+        Obtiene la lista de todos los miembros con filtros opcionales
         """
         try:
-            return self.db_session.query(Miembro).all()
+            query = self.db_session.query(Miembro)
+            
+            if filters:
+                if filters.get('search'):
+                    search = f"%{filters['search']}%"
+                    query = query.filter(
+                        (Miembro.nombre.ilike(search)) |
+                        (Miembro.apellido.ilike(search)) |
+                        (Miembro.documento.ilike(search)) |
+                        (Miembro.correo_electronico.ilike(search))
+                    )
+                if filters.get('status') is not None:
+                    query = query.filter(Miembro.estado == filters['status'])
+                if filters.get('membership_type'):
+                    query = query.filter(Miembro.tipo_membresia == filters['membership_type'])
+                if filters.get('fecha_registro_desde'):
+                    query = query.filter(Miembro.fecha_registro >= filters['fecha_registro_desde'])
+                if filters.get('fecha_registro_hasta'):
+                    query = query.filter(Miembro.fecha_registro <= filters['fecha_registro_hasta'])
+                
+                # Ordenamiento
+                if filters.get('order_by'):
+                    order_column = getattr(Miembro, filters['order_by'], None)
+                    if order_column is not None:
+                        if filters.get('order_direction') == 'desc':
+                            query = query.order_by(order_column.desc())
+                        else:
+                            query = query.order_by(order_column.asc())
+                
+                # Límite de resultados
+                if filters.get('limit'):
+                    query = query.limit(filters['limit'])
+            
+            return query.all()
         except SQLAlchemyError as e:
-            self.logger.error(f"Error al obtener miembros: {str(e)}")
+            self.logger.error(f"Error de base de datos: {str(e)}")
             self.db_session.rollback()
-            raise
+            raise Exception("Error al conectar con la base de datos. Por favor, intente nuevamente.")
 
     def get_member(self, member_id):
         """
@@ -126,4 +161,49 @@ class MemberController:
         except SQLAlchemyError as e:
             self.logger.error(f"Error al buscar miembros: {str(e)}")
             self.db_session.rollback()
-            raise 
+            raise
+
+    def get_active_members_count(self):
+        """
+        Obtiene el conteo total de miembros activos
+        """
+        try:
+            count = self.db_session.query(func.count(Miembro.id_miembro)).filter(
+                Miembro.estado == True
+            ).scalar()
+            return count or 0
+        except Exception as e:
+            self.logger.error(f"Error al contar miembros activos: {str(e)}")
+            return 0
+
+    def get_expired_memberships_count(self):
+        """
+        Obtiene el conteo de membresías vencidas (último pago hace más de 30 días)
+        """
+        try:
+            # Obtener la fecha límite (30 días atrás)
+            fecha_limite = datetime.now() - timedelta(days=30)
+            
+            # Subconsulta para obtener el último pago de cada miembro
+            subquery = self.db_session.query(
+                Pago.id_miembro,
+                func.max(Pago.fecha_pago).label('ultima_fecha_pago')
+            ).filter(
+                Pago.estado == True  # Solo pagos activos
+            ).group_by(Pago.id_miembro).subquery()
+            
+            # Contar miembros cuyo último pago fue antes de la fecha límite
+            count = self.db_session.query(func.count(Miembro.id_miembro)).join(
+                subquery,
+                Miembro.id_miembro == subquery.c.id_miembro
+            ).filter(
+                and_(
+                    Miembro.estado == True,  # Solo miembros activos
+                    subquery.c.ultima_fecha_pago < fecha_limite
+                )
+            ).scalar()
+            
+            return count or 0
+        except Exception as e:
+            self.logger.error(f"Error al contar membresías vencidas: {str(e)}")
+            return 0

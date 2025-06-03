@@ -1,22 +1,27 @@
 import flet as ft
+from gym_manager.views.module_views import ModuleView
+from gym_manager.models.payment import Pago
 from gym_manager.controllers.payment_controller import PaymentController
+from gym_manager.utils.database import get_db_session
 from gym_manager.controllers.monthly_fee_controller import MonthlyFeeController
 from datetime import datetime, timedelta
-from gym_manager.utils.navigation import db_session
+from gym_manager.utils.navigation import navigate_to_login
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
-from gym_manager.models.payment import Pago
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import os
 from pathlib import Path
+from gym_manager.models.monthly_fee import CuotaMensual
+from gym_manager.utils.database import session_scope
 
-class PaymentsView:
+class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
-        self.page = page
-        self.payment_controller = PaymentController(db_session)
-        self.monthly_fee_controller = MonthlyFeeController(db_session)
-        self.db_session = db_session
+        super().__init__(page, "Gestión de Pagos")
+        self.payment_controller = PaymentController(get_db_session())
+        self.monthly_fee_controller = MonthlyFeeController(get_db_session())
+        self.db_session = get_db_session()
+        self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
         self.setup_payment_view()
         self.load_data()
         self.export_type = None  # Agregar variable para el tipo de exportación
@@ -258,13 +263,10 @@ class PaymentsView:
             visible=False
         )
 
+        # Actualizar el dropdown de métodos de pago para que cargue los métodos activos
         self.new_payment_method_field = ft.Dropdown(
             label="Método de pago",
-            options=[
-                ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Transferencia bancaria"),
-                ft.dropdown.Option("Tarjeta de crédito")
-            ],
+            options=[],  # Se llenará dinámicamente
             border_radius=8,
             width=500,
             hint_text="Seleccionar método",
@@ -356,11 +358,7 @@ class PaymentsView:
         )
         self.edit_payment_method_field = ft.Dropdown(
             label="Método de pago",
-            options=[
-                ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Transferencia bancaria"),
-                ft.dropdown.Option("Tarjeta de crédito")
-            ],
+            options=[],  # Se llenará dinámicamente
             border_radius=8,
             width=500,
             hint_text="Seleccionar método",
@@ -826,7 +824,7 @@ class PaymentsView:
 
     def close_modal(self, e):
         self.new_payment_client_field.value = ""
-        self.selected_member = None
+        self.selected_member_data = None
         self.member_search_results.visible = False
         self.new_payment_date_value = None
         self.new_payment_date_picker.value = None
@@ -843,8 +841,33 @@ class PaymentsView:
         """
         Carga los datos iniciales de la vista
         """
+        # Cargar pagos
         payments = [p for p in self.payment_controller.get_payments() if p.estado == 1]
         self.update_payments_table(payments)
+
+        # Cargar la cuota mensual actual
+        try:
+            with session_scope() as session:
+                current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
+                self.current_monthly_fee = current_fee.monto if current_fee else None
+        except Exception as e:
+            print(f"Error al cargar cuota mensual: {str(e)}")
+            self.current_monthly_fee = None
+
+        # Cargar métodos de pago activos
+        active_payment_methods = self.db_session.query(MetodoPago).filter_by(estado=True).all()
+        self.new_payment_method_field.options = [
+            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+        ]
+        self.edit_payment_method_field.options = [
+            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+        ]
+        self.payment_method.options = [
+            ft.dropdown.Option("Todos")
+        ] + [
+            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+        ]
+        self.page.update()
 
     def update_payments_table(self, payments):
         """
@@ -1321,7 +1344,12 @@ class PaymentsView:
         """
         Selecciona un miembro de la lista de resultados
         """
-        self.selected_member = member
+        # Guardar solo los datos necesarios del miembro
+        self.selected_member_data = {
+            'id': member.id_miembro,
+            'nombre': member.nombre,
+            'apellido': member.apellido
+        }
         self.new_payment_client_field.value = f"{member.nombre} {member.apellido}"
         self.member_search_results.visible = False
         self.member_search_results_container.height = 0
@@ -1331,7 +1359,10 @@ class PaymentsView:
         """
         Guarda un nuevo pago
         """
-        if not self.selected_member:
+        print("Iniciando guardado de pago...")  # Debug log
+        
+        # Validaciones iniciales
+        if not self.selected_member_data:
             self.show_message("Debe seleccionar un miembro", ft.colors.RED)
             return
 
@@ -1339,46 +1370,69 @@ class PaymentsView:
             self.show_message("Debe seleccionar una fecha", ft.colors.RED)
             return
 
-        if not self.new_payment_amount_field.value or float(self.new_payment_amount_field.value) <= 0:
-            self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+        try:
+            monto = float(self.new_payment_amount_field.value)
+            if monto <= 0:
+                self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+                return
+        except ValueError:
+            self.show_message("El monto ingresado no es válido", ft.colors.RED)
             return
 
         if not self.new_payment_method_field.value:
             self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
             return
 
-        # Verificar si el monto coincide con la cuota mensual
-        current_fee = self.monthly_fee_controller.get_current_fee()
-        if current_fee:
-            # Mostrar advertencia si el monto es diferente, pero permitir continuar
-            if float(self.new_payment_amount_field.value) != current_fee.monto:
-                self.show_message(
-                    f"Advertencia: El monto ingresado (${float(self.new_payment_amount_field.value):,.2f}) es diferente a la cuota mensual (${current_fee.monto:,.2f})",
-                    ft.colors.ORANGE
-                )
+        try:
+            # Limpiar cualquier transacción pendiente
+            if hasattr(self, 'db_session'):
+                try:
+                    self.db_session.rollback()
+                except:
+                    pass
+                self.db_session.close()
+            
+            print("Obteniendo ID del método de pago...")  # Debug log
+            metodo_pago_id = self.get_payment_method_id(self.new_payment_method_field.value)
+            if not metodo_pago_id:
+                self.show_message("Error al obtener el método de pago", ft.colors.RED)
+                return
 
-        payment_data = {
-            'fecha_pago': self.new_payment_date_value,
-            'monto': float(self.new_payment_amount_field.value),
-            'id_miembro': self.selected_member.id_miembro,
-            'id_metodo_pago': self.get_payment_method_id(self.new_payment_method_field.value),
-            'referencia': self.new_payment_observations_field.value
-        }
-        
-        success, message = self.payment_controller.create_payment(payment_data)
-        if success:
-            self.show_message(message, ft.colors.GREEN)
-            self.close_modal(e)
-            self.load_data()
-        else:
-            self.show_message(message, ft.colors.RED)
+            print("Preparando datos del pago...")  # Debug log
+            payment_data = {
+                'fecha_pago': self.new_payment_date_value,
+                'monto': monto,
+                'id_miembro': self.selected_member_data['id'],
+                'id_metodo_pago': metodo_pago_id,
+                'referencia': self.new_payment_observations_field.value
+            }
+            
+            print("Llamando al controlador para crear el pago...")  # Debug log
+            success, message = self.payment_controller.create_payment(payment_data)
+            
+            if success:
+                print("Pago creado exitosamente")  # Debug log
+                self.show_message(message, ft.colors.GREEN)
+                self.close_modal(e)
+                self.load_data()
+            else:
+                print(f"Error al crear el pago: {message}")  # Debug log
+                self.show_message(message, ft.colors.RED)
+        except Exception as e:
+            print(f"Error inesperado al guardar el pago: {str(e)}")  # Debug log
+            self.show_message(f"Error al guardar el pago: {str(e)}", ft.colors.RED)
 
     def get_payment_method_id(self, method_name):
         """
         Obtiene el ID del método de pago según su nombre
         """
-        method = self.db_session.query(MetodoPago).filter_by(descripcion=method_name).first()
-        return method.id_metodo_pago if method else None
+        try:
+            with session_scope() as session:
+                method = session.query(MetodoPago).filter_by(descripcion=method_name).first()
+                return method.id_metodo_pago if method else None
+        except Exception as e:
+            print(f"Error al obtener método de pago: {str(e)}")
+            return None
 
     def show_message(self, message: str, color: str):
         self.page.snack_bar = ft.SnackBar(
@@ -2093,6 +2147,8 @@ class PaymentsView:
                 self.show_message(message, ft.colors.GREEN)
                 # Actualizar el valor mostrado en la tarjeta
                 self.monthly_fee_card.content.controls[0].controls[1].controls[1].value = f"${new_amount:,.2f}"
+                # Actualizar la cuota mensual en memoria
+                self.current_monthly_fee = new_amount
                 self.close_edit_fee_modal(e)
                 self.page.update()
             else:
@@ -2114,16 +2170,18 @@ class PaymentsView:
         Valida el monto ingresado contra la cuota mensual
         """
         try:
+            # Solo validar si el valor es un número válido
             amount = float(self.new_payment_amount_field.value)
-            current_fee = self.monthly_fee_controller.get_current_fee()
             
-            if current_fee and amount != current_fee.monto:
-                self.amount_warning_text.value = f"Advertencia: El monto ingresado (${amount:,.2f}) es diferente a la cuota mensual (${current_fee.monto:,.2f})"
+            # Usar la cuota mensual almacenada en memoria
+            if self.current_monthly_fee and amount != self.current_monthly_fee:
+                self.amount_warning_text.value = f"Advertencia: El monto ingresado (${amount:,.2f}) es diferente a la cuota mensual (${self.current_monthly_fee:,.2f})"
                 self.amount_warning_text.visible = True
             else:
                 self.amount_warning_text.visible = False
                 
             self.page.update()
         except ValueError:
+            # Si el valor no es un número válido, ocultamos la advertencia
             self.amount_warning_text.visible = False
             self.page.update()
