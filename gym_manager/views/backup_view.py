@@ -42,9 +42,43 @@ class BackupView(BaseView):
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
+
+        # Definir diálogo de éxito en restauración
+        self.restore_success_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("¡RESTAURACIÓN COMPLETADA!", size=20, weight=ft.FontWeight.BOLD),
+            content=ft.Column([
+                ft.Text(
+                    "La restauración del backup se completó correctamente.",
+                    size=16
+                ),
+                ft.Text(
+                    "Por favor, cierre la aplicación manualmente para finalizar el proceso.",
+                    size=16,
+                    color=ft.colors.BLUE
+                )
+            ], spacing=10),
+            actions=[],
+            actions_alignment=ft.MainAxisAlignment.END
+        )
+
+        # Definir diálogo de error en restauración
+        self.restore_error_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Error en la restauración", size=20, weight=ft.FontWeight.BOLD),
+            content=ft.Text("", size=16),
+            actions=[
+                ft.TextButton("Aceptar", on_click=lambda e: self._close_dialog(self.restore_error_dialog))
+            ],
+            actions_alignment=ft.MainAxisAlignment.END
+        )
         
-        # Agregar diálogo a la página
-        self.page.overlay.append(self.restore_dialog)
+        # Agregar diálogos a la página
+        self.page.overlay.extend([
+            self.restore_dialog,
+            self.restore_success_dialog,
+            self.restore_error_dialog
+        ])
         
         self.setup_backup_view()
         self.load_backups()
@@ -184,10 +218,20 @@ class BackupView(BaseView):
             
             def restore_thread():
                 try:
-                    if self.restore_service.restore_backup(backup_id):
-                        self.show_message("Backup restaurado exitosamente", ft.colors.GREEN)
+                    success, message = self.restore_service.restore_backup(backup_id)
+                    
+                    if success:
+                        # Mostrar diálogo de éxito
+                        self.page.dialog = self.restore_success_dialog
+                        self.restore_success_dialog.open = True
                     else:
-                        self.show_message("Error al restaurar el backup", ft.colors.RED)
+                        # Actualizar y mostrar diálogo de error
+                        self.restore_error_dialog.content.value = message
+                        self.page.dialog = self.restore_error_dialog
+                        self.restore_error_dialog.open = True
+                    
+                    self.page.update()
+                    
                 except Exception as e:
                     self.show_message(f"Error al restaurar el backup: {str(e)}", ft.colors.RED)
                 finally:

@@ -10,7 +10,6 @@ import traceback
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
-import sys
 import flet as ft
 import sqlparse
 
@@ -59,7 +58,7 @@ class RestoreService:
         
         return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-    def restore_backup(self, backup_id: int) -> bool:
+    def restore_backup(self, backup_id: int) -> Tuple[bool, str]:
         """
         Restaura un backup específico.
         
@@ -67,10 +66,9 @@ class RestoreService:
             backup_id (int): ID del backup a restaurar
             
         Returns:
-            bool: True si la restauración fue exitosa
-            
-        Raises:
-            Exception: Si hay un error durante la restauración
+            Tuple[bool, str]: (éxito, mensaje)
+            - éxito: True si la restauración fue exitosa
+            - mensaje: Mensaje descriptivo del resultado
         """
         self.logger.info(f"[Restore] Iniciando restauración del backup ID: {backup_id}")
         
@@ -78,7 +76,7 @@ class RestoreService:
             # Obtener el backup
             backup = self.db_session.query(Backup).get(backup_id)
             if not backup:
-                raise Exception("Backup no encontrado")
+                return False, "Backup no encontrado"
                 
             # Crear backup de seguridad del estado actual
             self.logger.info("[Restore] Creando backup de seguridad del estado actual...")
@@ -94,60 +92,18 @@ class RestoreService:
                 backup_path = Path(__file__).parent.parent.parent / backup_path
             
             if not backup_path.exists():
-                raise Exception(f"Archivo de backup no encontrado: {backup_path}")
+                return False, f"Archivo de backup no encontrado: {backup_path}"
             
             # Ejecutar la restauración
             self._execute_restore(backup_path)
             
             self.logger.info(f"[Restore] Backup {backup.name} restaurado exitosamente")
-            
-            # Mostrar mensaje de finalización en la interfaz gráfica
-            if self.page:
-                def close_app(e):
-                    self.page.window_destroy()
-                
-                # Crear diálogo de éxito
-                dialog = ft.AlertDialog(
-                    modal=True,
-                    title=ft.Text("¡RESTAURACIÓN COMPLETADA!"),
-                    content=ft.Text(
-                        "La restauración se ha completado correctamente.\n"
-                        "Es necesario reiniciar la aplicación para que los cambios surtan efecto."
-                    ),
-                    actions=[
-                        ft.TextButton("Cerrar aplicación", on_click=close_app)
-                    ],
-                    actions_alignment=ft.MainAxisAlignment.END
-                )
-                
-                # Mostrar diálogo
-                self.page.dialog = dialog
-                dialog.open = True
-                self.page.update()
-            
-            return True
+            return True, "La restauración se ha completado correctamente."
             
         except Exception as e:
             self.logger.error(f"[Restore] Error durante la restauración: {str(e)}")
             self.logger.error(traceback.format_exc())
-            
-            # Mostrar error en la interfaz gráfica
-            if self.page:
-                dialog = ft.AlertDialog(
-                    modal=True,
-                    title=ft.Text("Error en la restauración"),
-                    content=ft.Text(f"Ocurrió un error durante la restauración: {str(e)}"),
-                    actions=[
-                        ft.TextButton("Aceptar", on_click=lambda e: setattr(dialog, 'open', False))
-                    ],
-                    actions_alignment=ft.MainAxisAlignment.END
-                )
-                
-                self.page.dialog = dialog
-                dialog.open = True
-                self.page.update()
-            
-            raise
+            return False, f"Ocurrió un error durante la restauración: {str(e)}"
 
     def _execute_restore(self, backup_path: Path):
         """
@@ -155,44 +111,29 @@ class RestoreService:
         
         Args:
             backup_path (Path): Ruta al archivo de backup
-            
-        Raises:
-            Exception: Si hay un error durante la ejecución
         """
         try:
-            # Configurar timeout para la transacción
-            with self.engine.begin() as conn:
-                # Establecer timeout de 5 minutos
-                conn.execute(text("SET SESSION wait_timeout=300"))
-                
-                # Deshabilitar verificación de claves foráneas
-                conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
-                
-                # Obtener todas las tablas y sus relaciones
-                self.logger.info("[Restore] Obteniendo estructura de la base de datos...")
-                tables_query = """
+            with self.engine.connect() as conn:
+                # Obtener todas las tablas y sus claves foráneas
+                self.logger.info("[Restore] Obteniendo información de tablas...")
+                foreign_keys = {}
+                for row in conn.execute(text("""
                     SELECT 
                         TABLE_NAME,
-                        COLUMN_NAME,
-                        REFERENCED_TABLE_NAME,
-                        REFERENCED_COLUMN_NAME
-                    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                    WHERE REFERENCED_TABLE_NAME IS NOT NULL
-                    AND TABLE_SCHEMA = DATABASE()
-                """
-                foreign_keys = {}
-                for row in conn.execute(text(tables_query)):
-                    table = row[0]
-                    if table not in foreign_keys:
-                        foreign_keys[table] = []
-                    foreign_keys[table].append({
-                        'column': row[1],
-                        'referenced_table': row[2],
-                        'referenced_column': row[3]
+                        REFERENCED_TABLE_NAME
+                    FROM
+                        INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                    WHERE
+                        REFERENCED_TABLE_NAME IS NOT NULL
+                        AND TABLE_SCHEMA = DATABASE()
+                """)):
+                    if row[0] not in foreign_keys:
+                        foreign_keys[row[0]] = []
+                    foreign_keys[row[0]].append({
+                        'referenced_table': row[1]
                     })
-                
-                # Ordenar tablas por dependencias
-                self.logger.info("[Restore] Ordenando tablas por dependencias...")
+
+                # Ordenar tablas para evitar problemas con claves foráneas
                 ordered_tables = []
                 processed = set()
                 
@@ -232,177 +173,16 @@ class RestoreService:
                     # Usar sqlparse para dividir los comandos SQL
                     commands = sqlparse.split(content)
                     
-                    # Diccionario para almacenar el máximo ID de cada tabla
-                    max_ids = {}
-                    failed_commands = []
-                    
                     # Procesar y ejecutar comandos
                     for cmd in commands:
-                        cmd = cmd.strip()
-                        if not cmd:
-                            continue
-                            
-                        try:
-                            # Remover punto y coma final si existe
-                            if cmd.endswith(';'):
-                                cmd = cmd[:-1]
-                            
-                            # Procesar comandos INSERT
-                            if cmd.strip().upper().startswith('INSERT'):
-                                # Extraer partes del comando
-                                parts = cmd.split('VALUES')
-                                if len(parts) != 2:
-                                    raise ValueError("Formato de INSERT inválido")
-                                    
-                                insert_part = parts[0].strip()
-                                values_part = parts[1].strip()
-                                
-                                # Extraer nombre de tabla y columnas
-                                table_name = insert_part.split('INTO')[1].split('(')[0].strip()
-                                
-                                # Ignorar comandos INSERT para la tabla backups
-                                if table_name == 'backups':
-                                    self.logger.info("[Restore] Ignorando comando INSERT para tabla backups")
-                                    continue
-                                
-                                columns_part = insert_part[insert_part.find('('):insert_part.find(')')+1]
-                                
-                                # Construir parte UPDATE
-                                update_parts = []
-                                columns = columns_part.strip('()').split(',')
-                                for col in columns:
-                                    col = col.strip()
-                                    update_parts.append(f"{col}=VALUES({col})")
-                                
-                                # Procesar cada grupo de valores
-                                current_pos = 0
-                                while current_pos < len(values_part):
-                                    if values_part[current_pos] == '(':
-                                        end_pos = current_pos + 1
-                                        paren_count = 1
-                                        while end_pos < len(values_part) and paren_count > 0:
-                                            if values_part[end_pos] == '(':
-                                                paren_count += 1
-                                            elif values_part[end_pos] == ')':
-                                                paren_count -= 1
-                                            end_pos += 1
-                                        
-                                        value_group = values_part[current_pos:end_pos]
-                                        
-                                        # Procesar ID
-                                        value_group_clean = value_group.strip('()')
-                                        values = [v.strip() for v in value_group_clean.split(',')]
-                                        if len(values) > 0:
-                                            try:
-                                                id_value = int(values[0])
-                                                if table_name not in max_ids or id_value > max_ids[table_name]:
-                                                    max_ids[table_name] = id_value
-                                                    self.logger.info(f"[Restore] Nuevo máximo ID encontrado para {table_name}: {id_value}")
-                                            except ValueError:
-                                                self.logger.warning(f"[Restore] No se pudo convertir el ID a entero: {values[0]}")
-                                        
-                                        # Ejecutar INSERT individual
-                                        single_cmd = f"{insert_part} VALUES {value_group} ON DUPLICATE KEY UPDATE {', '.join(update_parts)}"
-                                        self.logger.info(f"[Restore] Ejecutando comando INSERT individual: {single_cmd}")
-                                        result = conn.execute(text(single_cmd))
-                                        self.logger.info(f"[Restore] Filas afectadas: {result.rowcount}")
-                                        
-                                        current_pos = end_pos
-                                    else:
-                                        current_pos += 1
-                            
-                            # Ejecutar otros comandos
-                            else:
-                                # Ignorar comandos que afecten a la tabla backups
-                                if 'backups' in cmd.lower():
-                                    self.logger.info("[Restore] Ignorando comando que afecta a la tabla backups")
-                                    continue
-                                    
-                                result = conn.execute(text(cmd))
-                                self.logger.info(f"[Restore] Comando ejecutado: {cmd}")
-                                
-                        except Exception as e:
-                            self.logger.error(f"[Restore] Error ejecutando comando SQL: {str(e)}")
-                            self.logger.error(f"[Restore] Comando que falló: {cmd}")
-                            failed_commands.append((cmd, str(e)))
-                            continue
-                    
-                    # Actualizar AUTO_INCREMENT para cada tabla
-                    self.logger.info("[Restore] Actualizando AUTO_INCREMENT...")
-                    for table, max_id in max_ids.items():
-                        if max_id:
+                        if cmd.strip():
                             try:
-                                next_id = max_id + 1
-                                conn.execute(text(f"ALTER TABLE {table} AUTO_INCREMENT = {next_id}"))
-                                self.logger.info(f"[Restore] AUTO_INCREMENT de {table} establecido en {next_id}")
+                                conn.execute(text(cmd))
+                                conn.commit()
                             except Exception as e:
-                                self.logger.warning(f"[Restore] Error actualizando AUTO_INCREMENT de {table}: {str(e)}")
-                
-                # Rehabilitar verificación de claves foráneas
-                conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
-                
-                # Verificar integridad de los datos restaurados
-                self.logger.info("[Restore] Verificando integridad de datos...")
-                for table, fks in foreign_keys.items():
-                    try:
-                        # Verificar conteo de registros
-                        result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
-                        count = result.scalar()
-                        self.logger.info(f"[Restore] Tabla {table}: {count} registros")
-                        
-                        # Verificar claves foráneas
-                        for fk in fks:
-                            query = f"""
-                                SELECT COUNT(*) FROM {table} t
-                                LEFT JOIN {fk['referenced_table']} r 
-                                ON t.{fk['column']} = r.{fk['referenced_column']}
-                                WHERE r.{fk['referenced_column']} IS NULL
-                                AND t.{fk['column']} IS NOT NULL
-                            """
-                            result = conn.execute(text(query))
-                            orphaned = result.scalar()
-                            if orphaned > 0:
-                                self.logger.warning(
-                                    f"[Restore] Se encontraron {orphaned} registros huérfanos en {table} "
-                                    f"referenciando {fk['referenced_table']}"
-                                )
-                        
-                    except Exception as e:
-                        self.logger.warning(f"[Restore] Error verificando tabla {table}: {str(e)}")
-                
-                # Reportar comandos fallidos
-                if failed_commands:
-                    self.logger.warning("[Restore] Los siguientes comandos fallaron:")
-                    for cmd, error in failed_commands:
-                        self.logger.warning(f"[Restore] Comando: {cmd}")
-                        self.logger.warning(f"[Restore] Error: {error}")
-                
-                # Registrar el backup restaurado en la tabla backups
-                try:
-                    # Verificar si el backup ya está registrado
-                    backup_name = backup_path.name
-                    existing_backup = self.db_session.query(Backup).filter_by(name=backup_name).first()
-                    
-                    if not existing_backup:
-                        self.logger.info(f"[Restore] Registrando backup restaurado: {backup_name}")
-                        backup = Backup(
-                            name=backup_name,
-                            file_path=str(backup_path),
-                            size_mb=backup_path.stat().st_size / (1024 * 1024),
-                            status='completed',
-                            description="Backup restaurado",
-                            created_by="system",
-                            created_at=datetime.now()
-                        )
-                        self.db_session.add(backup)
-                        self.db_session.commit()
-                        self.logger.info(f"[Restore] Backup registrado exitosamente: {backup_name}")
-                    else:
-                        self.logger.info(f"[Restore] El backup {backup_name} ya está registrado")
-                        
-                except Exception as e:
-                    self.logger.error(f"[Restore] Error registrando backup restaurado: {str(e)}")
-                    # No lanzamos la excepción para no interrumpir el proceso de restauración
+                                self.logger.error(f"[Restore] Error ejecutando comando: {str(e)}")
+                                self.logger.error(f"Comando: {cmd}")
+                                raise
                 
                 self.logger.info("[Restore] Restauración completada exitosamente")
                 

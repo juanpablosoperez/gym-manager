@@ -29,6 +29,7 @@ pillow = "^11.2.1"
 bcrypt = "^4.3.0"
 fpdf = "^1.7.2"
 sqlparse = "^0.5.3"
+psutil = "^5.9.8"
 
 
 [tool.poetry.group.dev.dependencies]
