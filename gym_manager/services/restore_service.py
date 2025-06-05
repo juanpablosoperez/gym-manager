@@ -7,11 +7,13 @@ from sqlalchemy import text, create_engine
 from gym_manager.models.backup import Backup
 from gym_manager.services.backup_service import BackupService
 import traceback
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Set
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 import flet as ft
 import sqlparse
+import re
+import base64
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +33,10 @@ class RestoreService:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         
+        # Crear directorio de logs si no existe
+        log_dir = Path('logs')
+        log_dir.mkdir(exist_ok=True)
+        
         # Crear manejador de archivo
         handler = logging.FileHandler('logs/restore.log')
         handler.setLevel(logging.INFO)
@@ -41,12 +47,15 @@ class RestoreService:
         # Cargar variables de entorno del archivo .env.dev
         project_root = Path(__file__).parent.parent.parent
         env_path = project_root / '.env.dev'
+        if not env_path.exists():
+            raise FileNotFoundError(f"No se encontró el archivo de configuración: {env_path}")
+            
         load_dotenv(env_path, override=True)  # Forzar la sobrescritura de variables
         
         # Configuración de la base de datos
         self.DATABASE_URL = os.getenv('DATABASE_URL')
         if not self.DATABASE_URL:
-            raise Exception("No se encontró la variable de entorno DATABASE_URL")
+            raise ValueError("No se encontró la variable de entorno DATABASE_URL")
             
         self.logger.info(f"[Restore] Usando base de datos: {self.DATABASE_URL}")
         
@@ -72,7 +81,7 @@ class RestoreService:
         DB_NAME = os.getenv('DB_NAME')
         
         if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
-            raise Exception("Faltan variables de entorno necesarias para la conexión a la base de datos")
+            raise ValueError("Faltan variables de entorno necesarias para la conexión a la base de datos")
         
         return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
@@ -130,80 +139,115 @@ class RestoreService:
         Args:
             backup_path (Path): Ruta al archivo de backup
         """
+        conn = None
+        cursor = None
         try:
-            with self.engine.connect() as conn:
-                # Obtener todas las tablas y sus claves foráneas
-                self.logger.info("[Restore] Obteniendo información de tablas...")
-                foreign_keys = {}
-                for row in conn.execute(text("""
-                    SELECT 
-                        TABLE_NAME,
-                        REFERENCED_TABLE_NAME
-                    FROM
-                        INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                    WHERE
-                        REFERENCED_TABLE_NAME IS NOT NULL
-                        AND TABLE_SCHEMA = DATABASE()
-                """)):
-                    if row[0] not in foreign_keys:
-                        foreign_keys[row[0]] = []
-                    foreign_keys[row[0]].append({
-                        'referenced_table': row[1]
-                    })
+            # Obtener una conexión directa a MySQL
+            conn = self.engine.raw_connection()
+            cursor = conn.cursor()
+            
+            self.logger.info(f"[Restore] Iniciando restauración desde: {backup_path}")
+            
+            # Obtener lista de tablas excluyendo backups
+            cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() 
+                AND table_name != 'backups'
+            """)
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            # Obtener dependencias de claves foráneas
+            cursor.execute("""
+                SELECT 
+                    table_name,
+                    referenced_table_name
+                FROM information_schema.key_column_usage
+                WHERE referenced_table_name IS NOT NULL
+                AND table_schema = DATABASE()
+            """)
+            dependencies = cursor.fetchall()
+            
+            # Construir grafo de dependencias
+            dependency_graph = {table: set() for table in tables}
+            for table, referenced_table in dependencies:
+                if referenced_table in dependency_graph:
+                    dependency_graph[table].add(referenced_table)
+            
+            # Ordenar tablas por dependencias (topological sort)
+            ordered_tables = []
+            visited = set()
+            
+            def visit(table):
+                if table in visited:
+                    return
+                visited.add(table)
+                for dep in dependency_graph[table]:
+                    visit(dep)
+                ordered_tables.append(table)
+            
+            for table in tables:
+                visit(table)
+            
+            # Eliminar datos en orden inverso
+            self.logger.info("[Restore] Eliminando datos existentes...")
+            for table in reversed(ordered_tables):
+                try:
+                    cursor.execute(f"DELETE FROM `{table}`")
+                    self.logger.info(f"[Restore] Datos eliminados de la tabla: {table}")
+                except Exception as e:
+                    self.logger.error(f"[Restore] Error al eliminar datos de {table}: {str(e)}")
+                    raise
 
-                # Ordenar tablas para evitar problemas con claves foráneas
-                ordered_tables = []
-                processed = set()
-                
-                def process_table(table):
-                    if table in processed:
-                        return
-                    if table in foreign_keys:
-                        for fk in foreign_keys[table]:
-                            process_table(fk['referenced_table'])
-                    ordered_tables.append(table)
-                    processed.add(table)
-                
-                # Obtener todas las tablas excepto 'backups'
-                all_tables = [row[0] for row in conn.execute(text("SHOW TABLES")) if row[0] != 'backups']
-                for table in all_tables:
-                    process_table(table)
-                
-                # Eliminar datos en orden inverso
-                self.logger.info("[Restore] Limpiando datos existentes...")
-                for table in reversed(ordered_tables):
-                    try:
-                        conn.execute(text(f"DELETE FROM {table}"))
-                        self.logger.info(f"[Restore] Datos eliminados de tabla {table}")
-                    except Exception as e:
-                        self.logger.warning(f"[Restore] Error al limpiar tabla {table}: {str(e)}")
-                
-                # Leer y ejecutar el archivo de backup
-                self.logger.info("[Restore] Ejecutando comandos del backup...")
-                with open(backup_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+            # Leer y parsear el archivo de backup línea por línea
+            statements = []
+            current_stmt = ""
+
+            with open(backup_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith('--') or stripped.startswith('/*') or stripped.startswith('/*!'):
+                        continue
+
+                    current_stmt += line
+                    if stripped.endswith(';'):
+                        statements.append(current_stmt.strip())
+                        current_stmt = ""
+
+            # En caso de que haya una última sentencia sin punto y coma (raro, pero seguro)
+            if current_stmt.strip():
+                statements.append(current_stmt.strip())
+
+
+            self.logger.info(f"[Restore] Se encontraron {len(statements)} sentencias SQL para ejecutar")
+            if statements:
+                self.logger.debug(f"[Restore] Primera sentencia: {statements[0]}")
+
+            # Ejecutar cada sentencia
+            for i, stmt in enumerate(statements, 1):
+                try:
+                    if not stmt:
+                        continue
                     
-                    # Limpiar el contenido del archivo
-                    self.logger.info("[Restore] Limpiando contenido del archivo...")
-                    content = '\n'.join(line for line in content.split('\n') 
-                                      if line.strip() and not line.strip().startswith('--'))
+                    self.logger.debug(f"[Restore] Ejecutando sentencia {i}/{len(statements)}")
+                    cursor.execute(stmt)
                     
-                    # Usar sqlparse para dividir los comandos SQL
-                    commands = sqlparse.split(content)
-                    
-                    # Procesar y ejecutar comandos
-                    for cmd in commands:
-                        if cmd.strip():
-                            try:
-                                conn.execute(text(cmd))
-                                conn.commit()
-                            except Exception as e:
-                                self.logger.error(f"[Restore] Error ejecutando comando: {str(e)}")
-                                self.logger.error(f"Comando: {cmd}")
-                                raise
-                
-                self.logger.info("[Restore] Restauración completada exitosamente")
-                
+                except Exception as e:
+                    self.logger.error(f"[Restore] Error en sentencia {i}: {str(e)}")
+                    self.logger.error(f"[Restore] Sentencia problemática: {stmt}")
+                    raise
+            
+            # Hacer commit de todos los cambios
+            conn.commit()
+            self.logger.info("[Restore] Restauración completada exitosamente")
+            
         except Exception as e:
-            self.logger.error(f"[Restore] Error durante la ejecución: {str(e)}")
-            raise 
+            self.logger.error(f"[Restore] Error durante la restauración: {str(e)}")
+            if conn:
+                conn.rollback()
+            raise
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
