@@ -9,6 +9,7 @@ import traceback
 from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
+import base64
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,10 @@ class BackupService:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         
+        # Crear directorio de logs si no existe
+        log_dir = Path('logs')
+        log_dir.mkdir(exist_ok=True)
+        
         # Crear manejador de archivo
         handler = logging.FileHandler('logs/backup.log')
         handler.setLevel(logging.INFO)
@@ -42,12 +47,15 @@ class BackupService:
         
         # Cargar variables de entorno del archivo .env.dev
         env_path = project_root / '.env.dev'
+        if not env_path.exists():
+            raise FileNotFoundError(f"No se encontró el archivo de configuración: {env_path}")
+            
         load_dotenv(env_path, override=True)  # Forzar la sobrescritura de variables
         
         # Configuración de la base de datos
         self.DATABASE_URL = os.getenv('DATABASE_URL')
         if not self.DATABASE_URL:
-            raise Exception("No se encontró la variable de entorno DATABASE_URL")
+            raise ValueError("No se encontró la variable de entorno DATABASE_URL")
             
         self.logger.info(f"[Backup] Usando base de datos: {self.DATABASE_URL}")
         
@@ -73,7 +81,7 @@ class BackupService:
         DB_NAME = os.getenv('DB_NAME')
         
         if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
-            raise Exception("Faltan variables de entorno necesarias para la conexión a la base de datos")
+            raise ValueError("Faltan variables de entorno necesarias para la conexión a la base de datos")
         
         return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
@@ -93,6 +101,7 @@ class BackupService:
                 self.logger.info(f"[Cleanup] Se eliminaron {len(backups) - max_backups} backups antiguos")
         except Exception as e:
             self.logger.error(f"[Cleanup] Error limpiando backups antiguos: {str(e)}")
+            self.logger.error(traceback.format_exc())
 
     def create_backup(self, description: str = None, created_by: str = None) -> Backup:
         """
@@ -134,7 +143,7 @@ class BackupService:
                 backup.status = 'failed'
                 backup.error_message = error_msg
                 self.db_session.commit()
-                raise Exception(error_msg)
+                raise ValueError(error_msg)
 
             # Guardar tamaño final y estado
             backup.size_mb = backup_path.stat().st_size / (1024 * 1024)
@@ -146,6 +155,7 @@ class BackupService:
 
         except Exception as e:
             self.logger.error(f"[Backup] Error al crear backup: {str(e)}")
+            self.logger.error(traceback.format_exc())
             if 'backup' in locals():
                 backup.status = 'failed'
                 backup.error_message = str(e)
@@ -171,6 +181,13 @@ class BackupService:
                     create_stmt = create_stmt.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
                     f.write(f"-- Estructura de la tabla {table}\n")
                     f.write(f"{create_stmt};\n\n")
+
+                    # Obtener información de las columnas
+                    columns_info = conn.execute(text(f"SHOW COLUMNS FROM {table}")).fetchall()
+                    blob_columns = [col[0] for col in columns_info if 'BLOB' in col[1].upper()]
+                    
+                    if blob_columns:
+                        self.logger.info(f"[Backup] Columnas BLOB detectadas en {table}: {', '.join(blob_columns)}")
 
                     # Datos
                     # Obtener la clave primaria de la tabla
@@ -198,9 +215,13 @@ class BackupService:
 
                         for row in rows:
                             values = []
-                            for val in row:
+                            for col_name, val in zip(columns, row):
                                 if val is None:
                                     values.append("NULL")
+                                elif col_name in blob_columns and isinstance(val, bytes):
+                                    # Codificar BLOB en Base64
+                                    encoded = base64.b64encode(val).decode('utf-8')
+                                    values.append(f"'{encoded}'")
                                 elif isinstance(val, (int, float)):
                                     values.append(str(val))
                                 else:
@@ -208,11 +229,15 @@ class BackupService:
                                     values.append(f"'{escaped}'")
                             
                             values_str = ', '.join(values)
-                            columns_str = ', '.join(columns)
-                            f.write(f"INSERT INTO {table} ({columns_str}) VALUES ({values_str});\n")
+                            columns_str = ', '.join(f"`{col}`" for col in columns)
+                            f.write(f"INSERT INTO `{table}` ({columns_str}) VALUES ({values_str});\n")
                         f.write("\n")
                     else:
                         self.logger.info(f"[Backup] Tabla {table} vacía")
+                   
+            # Cierre formal del archivo de backup
+            f.write("-- Fin del backup\n")
+            f.write("\n")
 
     def get_backups(self) -> list[Backup]:
         """
@@ -269,6 +294,7 @@ class BackupService:
             
         except Exception as e:
             self.logger.error(f"[Delete] Error al eliminar backup: {str(e)}")
+            self.logger.error(traceback.format_exc())
             self.db_session.rollback()
             return False, f"Error al eliminar backup: {str(e)}"
 
@@ -287,5 +313,5 @@ class BackupService:
         """
         backup = self.db_session.query(Backup).get(backup_id)
         if not backup:
-            raise Exception("Backup no encontrado")
+            raise ValueError("Backup no encontrado")
         return backup 
