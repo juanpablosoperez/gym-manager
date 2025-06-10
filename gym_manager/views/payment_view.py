@@ -304,6 +304,18 @@ class PaymentsView(ModuleView):
             actions=[
                 ft.TextButton("Cancelar", on_click=self.close_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
                 ft.ElevatedButton(
+                    "Comprobante",
+                    icon=ft.icons.RECEIPT,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.GREEN_700,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=20, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
+                    ),
+                    on_click=self.generate_receipt_from_form
+                ),
+                ft.ElevatedButton(
                     "Guardar",
                     style=ft.ButtonStyle(
                         bgcolor=ft.colors.BLUE_900,
@@ -951,12 +963,6 @@ class PaymentsView(ModuleView):
                                             tooltip="Eliminar",
                                             on_click=lambda e, p=payment: self.delete_payment(p)
                                         ),
-                                        ft.IconButton(
-                                            icon=ft.icons.RECEIPT,
-                                            icon_color=ft.colors.GREEN,
-                                            tooltip="Generar Comprobante",
-                                            on_click=lambda e, p=payment: self.generate_receipt(p)
-                                        ),
                                     ],
                                     spacing=0,
                                 )
@@ -1210,16 +1216,12 @@ class PaymentsView(ModuleView):
             elements.append(line)
             elements.append(Spacer(1, 20))
 
-            # Número de comprobante
-            receipt_number = Paragraph(f"N° {self.selected_payment_for_receipt.id_pago:06d}", subtitle_style)
-            elements.append(receipt_number)
-            elements.append(Spacer(1, 30))
+            
 
             # Información del pago con diseño mejorado
             payment_info = [
                 ["Fecha:", self.selected_payment_for_receipt.fecha_pago.strftime("%d/%m/%Y")],
                 ["Miembro:", f"{self.selected_payment_for_receipt.miembro.nombre} {self.selected_payment_for_receipt.miembro.apellido}"],
-                ["Documento:", self.selected_payment_for_receipt.miembro.documento],
                 ["Método de Pago:", self.selected_payment_for_receipt.metodo_pago.descripcion],
                 ["Monto:", f"${self.selected_payment_for_receipt.monto:,.2f}"],
                 ["Estado:", "PAGADO" if self.selected_payment_for_receipt.estado == 1 else "CANCELADO"]
@@ -2185,3 +2187,55 @@ class PaymentsView(ModuleView):
             # Si el valor no es un número válido, ocultamos la advertencia
             self.amount_warning_text.visible = False
             self.page.update()
+
+    def generate_receipt_from_form(self, e):
+        """
+        Genera un comprobante con los datos ingresados en el formulario
+        """
+        if not self.selected_member_data:
+            self.show_message("Debe seleccionar un miembro", ft.colors.RED)
+            return
+
+        if not self.new_payment_date_value:
+            self.show_message("Debe seleccionar una fecha", ft.colors.RED)
+            return
+
+        try:
+            monto = float(self.new_payment_amount_field.value)
+            if monto <= 0:
+                self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+                return
+        except ValueError:
+            self.show_message("El monto ingresado no es válido", ft.colors.RED)
+            return
+
+        if not self.new_payment_method_field.value:
+            self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
+            return
+
+        try:
+            # Crear un objeto temporal con los datos del formulario
+            temp_payment = type('TempPayment', (), {
+                'id_pago': 0,  # ID temporal
+                'fecha_pago': self.new_payment_date_value,
+                'monto': monto,
+                'miembro': type('TempMember', (), {
+                    'nombre': self.selected_member_data['nombre'],
+                    'apellido': self.selected_member_data['apellido'],
+                    'documento': self.selected_member_data.get('documento', '')
+                }),
+                'metodo_pago': type('TempPaymentMethod', (), {
+                    'descripcion': self.new_payment_method_field.value
+                }),
+                'referencia': self.new_payment_observations_field.value,
+                'estado': 1
+            })
+
+            # Guardar el pago temporal para la generación del comprobante
+            self.selected_payment_for_receipt = temp_payment
+            
+            # Generar el comprobante
+            self.confirm_generate_receipt(e)
+
+        except Exception as e:
+            self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
