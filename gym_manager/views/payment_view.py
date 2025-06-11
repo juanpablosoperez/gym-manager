@@ -281,8 +281,17 @@ class PaymentsView(ModuleView):
             height=60,
             hint_text="Agregar observaciones...",
         )
+        # Mensaje de validación para el comprobante
+        self.receipt_validation_text = ft.Text(
+            "",
+            color=ft.colors.GREEN,
+            size=12,
+            visible=False
+        )
+
+        # Modal de nuevo pago
         self.new_payment_modal = ft.AlertDialog(
-            title=ft.Text("Registrar Nuevo Pago", size=26, weight=ft.FontWeight.BOLD),
+            title=ft.Text("Nuevo Pago", size=22, weight=ft.FontWeight.BOLD),
             content=ft.Column(
                 controls=[
                     ft.Text("Miembro", size=16, weight=ft.FontWeight.BOLD),
@@ -297,36 +306,39 @@ class PaymentsView(ModuleView):
                     self.new_payment_method_field,
                     ft.Text("Observaciones", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_observations_field,
+                    self.receipt_validation_text,  # Agregar el texto de validación
+                    ft.Row(
+                        controls=[
+                            ft.TextButton("Cancelar", on_click=self.close_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
+                            ft.ElevatedButton(
+                                "Comprobante",
+                                icon=ft.icons.RECEIPT,
+                                style=ft.ButtonStyle(
+                                    bgcolor=ft.colors.GREEN_700,
+                                    color=ft.colors.WHITE,
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                    padding=ft.padding.symmetric(horizontal=20, vertical=12),
+                                    text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
+                                ),
+                                on_click=self.generate_receipt_from_form
+                            ),
+                            ft.ElevatedButton(
+                                "Guardar",
+                                style=ft.ButtonStyle(
+                                    bgcolor=ft.colors.BLUE_900,
+                                    color=ft.colors.WHITE,
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                    padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                                    text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                                ),
+                                on_click=self.save_payment
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.END,
+                    ),
                 ],
-                spacing=18,
-                width=540,
+                spacing=20,
             ),
-            actions=[
-                ft.TextButton("Cancelar", on_click=self.close_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
-                ft.ElevatedButton(
-                    "Comprobante",
-                    icon=ft.icons.RECEIPT,
-                    style=ft.ButtonStyle(
-                        bgcolor=ft.colors.GREEN_700,
-                        color=ft.colors.WHITE,
-                        shape=ft.RoundedRectangleBorder(radius=8),
-                        padding=ft.padding.symmetric(horizontal=20, vertical=12),
-                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                    ),
-                    on_click=self.generate_receipt_from_form
-                ),
-                ft.ElevatedButton(
-                    "Guardar",
-                    style=ft.ButtonStyle(
-                        bgcolor=ft.colors.BLUE_900,
-                        color=ft.colors.WHITE,
-                        shape=ft.RoundedRectangleBorder(radius=8),
-                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
-                        text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
-                    ),
-                    on_click=self.save_payment
-                ),
-            ],
             actions_alignment=ft.MainAxisAlignment.END,
             modal=True,
         )
@@ -835,17 +847,21 @@ class PaymentsView(ModuleView):
         self.page.update()
 
     def close_modal(self, e):
+        """
+        Cierra el modal de nuevo pago y limpia los campos
+        """
         self.new_payment_client_field.value = ""
-        self.selected_member_data = None
-        self.member_search_results.visible = False
         self.new_payment_date_value = None
         self.new_payment_date_picker.value = None
         self.new_payment_date_field.content.controls[0].value = "Seleccionar fecha"
         self.new_payment_amount_field.value = "0.00"
-        self.amount_warning_text.visible = False  # Ocultar el mensaje al cerrar
         self.new_payment_method_field.value = None
         self.new_payment_observations_field.value = ""
-        self.new_payment_observations_field.height = 100
+        self.selected_member_data = None
+        self.member_search_results.visible = False
+        self.member_search_results_container.height = 0
+        self.amount_warning_text.visible = False
+        self.receipt_validation_text.visible = False  # Ocultar el mensaje de validación
         self.new_payment_modal.open = False
         self.page.update()
 
@@ -1135,7 +1151,10 @@ class PaymentsView(ModuleView):
         Confirma la generación del comprobante
         """
         if not self.selected_payment_for_receipt:
-            self.show_message("No hay pago seleccionado", ft.colors.RED)
+            self.receipt_validation_text.value = "No hay pago seleccionado"
+            self.receipt_validation_text.color = ft.colors.RED
+            self.receipt_validation_text.visible = True
+            self.page.update()
             return
 
         try:
@@ -1216,8 +1235,6 @@ class PaymentsView(ModuleView):
             elements.append(line)
             elements.append(Spacer(1, 20))
 
-            
-
             # Información del pago con diseño mejorado
             payment_info = [
                 ["Fecha:", self.selected_payment_for_receipt.fecha_pago.strftime("%d/%m/%Y")],
@@ -1280,17 +1297,21 @@ class PaymentsView(ModuleView):
             print("Construyendo comprobante...")  # Debug
             doc.build(elements)
             print("Comprobante generado exitosamente")  # Debug
-
-            # Mostrar mensaje de éxito
-            self.show_message(f"Comprobante guardado en: {filepath}", ft.colors.GREEN)
             
-            # Cerrar el modal
-            self.close_receipt_modal(e)
+            # Mostrar mensaje de éxito
+            self.receipt_validation_text.value = f"Comprobante guardado en: {filepath}"
+            self.receipt_validation_text.color = ft.colors.GREEN
+            self.receipt_validation_text.visible = True
+            self.page.update()
 
         except Exception as e:
             print(f"Error al generar comprobante: {str(e)}")  # Debug
-            self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
-            self.close_receipt_modal(e)
+            
+            # Mostrar mensaje de error
+            self.receipt_validation_text.value = f"Error al generar el comprobante: {str(e)}"
+            self.receipt_validation_text.color = ft.colors.RED
+            self.receipt_validation_text.visible = True
+            self.page.update()
 
     def search_member(self, e):
         """
