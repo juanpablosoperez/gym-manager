@@ -719,6 +719,37 @@ class PaymentsView(ModuleView):
         )
         self.page.overlay.append(self.edit_fee_modal)
 
+        # Modal de éxito al guardar pago
+        self.success_modal = ft.AlertDialog(
+            title=ft.Text("¡Éxito!", size=20, weight=ft.FontWeight.BOLD),
+            content=ft.Column(
+                controls=[
+                    ft.Icon(ft.icons.CHECK_CIRCLE, color=ft.colors.GREEN, size=40),
+                    ft.Text("El pago se ha guardado correctamente", size=14),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10,
+                width=300,
+                height=100,
+            ),
+            actions=[
+                ft.ElevatedButton(
+                    "Aceptar",
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.GREEN_700,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=20, vertical=8),
+                        text_style=ft.TextStyle(size=14, weight=ft.FontWeight.BOLD),
+                    ),
+                    on_click=lambda e: self.close_success_modal(e)
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.CENTER,
+            modal=True,
+        )
+        self.page.overlay.append(self.success_modal)
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
@@ -1380,11 +1411,8 @@ class PaymentsView(ModuleView):
 
     def save_payment(self, e):
         """
-        Guarda un nuevo pago
+        Guarda el nuevo pago
         """
-        print("Iniciando guardado de pago...")  # Debug log
-        
-        # Validaciones iniciales
         if not self.selected_member_data:
             self.show_message("Debe seleccionar un miembro", ft.colors.RED)
             return
@@ -1435,9 +1463,11 @@ class PaymentsView(ModuleView):
             
             if success:
                 print("Pago creado exitosamente")  # Debug log
-                self.show_message(message, ft.colors.GREEN)
                 self.close_modal(e)
                 self.load_data()
+                # Mostrar modal de éxito
+                self.success_modal.open = True
+                self.page.update()
             else:
                 print(f"Error al crear el pago: {message}")  # Debug log
                 self.show_message(message, ft.colors.RED)
@@ -2260,3 +2290,10 @@ class PaymentsView(ModuleView):
 
         except Exception as e:
             self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
+
+    def close_success_modal(self, e):
+        """
+        Cierra el modal de éxito
+        """
+        self.success_modal.open = False
+        self.page.update()
