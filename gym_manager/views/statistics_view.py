@@ -21,7 +21,8 @@ class StatisticsView(ModuleView):
                 ft.dropdown.Option("Informe de Miembros"),
                 ft.dropdown.Option("Informe de Pagos"),
             ],
-            expand=True, border_radius=8, content_padding=12
+            expand=True, border_radius=8, content_padding=12,
+            on_change=self._validate_report_generation
         )
 
         self.start_date_picker = ft.DatePicker(
@@ -66,11 +67,12 @@ class StatisticsView(ModuleView):
 
         self.generate_report_button = ft.ElevatedButton(
             text="Generar Informe",
-            icon=ft.icons.RECEIPT_LONG, # Icono 🧾
+            icon=ft.icons.RECEIPT_LONG,
             bgcolor=ft.colors.BLUE_GREY_800,
             color=ft.colors.WHITE,
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(vertical=12, horizontal=16)),
-            height=48
+            height=48,
+            disabled=True  # Inicialmente deshabilitado
         )
 
         # --- Panel de Estadísticas Dinámicas ---
@@ -147,7 +149,18 @@ class StatisticsView(ModuleView):
         picker.open = True
         self.page.update()
 
+    def _validate_report_generation(self, e):
+        """Valida si se puede generar el informe basado en la selección del dropdown"""
+        if self.report_type_dropdown.value:
+            self.generate_report_button.disabled = False
+            self.generate_report_button.bgcolor = ft.colors.BLUE_GREY_800
+        else:
+            self.generate_report_button.disabled = True
+            self.generate_report_button.bgcolor = ft.colors.GREY_400
+        self.page.update()
+
     def build(self):
+        self.report_type_dropdown.on_change = self._validate_report_generation
         self.start_date_picker.on_change = lambda e: self._update_date_text(self.start_date_text, self.start_date_picker.value)
         self.end_date_picker.on_change = lambda e: self._update_date_text(self.end_date_text, self.end_date_picker.value)
 
