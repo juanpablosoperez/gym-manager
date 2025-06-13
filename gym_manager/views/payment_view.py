@@ -560,6 +560,7 @@ class PaymentsView(ModuleView):
             prefix_icon=ft.icons.ATTACH_MONEY,
             border_radius=8,
             width=300,
+            height=200,
             value=str(self.monthly_fee_controller.get_current_fee().monto) if self.monthly_fee_controller.get_current_fee() else "0.00"
         )
 
@@ -658,7 +659,8 @@ class PaymentsView(ModuleView):
                     spread_radius=1,
                     blur_radius=10,
                     color=ft.colors.GREY_300,
-                )
+                ),
+                height=300  # Altura máxima del modal
             ),
             actions=[
                 ft.TextButton(
