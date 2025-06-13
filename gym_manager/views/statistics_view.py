@@ -390,7 +390,7 @@ class StatisticsView(ModuleView):
                 spacing=0, # Controlar espaciado con márgenes de los hijos
             ),
             expand=True,
-            bgcolor=ft.colors.GREY_100, # Fondo general gris claro para contraste con cards blancas
+            bgcolor=ft.colors.WHITE, # Fondo blanco
             padding=ft.padding.symmetric(horizontal=15, vertical=10)
         )
 
