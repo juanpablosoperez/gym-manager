@@ -170,7 +170,8 @@ class PaymentMethodView(ModuleView):
                     self.new_method_status_switch,
                 ],
                 spacing=18,
-                width=540,
+                width=500,
+                height=150,
             ),
             actions=[
                 ft.TextButton(
