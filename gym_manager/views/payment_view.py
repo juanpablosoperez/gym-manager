@@ -1251,10 +1251,15 @@ class PaymentsView(ModuleView):
                 )
                 if not success:
                     print(f"Error al guardar comprobante: {message}")  # Debug
-
-            # Mostrar mensaje de éxito
-            self.receipt_validation_text.value = "Comprobante generado exitosamente, se ha guardado en la carpeta de descargas."
-            self.receipt_validation_text.color = ft.colors.GREEN
+                    self.receipt_validation_text.value = f"Error al guardar el comprobante: {message}"
+                    self.receipt_validation_text.color = ft.colors.RED
+                else:
+                    self.receipt_validation_text.value = "Comprobante generado y guardado exitosamente"
+                    self.receipt_validation_text.color = ft.colors.GREEN
+            else:
+                self.receipt_validation_text.value = "Comprobante generado exitosamente, se ha guardado en la carpeta de descargas."
+                self.receipt_validation_text.color = ft.colors.GREEN
+            
             self.receipt_validation_text.visible = True
             
             # Cerrar el modal
@@ -1336,7 +1341,7 @@ class PaymentsView(ModuleView):
 
     def save_payment(self, e):
         """
-        Guarda el nuevo pago
+        Guarda un nuevo pago
         """
         if not self.selected_member_data:
             self.show_message("Debe seleccionar un miembro", ft.colors.RED)
@@ -1384,10 +1389,11 @@ class PaymentsView(ModuleView):
             }
             
             print("Llamando al controlador para crear el pago...")  # Debug log
-            success, message = self.payment_controller.create_payment(payment_data)
+            success, response = self.payment_controller.create_payment(payment_data)
             
             if success:
                 print("Pago creado exitosamente")  # Debug log
+                payment_id = response['id_pago']  # Obtener el ID del pago creado
                 
                 # Generar el comprobante para el pago recién creado
                 try:
@@ -1472,14 +1478,18 @@ class PaymentsView(ModuleView):
 
                     # Guardar el comprobante en la base de datos
                     success, message = self.payment_controller.save_payment_receipt(
-                        message['id_pago'],  # ID del pago recién creado
+                        payment_id,  # Usar el ID del pago recién creado
                         pdf_content
                     )
                     if not success:
                         print(f"Error al guardar comprobante: {message}")  # Debug
+                        self.show_message(f"Error al guardar el comprobante: {message}", ft.colors.RED)
+                    else:
+                        print("Comprobante guardado exitosamente en la base de datos")  # Debug
 
                 except Exception as ex:
                     print(f"Error al generar comprobante automático: {str(ex)}")
+                    self.show_message(f"Error al generar el comprobante: {str(ex)}", ft.colors.RED)
                 
                 self.close_modal(e)
                 self.load_data()
@@ -1487,8 +1497,8 @@ class PaymentsView(ModuleView):
                 self.success_modal.open = True
                 self.page.update()
             else:
-                print(f"Error al crear el pago: {message}")  # Debug log
-                self.show_message(message, ft.colors.RED)
+                print(f"Error al crear el pago: {response}")  # Debug log
+                self.show_message(response, ft.colors.RED)
         except Exception as e:
             print(f"Error inesperado al guardar el pago: {str(e)}")  # Debug log
             self.show_message(f"Error al guardar el pago: {str(e)}", ft.colors.RED)

@@ -76,9 +76,9 @@ class PaymentController:
                 )
                 self.logger.info(f"Datos del pago: {payment_data}")
                 session.add(new_payment)
-                session.flush()
+                session.flush()  # Esto asegura que se genere el ID
                 self.logger.info("Pago creado exitosamente")
-                return True, "Pago registrado exitosamente"
+                return True, {"message": "Pago registrado exitosamente", "id_pago": new_payment.id_pago}
         except Exception as e:
             self.logger.error(f"Error al crear pago: {str(e)}")
             return False, f"Error al crear el pago: {str(e)}"
