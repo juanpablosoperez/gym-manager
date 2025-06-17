@@ -2,6 +2,7 @@ from datetime import datetime
 from gym_manager.models.payment import Pago
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
+from gym_manager.models.payment_receipt import ComprobantePago
 from gym_manager.utils.database import session_scope
 from sqlalchemy.exc import DBAPIError, PendingRollbackError, SQLAlchemyError
 from sqlalchemy import func, extract
@@ -187,3 +188,30 @@ class PaymentController:
         except Exception as e:
             self.logger.error(f"Error al obtener suma de pagos anuales: {str(e)}")
             return 0
+
+    def save_payment_receipt(self, payment_id: int, pdf_content: bytes):
+        """
+        Guarda el comprobante de pago en la base de datos
+        """
+        try:
+            with session_scope() as session:
+                # Verificar si ya existe un comprobante para este pago
+                existing_receipt = session.query(ComprobantePago).filter_by(id_pago=payment_id).first()
+                
+                if existing_receipt:
+                    # Actualizar el comprobante existente
+                    existing_receipt.contenido = pdf_content
+                    existing_receipt.fecha_emision = datetime.now()
+                else:
+                    # Crear nuevo comprobante
+                    new_receipt = ComprobantePago(
+                        contenido=pdf_content,
+                        fecha_emision=datetime.now(),
+                        id_pago=payment_id
+                    )
+                    session.add(new_receipt)
+                
+                return True, "Comprobante guardado exitosamente"
+        except Exception as e:
+            self.logger.error(f"Error al guardar comprobante: {str(e)}")
+            return False, f"Error al guardar el comprobante: {str(e)}"
