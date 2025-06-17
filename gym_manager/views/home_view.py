@@ -7,6 +7,7 @@ from gym_manager.views.module_views import (
     MembersView, PaymentsView, ReportsView,
     PaymentMethodsView, UsersView, BackupsView, RoutinesView
 )
+from gym_manager.views.payment_receipt_view import PaymentReceiptView
 from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.controllers.member_controller import MemberController
 from datetime import datetime, timedelta
@@ -342,19 +343,23 @@ class HomeView:
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 4:  # Informes y Estadísticas
+        elif index == 4:  # Comprobantes de Pago
+            self.section_title = "Comprobantes de Pago"
+            view = PaymentReceiptView(self.page)
+            self.main_content.content = view.get_content()
+        elif index == 5:  # Informes y Estadísticas
             self.section_title = "Informes y Estadísticas"
             view = ReportsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 5:  # Métodos de Pago
+        elif index == 6:  # Métodos de Pago
             self.section_title = "Métodos de Pago"
             view = PaymentMethodsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 6:  # Gestión de Usuarios
+        elif index == 7:  # Gestión de Usuarios
             self.section_title = "Gestión de Usuarios"
             view = UsersView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 7:  # Gestión de Backups
+        elif index == 8:  # Gestión de Backups
             self.section_title = "Gestión de Backups"
             view = BackupsView(self.page)
             self.main_content.content = view.get_content()
