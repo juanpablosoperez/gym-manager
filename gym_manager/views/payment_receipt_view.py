@@ -23,85 +23,92 @@ class PaymentReceiptView(ModuleView):
             text_align=ft.TextAlign.LEFT,
         )
 
-        # Campos de fecha
-        self.date_from_field = ft.TextField(
-            read_only=True,
-            border_radius=8,
-            width=200,
-            height=40,
-            hint_text="Seleccionar fecha",
-            on_focus=lambda e: self.open_date_picker(self.date_from),
+        # DatePicker Desde
+        self.date_from = ft.DatePicker(
+            first_date=datetime(2024, 1, 1),
+            last_date=datetime(2025, 12, 31),
+            on_change=self.on_date_from_change
+        )
+        self.page.overlay.append(self.date_from)
+        self.date_from_value = None
+        self.date_from_field = ft.Container(
+            content=ft.Row([
+                ft.Text(self.date_from_value.strftime("%d/%m/%Y") if self.date_from_value else "",
+                        size=16,
+                        color=ft.colors.BLACK54),
+                ft.Icon(ft.icons.CALENDAR_TODAY, size=20, color=ft.colors.GREY_700),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            border=ft.border.all(1, ft.colors.GREY_400),
+            border_radius=10,
+            padding=ft.padding.symmetric(horizontal=12, vertical=8),
+            width=120,
+            on_click=lambda e: self.open_date_picker(self.date_from),
+            bgcolor=ft.colors.WHITE,
+            tooltip="Seleccionar fecha desde",
         )
 
-        self.date_to_field = ft.TextField(
-            read_only=True,
-            border_radius=8,
-            width=200,
-            height=40,
-            hint_text="Seleccionar fecha",
-            on_focus=lambda e: self.open_date_picker(self.date_to),
+        # DatePicker Hasta
+        self.date_to = ft.DatePicker(
+            first_date=datetime(2024, 1, 1),
+            last_date=datetime(2025, 12, 31),
+            on_change=self.on_date_to_change
+        )
+        self.page.overlay.append(self.date_to)
+        self.date_to_value = None
+        self.date_to_field = ft.Container(
+            content=ft.Row([
+                ft.Text(self.date_to_value.strftime("%d/%m/%Y") if self.date_to_value else "", 
+                        size=16, 
+                        color=ft.colors.BLACK54),
+                ft.Icon(ft.icons.CALENDAR_TODAY, size=20, color=ft.colors.GREY_700),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            border=ft.border.all(1, ft.colors.GREY_400),
+            border_radius=10,
+            padding=ft.padding.symmetric(horizontal=12, vertical=8),
+            width=120,
+            on_click=lambda e: self.open_date_picker(self.date_to),
+            bgcolor=ft.colors.WHITE,
+            tooltip="Seleccionar fecha hasta",
+        )
+
+        # Botón limpiar filtros
+        self.clear_btn = ft.OutlinedButton(
+            text="Limpiar filtros",
+            icon=ft.icons.CLEAR,
+            style=ft.ButtonStyle(
+                color=ft.colors.GREY_700,
+                shape=ft.RoundedRectangleBorder(radius=8),
+                padding=ft.padding.symmetric(horizontal=18, vertical=12),
+                text_style=ft.TextStyle(size=16),
+            ),
+            on_click=self.clear_filters
         )
 
         # Filtros
         self.filters_container = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Filtros", size=20, weight=ft.FontWeight.BOLD),
                     ft.Row(
                         controls=[
                             # Fecha desde
                             ft.Column(
                                 controls=[
                                     ft.Text("Fecha desde", size=16),
-                                    ft.Container(
-                                        content=self.date_from_field,
-                                        border=ft.border.all(1, ft.colors.GREY_400),
-                                        border_radius=8,
-                                    ),
+                                    self.date_from_field,
                                 ],
                             ),
                             # Fecha hasta
                             ft.Column(
                                 controls=[
                                     ft.Text("Fecha hasta", size=16),
-                                    ft.Container(
-                                        content=self.date_to_field,
-                                        border=ft.border.all(1, ft.colors.GREY_400),
-                                        border_radius=8,
-                                    ),
+                                    self.date_to_field,
                                 ],
                             ),
-                            # Botones de filtro
+                            # Botón limpiar
                             ft.Column(
                                 controls=[
                                     ft.Text("", size=16),  # Espaciador
-                                    ft.Row(
-                                        controls=[
-                                            ft.ElevatedButton(
-                                                "Filtrar",
-                                                icon=ft.icons.FILTER_LIST,
-                                                style=ft.ButtonStyle(
-                                                    bgcolor=ft.colors.BLUE_900,
-                                                    color=ft.colors.WHITE,
-                                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                                    padding=ft.padding.symmetric(horizontal=20, vertical=12),
-                                                ),
-                                                on_click=self.apply_filters
-                                            ),
-                                            ft.ElevatedButton(
-                                                "Limpiar",
-                                                icon=ft.icons.CLEAR,
-                                                style=ft.ButtonStyle(
-                                                    bgcolor=ft.colors.GREY_400,
-                                                    color=ft.colors.WHITE,
-                                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                                    padding=ft.padding.symmetric(horizontal=20, vertical=12),
-                                                ),
-                                                on_click=self.clear_filters
-                                            ),
-                                        ],
-                                        spacing=10,
-                                    ),
+                                    self.clear_btn,
                                 ],
                             ),
                         ],
@@ -203,33 +210,22 @@ class PaymentReceiptView(ModuleView):
             alignment=ft.alignment.top_left,
         )
 
-        # Date pickers
-        self.date_from = ft.DatePicker(
-            on_change=self.on_date_from_change,
-        )
-        self.date_to = ft.DatePicker(
-            on_change=self.on_date_to_change,
-        )
-        self.page.overlay.extend([self.date_from, self.date_to])
-
-        # Valores de fecha
-        self.date_from_value = None
-        self.date_to_value = None
-
     def open_date_picker(self, picker):
-        picker.pick_date()
+        picker.open = True
+        self.page.update()
 
     def on_date_from_change(self, e):
-        if e.date:
-            self.date_from_value = e.date
-            self.date_from_field.value = e.date.strftime("%d/%m/%Y")
-            self.page.update()
+        self.date_from_value = self.date_from.value
+        value = self.date_from.value.strftime("%d/%m/%Y") if self.date_from.value else ""
+        self.date_from_field.content.controls[0].value = value
+        self.page.update()
 
     def on_date_to_change(self, e):
-        if e.date:
-            self.date_to_value = e.date
-            self.date_to_field.value = e.date.strftime("%d/%m/%Y")
-            self.page.update()
+        self.date_to_value = self.date_to.value
+        value = self.date_to.value.strftime("%d/%m/%Y") if self.date_to.value else ""
+        self.date_to_field.content.controls[0].value = value
+        self.page.update()
+        self.apply_filters()  # Aplicar filtros automáticamente al cambiar la fecha hasta
 
     def load_data(self):
         """
@@ -304,7 +300,7 @@ class PaymentReceiptView(ModuleView):
         except Exception as e:
             self.show_message(f"Error al mostrar el comprobante: {str(e)}", ft.colors.RED)
 
-    def apply_filters(self, e):
+    def apply_filters(self):
         """
         Aplica los filtros seleccionados
         """
@@ -316,8 +312,10 @@ class PaymentReceiptView(ModuleView):
         """
         self.date_from_value = None
         self.date_to_value = None
-        self.date_from_field.value = "Seleccionar fecha"
-        self.date_to_field.value = "Seleccionar fecha"
+        self.date_from.value = None
+        self.date_to.value = None
+        self.date_from_field.content.controls[0].value = ""
+        self.date_to_field.content.controls[0].value = ""
         self.page.update()
         self.load_data()
 
