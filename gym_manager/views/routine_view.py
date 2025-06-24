@@ -3,6 +3,8 @@ from gym_manager.views.module_views import ModuleView
 from gym_manager.utils.database import get_db_session
 from gym_manager.models.routine import Rutina
 from gym_manager.controllers.routine_controller import RoutineController
+import os
+from pathlib import Path
 
 class RoutinesView(ModuleView):
     def __init__(self, page: ft.Page):
@@ -33,9 +35,9 @@ class RoutinesView(ModuleView):
             self.page.update()
 
     def setup_view(self):
-        # Título principal
+        # Título amigable
         self.welcome_title = ft.Text(
-            "¡Administra las rutinas de entrenamiento!",
+            "¡Administra y consulta tus rutinas!",
             size=28,
             weight=ft.FontWeight.BOLD,
             color=ft.colors.BLACK,
@@ -45,7 +47,7 @@ class RoutinesView(ModuleView):
         # Botón Nueva Rutina
         self.new_routine_btn = ft.ElevatedButton(
             text="Nueva Rutina",
-            icon=ft.icons.ADD,
+            icon=ft.icons.FITNESS_CENTER,
             style=ft.ButtonStyle(
                 bgcolor=ft.colors.BLUE,
                 color=ft.colors.WHITE,
@@ -57,9 +59,27 @@ class RoutinesView(ModuleView):
             on_click=self.show_new_routine_modal
         )
 
-        # Filtros
+        # Botones de exportación
+        self.export_excel_btn = ft.IconButton(
+            icon=ft.icons.TABLE_VIEW,
+            icon_color=ft.colors.GREEN_700,
+            tooltip="Exportar a Excel",
+            on_click=self.export_to_excel,
+            width=48,
+            height=48,
+        )
+        self.export_pdf_btn = ft.IconButton(
+            icon=ft.icons.PICTURE_AS_PDF,
+            icon_color=ft.colors.RED_700,
+            tooltip="Exportar a PDF",
+            on_click=self.export_to_pdf,
+            width=48,
+            height=48,
+        )
+
+        # Filtros de búsqueda
         self.search_field = ft.TextField(
-            label="Buscar rutina",
+            label="Buscar por nombre de rutina",
             prefix_icon=ft.icons.SEARCH,
             border_radius=10,
             width=320,
@@ -70,7 +90,7 @@ class RoutinesView(ModuleView):
 
         self.difficulty_filter = ft.Dropdown(
             label="Dificultad",
-            width=150,
+            width=200,
             options=[
                 ft.dropdown.Option("Todas"),
                 ft.dropdown.Option("Principiante"),
@@ -97,61 +117,101 @@ class RoutinesView(ModuleView):
         # Tabla de rutinas
         self.routines_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Nombre")),
-                ft.DataColumn(ft.Text("Dificultad")),
-                ft.DataColumn(ft.Text("Descripción")),
-                ft.DataColumn(ft.Text("Miembros Asignados")),
-                ft.DataColumn(ft.Text("Acciones")),
+                ft.DataColumn(ft.Text("Nombre", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Dificultad", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Descripción", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Miembros Asignados", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Acciones", size=18, weight=ft.FontWeight.BOLD)),
             ],
             rows=[],
+            border=ft.border.all(1, ft.colors.GREY_300),
+            border_radius=12,
+            vertical_lines=ft.border.all(1, ft.colors.GREY_300),
+            horizontal_lines=ft.border.all(1, ft.colors.GREY_300),
+            column_spacing=60,
+            heading_row_color=ft.colors.GREY_100,
+            heading_row_height=60,
+            data_row_color=ft.colors.WHITE,
+            data_row_min_height=56,
         )
 
         # Contenedor principal
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
-                    # Encabezado
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                self.welcome_title,
-                                ft.Container(expand=True),
-                                self.new_routine_btn,
-                            ],
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        ),
-                        padding=ft.padding.only(bottom=20),
+                    ft.Row(
+                        controls=[
+                            self.welcome_title,
+                            ft.Row(
+                                controls=[
+                                    self.new_routine_btn,
+                                    self.export_excel_btn,
+                                    self.export_pdf_btn,
+                                ],
+                                alignment=ft.MainAxisAlignment.END,
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
-                    # Filtros
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                self.search_field,
-                                self.difficulty_filter,
-                                self.clear_btn,
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=10,
-                        ),
-                        padding=ft.padding.only(bottom=20),
+                    ft.Container(height=20),
+                    ft.Row(
+                        controls=[
+                            self.search_field,
+                            self.difficulty_filter,
+                            self.clear_btn,
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
-                    # Tabla
-                    ft.Container(
-                        content=self.routines_table,
-                        padding=ft.padding.only(top=10),
+                    ft.Container(height=20),
+                    ft.Column(
+                        controls=[self.routines_table],
+                        scroll=ft.ScrollMode.AUTO,
+                        expand=True,
                     ),
                 ],
-                scroll=ft.ScrollMode.ALWAYS,
+                spacing=0,
                 expand=True,
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
+            padding=20,
             expand=True,
-            padding=ft.padding.symmetric(horizontal=0, vertical=0),
-            bgcolor=ft.colors.WHITE,
-            border_radius=18,
-            margin=ft.margin.symmetric(horizontal=0, vertical=0),
-            alignment=ft.alignment.top_left,
         )
+        
+        # Modal de exportación
+        self.export_dialog = ft.AlertDialog(
+            title=ft.Text("Confirmar Exportación", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Text(
+                "¿Deseas exportar las rutinas?\n"
+                "El archivo se guardará en tu carpeta de Descargas.",
+                size=16
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.close_export_dialog,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.WHITE,
+                        color=ft.colors.BLACK87,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+                ft.ElevatedButton(
+                    "Exportar",
+                    on_click=self.confirm_export,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE_900,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.export_dialog)
         
         # Cargar datos iniciales
         self.load_data()
@@ -237,11 +297,45 @@ class RoutinesView(ModuleView):
             # Contar miembros asignados
             miembros_asignados = self.routine_controller.count_members_assigned_to_routine(rutina.id_rutina)
             
+            # Crear botones de acciones
+            action_buttons = [
+                ft.IconButton(
+                    icon=ft.icons.EDIT,
+                    icon_color=ft.colors.BLUE,
+                    tooltip="Editar",
+                    on_click=lambda e, r=rutina: self.edit_routine(r)
+                ),
+                ft.IconButton(
+                    icon=ft.icons.DELETE,
+                    icon_color=ft.colors.RED,
+                    tooltip="Eliminar",
+                    on_click=lambda e, r=rutina: self.delete_routine(r)
+                ),
+                ft.IconButton(
+                    icon=ft.icons.VISIBILITY,
+                    icon_color=ft.colors.GREEN,
+                    tooltip="Ver detalles",
+                    on_click=lambda e, r=rutina: self.view_routine_details(r)
+                ),
+            ]
+            
             self.routines_table.rows.append(
                 ft.DataRow(
                     cells=[
                         ft.DataCell(ft.Text(rutina.nombre)),
-                        ft.DataCell(ft.Text(rutina.nivel_dificultad)),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Text(
+                                    rutina.nivel_dificultad,
+                                    color=ft.colors.WHITE
+                                ),
+                                bgcolor=ft.colors.BLUE if rutina.nivel_dificultad == "Principiante" else 
+                                       ft.colors.ORANGE if rutina.nivel_dificultad == "Intermedio" else 
+                                       ft.colors.RED,
+                                border_radius=8,
+                                padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                            )
+                        ),
                         ft.DataCell(ft.Text(rutina.descripcion or "-")),
                         ft.DataCell(
                             ft.Container(
@@ -256,26 +350,7 @@ class RoutinesView(ModuleView):
                             )
                         ),
                         ft.DataCell(
-                            ft.Row([
-                                ft.IconButton(
-                                    icon=ft.icons.EDIT,
-                                    icon_color=ft.colors.BLUE,
-                                    tooltip="Editar",
-                                    on_click=lambda e, r=rutina: self.edit_routine(r)
-                                ),
-                                ft.IconButton(
-                                    icon=ft.icons.DELETE,
-                                    icon_color=ft.colors.RED,
-                                    tooltip="Eliminar",
-                                    on_click=lambda e, r=rutina: self.delete_routine(r)
-                                ),
-                                ft.IconButton(
-                                    icon=ft.icons.VISIBILITY,
-                                    icon_color=ft.colors.GREEN,
-                                    tooltip="Ver detalles",
-                                    on_click=lambda e, r=rutina: self.view_routine_details(r)
-                                ),
-                            ])
+                            ft.Row(action_buttons)
                         ),
                     ]
                 )
@@ -384,19 +459,34 @@ class RoutinesView(ModuleView):
                 print("[DEBUG] Falta archivo")
                 self.show_message("Por favor, seleccione un archivo de rutina", ft.colors.RED)
                 return
+            
+            # Validar tamaño del archivo (máximo 1MB para compatibilidad)
+            MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB en bytes
+            file_size = os.path.getsize(self.selected_file.path)
+            if file_size > MAX_FILE_SIZE:
+                self.show_message(f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB", ft.colors.RED)
+                return
+            
             print("[DEBUG] Todos los campos requeridos presentes")
             with open(self.selected_file.path, 'rb') as file:
                 file_content = file.read()
             import datetime
             now = datetime.datetime.now()
+            fecha_creacion = now
+            fecha_horario = now
             routine_data = {
                 'nombre': self.new_routine_name.current.value,
                 'nivel_dificultad': self.new_routine_difficulty.current.value,
                 'descripcion': self.new_routine_description.current.value,
                 'documento_rutina': file_content,
-                'fecha_creacion': now,
-                'fecha_horario': now,
+                'fecha_creacion': fecha_creacion,
+                'fecha_horario': fecha_horario,
             }
+            # Refuerzo: si por alguna razón no están, los agrego
+            if not routine_data.get('fecha_creacion'):
+                routine_data['fecha_creacion'] = now
+            if not routine_data.get('fecha_horario'):
+                routine_data['fecha_horario'] = now
             print(f"[DEBUG] routine_data a guardar: {routine_data}")
             success, message = self.routine_controller.create_routine(routine_data)
             print(f"[DEBUG] Resultado create_routine: success={success}, message={message}")
@@ -501,6 +591,13 @@ class RoutinesView(ModuleView):
                 'descripcion': self.new_routine_description.current.value,
             }
             if hasattr(self, 'selected_file') and self.selected_file:
+                # Validar tamaño del archivo (máximo 1MB para compatibilidad)
+                MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB en bytes
+                file_size = os.path.getsize(self.selected_file.path)
+                if file_size > MAX_FILE_SIZE:
+                    self.show_message(f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB", ft.colors.RED)
+                    return
+                
                 with open(self.selected_file.path, 'rb') as file:
                     routine_data['documento_rutina'] = file.read()
             success, message = self.routine_controller.update_routine(self.editing_routine.id_rutina, routine_data)
@@ -610,4 +707,358 @@ class RoutinesView(ModuleView):
         self.search_field.value = ""
         self.difficulty_filter.value = "Todas"
         self.page.update()
-        self.load_data() 
+        self.load_data()
+
+    def export_to_excel(self, e):
+        """
+        Exporta las rutinas actuales a un archivo Excel
+        """
+        try:
+            self.export_type = "excel"  # Establecer tipo de exportación
+            
+            # Obtener las rutinas filtradas actuales
+            filters = {}
+            
+            if self.search_field.value:
+                filters['search'] = self.search_field.value
+            
+            if self.difficulty_filter.value and self.difficulty_filter.value != "Todas":
+                filters['nivel_dificultad'] = self.difficulty_filter.value
+
+            rutinas = self.routine_controller.get_routines(filters)
+            
+            if not rutinas:
+                self.show_message("No hay rutinas para exportar", ft.colors.ORANGE)
+                return
+
+            # Actualizar el contenido del diálogo con el número de rutinas
+            self.export_dialog.content.value = f"¿Deseas exportar {len(rutinas)} rutinas a Excel?\nEl archivo se guardará en tu carpeta de Descargas."
+            
+            # Guardar las rutinas en una variable de instancia para usarla en confirm_export
+            self.rutinas_to_export = rutinas
+            
+            # Mostrar el diálogo
+            self.export_dialog.open = True
+            self.page.update()
+
+        except Exception as e:
+            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
+
+    def export_to_pdf(self, e):
+        """
+        Exporta las rutinas actuales a un archivo PDF
+        """
+        try:
+            self.export_type = "pdf"  # Establecer tipo de exportación
+            
+            # Obtener las rutinas filtradas actuales
+            filters = {}
+            
+            if self.search_field.value:
+                filters['search'] = self.search_field.value
+            
+            if self.difficulty_filter.value and self.difficulty_filter.value != "Todas":
+                filters['nivel_dificultad'] = self.difficulty_filter.value
+
+            rutinas = self.routine_controller.get_routines(filters)
+            
+            if not rutinas:
+                self.show_message("No hay rutinas para exportar", ft.colors.ORANGE)
+                return
+
+            # Actualizar el contenido del diálogo con el número de rutinas
+            self.export_dialog.content.value = f"¿Deseas exportar {len(rutinas)} rutinas a PDF?\nEl archivo se guardará en tu carpeta de Descargas."
+            
+            # Guardar las rutinas en una variable de instancia para usarla en confirm_export
+            self.rutinas_to_export = rutinas
+            
+            # Mostrar el diálogo
+            self.export_dialog.open = True
+            self.page.update()
+
+        except Exception as e:
+            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
+
+    def confirm_export(self, e):
+        """
+        Confirma la exportación y genera el archivo
+        """
+        try:
+            # Obtener la ruta de la carpeta de descargas
+            downloads_path = str(Path.home() / "Downloads")
+
+            # Usar las rutinas guardadas en export_to_excel/export_to_pdf
+            rutinas = getattr(self, 'rutinas_to_export', [])
+            if not rutinas:
+                self.show_message("No hay rutinas para exportar", ft.colors.ORANGE)
+                return
+
+            # Determinar el tipo de exportación
+            if self.export_type == "excel":
+                self._export_to_excel(rutinas, downloads_path)
+            elif self.export_type == "pdf":
+                self._export_to_pdf(rutinas, downloads_path)
+            else:
+                self.show_message("Error: Tipo de exportación no válido", ft.colors.RED)
+                return
+
+            # Limpiar las rutinas guardadas
+            self.rutinas_to_export = None
+
+            # Cerrar el diálogo de confirmación
+            self.close_export_dialog(e)
+
+        except Exception as e:
+            self.show_message(f"Error al exportar: {str(e)}", ft.colors.RED)
+
+    def close_export_dialog(self, e):
+        """
+        Cierra el diálogo de exportación
+        """
+        self.export_dialog.open = False
+        self.export_type = None  # Resetear el tipo de exportación
+        self.page.update()
+
+    def _export_to_excel(self, rutinas, downloads_path):
+        """
+        Exporta las rutinas a Excel
+        """
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from datetime import datetime
+        
+        # Crear un nuevo libro de Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Rutinas"
+
+        # Estilos
+        header_font = Font(bold=True, size=12, color="FFFFFF")
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        date_format = 'dd/mm/yyyy'
+
+        # Configurar ancho de columnas
+        ws.column_dimensions['A'].width = 30  # Nombre
+        ws.column_dimensions['B'].width = 20  # Dificultad
+        ws.column_dimensions['C'].width = 40  # Descripción
+        ws.column_dimensions['D'].width = 20  # Miembros Asignados
+        ws.column_dimensions['E'].width = 20  # Fecha Creación
+
+        # Escribir encabezados
+        headers = ["Nombre", "Dificultad", "Descripción", "Miembros Asignados", "Fecha Creación"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = border
+
+        # Escribir datos
+        for row, rutina in enumerate(rutinas, 2):
+            # Nombre
+            cell = ws.cell(row=row, column=1)
+            cell.value = rutina.nombre
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # Dificultad
+            cell = ws.cell(row=row, column=2)
+            cell.value = rutina.nivel_dificultad
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            # Color de fondo según dificultad
+            if rutina.nivel_dificultad == "Principiante":
+                cell.fill = PatternFill(start_color="E3F2FD", end_color="E3F2FD", fill_type="solid")
+            elif rutina.nivel_dificultad == "Intermedio":
+                cell.fill = PatternFill(start_color="FFF3E0", end_color="FFF3E0", fill_type="solid")
+            elif rutina.nivel_dificultad == "Avanzado":
+                cell.fill = PatternFill(start_color="FFEBEE", end_color="FFEBEE", fill_type="solid")
+
+            # Descripción
+            cell = ws.cell(row=row, column=3)
+            cell.value = rutina.descripcion if rutina.descripcion else ""
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+            # Miembros Asignados
+            cell = ws.cell(row=row, column=4)
+            miembros_asignados = self.routine_controller.count_members_assigned_to_routine(rutina.id_rutina)
+            cell.value = miembros_asignados
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Fecha Creación
+            cell = ws.cell(row=row, column=5)
+            if rutina.fecha_creacion:
+                cell.value = rutina.fecha_creacion
+                cell.number_format = date_format
+            else:
+                cell.value = ""
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Congelar la primera fila
+        ws.freeze_panes = 'A2'
+
+        # Generar nombre del archivo
+        filename = f"rutinas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filepath = os.path.join(downloads_path, filename)
+
+        # Guardar archivo
+        wb.save(filepath)
+
+        # Mostrar mensaje de éxito
+        self.show_message(f"Archivo Excel guardado en: {filepath}", ft.colors.GREEN)
+
+    def _export_to_pdf(self, rutinas, downloads_path):
+        """
+        Exporta las rutinas a PDF
+        """
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from datetime import datetime
+
+            # Generar nombre del archivo
+            filename = f"rutinas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(downloads_path, filename)
+
+            # Crear el documento PDF
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=landscape(letter),
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+
+            # Estilos
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                alignment=1  # Centrado
+            )
+
+            # Contenido del PDF
+            elements = []
+
+            # Título
+            title = Paragraph("Reporte de Rutinas", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 20))
+
+            # Información de filtros aplicados
+            filter_info = []
+            if self.search_field.value:
+                filter_info.append(f"Búsqueda: {self.search_field.value}")
+            if self.difficulty_filter.value and self.difficulty_filter.value != "Todas":
+                filter_info.append(f"Dificultad: {self.difficulty_filter.value}")
+
+            if filter_info:
+                filter_text = " | ".join(filter_info)
+                filter_paragraph = Paragraph(f"Filtros aplicados: {filter_text}", styles["Normal"])
+                elements.append(filter_paragraph)
+                elements.append(Spacer(1, 20))
+
+            # Datos de la tabla
+            data = [["Nombre", "Dificultad", "Descripción", "Miembros Asignados", "Fecha Creación"]]
+            
+            for rutina in rutinas:
+                miembros_asignados = self.routine_controller.count_members_assigned_to_routine(rutina.id_rutina)
+                data.append([
+                    rutina.nombre,
+                    rutina.nivel_dificultad,
+                    rutina.descripcion if rutina.descripcion else "",
+                    str(miembros_asignados),
+                    rutina.fecha_creacion.strftime("%d/%m/%Y") if rutina.fecha_creacion else ""
+                ])
+
+            # Crear la tabla
+            table = Table(data, colWidths=[2.5*inch, 1.5*inch, 3*inch, 1.5*inch, 1.5*inch])
+            
+            # Estilo de la tabla
+            table_style = TableStyle([
+                # Encabezados
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                
+                # Alineación específica
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Nombre
+                ('ALIGN', (2, 1), (2, -1), 'LEFT'),  # Descripción
+            ])
+
+            # Agregar colores de fondo según dificultad
+            for i, rutina in enumerate(rutinas, 1):
+                if rutina.nivel_dificultad == "Principiante":
+                    table_style.add('BACKGROUND', (1, i), (1, i), colors.HexColor('#E3F2FD'))
+                elif rutina.nivel_dificultad == "Intermedio":
+                    table_style.add('BACKGROUND', (1, i), (1, i), colors.HexColor('#FFF3E0'))
+                elif rutina.nivel_dificultad == "Avanzado":
+                    table_style.add('BACKGROUND', (1, i), (1, i), colors.HexColor('#FFEBEE'))
+
+            table.setStyle(table_style)
+            elements.append(table)
+
+            # Pie de página con fecha y hora
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(footer)
+
+            # Generar el PDF
+            doc.build(elements)
+
+            # Mostrar mensaje de éxito
+            self.show_message(f"Archivo PDF guardado en: {filepath}", ft.colors.GREEN)
+
+        except Exception as e:
+            self.show_message(f"Error al generar PDF: {str(e)}", ft.colors.RED)
+
+    def show_message(self, content, bgcolor: str):
+        """
+        Muestra un mensaje temporal
+        """
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(content),
+            bgcolor=bgcolor,
+            open=True,
+        )
+        self.page.update() 
