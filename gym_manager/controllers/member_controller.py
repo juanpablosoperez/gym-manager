@@ -129,16 +129,26 @@ class MemberController:
 
     def delete_member(self, member_id):
         """
-        Elimina un miembro (cambia su estado a inactivo)
+        Elimina un miembro de la base de datos si no tiene pagos asociados.
+        Si tiene pagos, lo deshabilita (cambia su estado a inactivo).
         """
         try:
             member = self.db_session.query(Miembro).filter_by(id_miembro=member_id).first()
             if not member:
                 return False, "Miembro no encontrado"
 
-            member.estado = False
+            # Verificar si el miembro tiene pagos asociados
+            pagos = self.db_session.query(Pago).filter_by(id_miembro=member_id).all()
+            if pagos:
+                # Si tiene pagos, solo deshabilitar
+                member.estado = False
+                self.db_session.commit()
+                return False, "Este miembro no se puede eliminar ya que tiene pagos asociados. Se ha deshabilitado en su lugar."
+
+            # Si no tiene pagos, eliminar físicamente
+            self.db_session.delete(member)
             self.db_session.commit()
-            return True, "Miembro eliminado exitosamente"
+            return True, "Miembro eliminado exitosamente de la base de datos"
         except SQLAlchemyError as e:
             self.logger.error(f"Error al eliminar miembro: {str(e)}")
             self.db_session.rollback()
@@ -207,3 +217,24 @@ class MemberController:
         except Exception as e:
             self.logger.error(f"Error al contar membresías vencidas: {str(e)}")
             return 0
+
+    def assign_routine_to_member(self, member_id, routine_id):
+        """
+        Asigna una rutina a un miembro (solo actualiza el campo id_rutina)
+        """
+        try:
+            member = self.db_session.query(Miembro).filter_by(id_miembro=member_id).first()
+            if not member:
+                return False, "Miembro no encontrado"
+
+            member.id_rutina = routine_id
+            self.db_session.commit()
+            return True, "Rutina asignada exitosamente"
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al asignar rutina al miembro: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error al asignar la rutina: {str(e)}"
+        except Exception as e:
+            self.logger.error(f"Error inesperado al asignar rutina: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error inesperado: {str(e)}"
