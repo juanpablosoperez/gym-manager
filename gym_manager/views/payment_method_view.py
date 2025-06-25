@@ -227,6 +227,7 @@ class PaymentMethodView(ModuleView):
                 ],
                 spacing=18,
                 width=540,
+                height=150,
             ),
             actions=[
                 ft.TextButton(
