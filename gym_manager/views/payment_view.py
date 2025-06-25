@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from gym_manager.models.monthly_fee import CuotaMensual
 from gym_manager.utils.database import session_scope
+from sqlalchemy.orm import joinedload
 import subprocess
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -872,9 +873,16 @@ class PaymentsView(ModuleView):
         """
         Carga los datos iniciales de la vista
         """
-        # Cargar pagos
-        payments = [p for p in self.payment_controller.get_payments() if p.estado == 1]
-        self.update_payments_table(payments)
+        # Cargar pagos usando session_scope para evitar problemas de sesión
+        try:
+            with session_scope() as session:
+                # Recrear el controlador con la nueva sesión
+                temp_controller = PaymentController(session)
+                payments = [p for p in temp_controller.get_payments() if p.estado == 1]
+                self.update_payments_table(payments)
+        except Exception as e:
+            print(f"Error al cargar datos: {str(e)}")
+            self.update_payments_table([])
 
         # Cargar la cuota mensual actual
         try:
@@ -885,19 +893,24 @@ class PaymentsView(ModuleView):
             print(f"Error al cargar cuota mensual: {str(e)}")
             self.current_monthly_fee = None
 
-        # Cargar métodos de pago activos
-        active_payment_methods = self.db_session.query(MetodoPago).filter_by(estado=True).all()
-        self.new_payment_method_field.options = [
-            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-        ]
-        self.edit_payment_method_field.options = [
-            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-        ]
-        self.payment_method.options = [
-            ft.dropdown.Option("Todos")
-        ] + [
-            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-        ]
+        # Cargar métodos de pago activos usando session_scope
+        try:
+            with session_scope() as session:
+                active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
+                self.new_payment_method_field.options = [
+                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                ]
+                self.edit_payment_method_field.options = [
+                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                ]
+                self.payment_method.options = [
+                    ft.dropdown.Option("Todos")
+                ] + [
+                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                ]
+        except Exception as e:
+            print(f"Error al cargar métodos de pago: {str(e)}")
+        
         self.page.update()
 
     def update_payments_table(self, payments):
@@ -948,21 +961,33 @@ class PaymentsView(ModuleView):
             for payment in payments:
                 estado_texto = "Pagado" if payment.estado == 1 else "Cancelado"
                 color_estado = ft.colors.GREEN if payment.estado == 1 else ft.colors.RED
+                
+                # Crear un objeto ligero con solo los datos necesarios para evitar problemas de sesión
+                payment_data = type('PaymentData', (), {
+                    'id_pago': payment.id_pago,
+                    'fecha_pago': payment.fecha_pago,
+                    'monto': payment.monto,
+                    'referencia': payment.referencia,
+                    'estado': payment.estado,
+                    'miembro_nombre': f"{payment.miembro.nombre} {payment.miembro.apellido}",
+                    'metodo_pago_descripcion': payment.metodo_pago.descripcion
+                })
+                
                 self.payments_table.rows.append(
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text(f"{payment.miembro.nombre} {payment.miembro.apellido}")),
-                            ft.DataCell(ft.Text(payment.fecha_pago.strftime("%d/%m/%Y"))),
-                            ft.DataCell(ft.Text(f"${payment.monto}")),
-                            ft.DataCell(ft.Text(payment.metodo_pago.descripcion)),
-                            ft.DataCell(ft.Text(payment.referencia if payment.referencia else "")),
+                            ft.DataCell(ft.Text(payment_data.miembro_nombre)),
+                            ft.DataCell(ft.Text(payment_data.fecha_pago.strftime("%d/%m/%Y"))),
+                            ft.DataCell(ft.Text(f"${payment_data.monto}")),
+                            ft.DataCell(ft.Text(payment_data.metodo_pago_descripcion)),
+                            ft.DataCell(ft.Text(payment_data.referencia if payment_data.referencia else "")),
                             ft.DataCell(
                                 ft.Container(
                                     content=ft.Text(
                                         estado_texto,
                                         color=color_estado
                                     ),
-                                    bgcolor=ft.colors.GREY_100 if payment.estado == 1 else ft.colors.RED_100,
+                                    bgcolor=ft.colors.GREY_100 if payment_data.estado == 1 else ft.colors.RED_100,
                                     border_radius=8,
                                     padding=5,
                                 )
@@ -974,13 +999,13 @@ class PaymentsView(ModuleView):
                                             icon=ft.icons.EDIT,
                                             icon_color=ft.colors.BLUE,
                                             tooltip="Editar",
-                                            on_click=lambda e, p=payment: self.edit_payment(p)
+                                            on_click=lambda e, p=payment_data: self.edit_payment(p)
                                         ),
                                         ft.IconButton(
                                             icon=ft.icons.DELETE,
                                             icon_color=ft.colors.RED,
                                             tooltip="Eliminar",
-                                            on_click=lambda e, p=payment: self.delete_payment(p)
+                                            on_click=lambda e, p=payment_data: self.delete_payment(p)
                                         ),
                                     ],
                                     spacing=0,
@@ -1018,11 +1043,18 @@ class PaymentsView(ModuleView):
             filters['estado'] = 0
         # Si es "Todos", no se agrega filtro
         
-        payments = self.payment_controller.get_payments(filters)
-        # Si el filtro es por estado, filtrar aquí también por si acaso
-        if 'estado' in filters:
-            payments = [p for p in payments if p.estado == filters['estado']]
-        self.update_payments_table(payments)
+        try:
+            with session_scope() as session:
+                # Recrear el controlador con la nueva sesión
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments(filters)
+                # Si el filtro es por estado, filtrar aquí también por si acaso
+                if 'estado' in filters:
+                    payments = [p for p in payments if p.estado == filters['estado']]
+                self.update_payments_table(payments)
+        except Exception as e:
+            print(f"Error al aplicar filtros: {str(e)}")
+            self.update_payments_table([])
 
     def clear_filters(self, e):
         """
@@ -1043,16 +1075,31 @@ class PaymentsView(ModuleView):
         """
         Abre el modal para editar un pago, cargando los datos del pago seleccionado
         """
-        self.selected_payment = payment
-        self.edit_payment_client_field.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
-        self.edit_payment_date_value = payment.fecha_pago
-        self.edit_payment_date_picker.value = payment.fecha_pago
-        self.edit_payment_date_field.content.controls[0].value = payment.fecha_pago.strftime("%d/%m/%Y")
-        self.edit_payment_amount_field.value = str(payment.monto)
-        self.edit_payment_method_field.value = payment.metodo_pago.descripcion
-        self.edit_payment_observations_field.value = payment.referencia if payment.referencia else ""
-        self.edit_payment_modal.open = True
-        self.page.update()
+        try:
+            # Recargar el pago desde la base de datos con todas las relaciones
+            with session_scope() as session:
+                payment_fresh = session.query(Pago).options(
+                    joinedload(Pago.miembro),
+                    joinedload(Pago.metodo_pago)
+                ).filter_by(id_pago=payment.id_pago).first()
+                
+                if not payment_fresh:
+                    self.show_message("No se pudo encontrar el pago", ft.colors.RED)
+                    return
+                
+                self.selected_payment = payment_fresh
+                self.edit_payment_client_field.value = f"{payment_fresh.miembro.nombre} {payment_fresh.miembro.apellido}"
+                self.edit_payment_date_value = payment_fresh.fecha_pago
+                self.edit_payment_date_picker.value = payment_fresh.fecha_pago
+                self.edit_payment_date_field.content.controls[0].value = payment_fresh.fecha_pago.strftime("%d/%m/%Y")
+                self.edit_payment_amount_field.value = str(payment_fresh.monto)
+                self.edit_payment_method_field.value = payment_fresh.metodo_pago.descripcion
+                self.edit_payment_observations_field.value = payment_fresh.referencia if payment_fresh.referencia else ""
+                self.edit_payment_modal.open = True
+                self.page.update()
+        except Exception as e:
+            print(f"Error al cargar datos del pago: {str(e)}")
+            self.show_message(f"Error al cargar los datos del pago: {str(e)}", ft.colors.RED)
 
     def close_edit_modal(self, e):
         self.edit_payment_client_field.value = ""
@@ -1104,6 +1151,7 @@ class PaymentsView(ModuleView):
         """
         Abre el modal de confirmación para eliminar un pago
         """
+        # Solo necesitamos el ID para eliminar, no las relaciones
         self.selected_payment_to_delete = payment
         self.delete_confirm_modal.open = True
         self.page.update()
@@ -1285,12 +1333,17 @@ class PaymentsView(ModuleView):
             self.page.update()
             return
 
-        # Buscar miembros que coincidan con el texto de búsqueda
-        members = self.db_session.query(Miembro).filter(
-            (Miembro.nombre.ilike(f"%{search_text}%")) |
-            (Miembro.apellido.ilike(f"%{search_text}%")) |
-            (Miembro.documento.ilike(f"%{search_text}%"))
-        ).limit(5).all()
+        # Buscar miembros que coincidan con el texto de búsqueda usando session_scope
+        try:
+            with session_scope() as session:
+                members = session.query(Miembro).filter(
+                    (Miembro.nombre.ilike(f"%{search_text}%")) |
+                    (Miembro.apellido.ilike(f"%{search_text}%")) |
+                    (Miembro.documento.ilike(f"%{search_text}%"))
+                ).limit(5).all()
+        except Exception as e:
+            print(f"Error al buscar miembros: {str(e)}")
+            members = []
 
         self.member_search_results.controls.clear()
         
@@ -1604,9 +1657,11 @@ class PaymentsView(ModuleView):
         Exporta los datos a Excel
         """
         try:
-            payments = self.payment_controller.get_payments()
-            file_path = self._export_to_excel(payments, os.path.expanduser("~/Downloads"))
-            self.show_success_dialog(file_path)
+            with session_scope() as session:
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments()
+                file_path = self._export_to_excel(payments, os.path.expanduser("~/Downloads"))
+                self.show_success_dialog(file_path)
         except Exception as ex:
             self.show_message(
                 ft.Row([
@@ -1621,9 +1676,11 @@ class PaymentsView(ModuleView):
         Exporta los datos a PDF
         """
         try:
-            payments = self.payment_controller.get_payments()
-            file_path = self._export_to_pdf(payments, os.path.expanduser("~/Downloads"))
-            self.show_success_dialog(file_path)
+            with session_scope() as session:
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments()
+                file_path = self._export_to_pdf(payments, os.path.expanduser("~/Downloads"))
+                self.show_success_dialog(file_path)
         except Exception as ex:
             self.show_message(
                 ft.Row([
@@ -1638,30 +1695,34 @@ class PaymentsView(ModuleView):
         Verifica los pagos vencidos y muestra una alerta
         """
         try:
-            # Obtener todos los miembros
-            members = self.db_session.query(Miembro).all()
-            overdue_members = []
+            # Obtener todos los miembros usando session_scope
+            with session_scope() as session:
+                # Cargar miembros con sus pagos y métodos de pago eagerly
+                members = session.query(Miembro).all()
+                overdue_members = []
 
-            for member in members:
-                # Obtener el último pago del miembro
-                last_payment = self.db_session.query(Pago).filter(
-                    Pago.id_miembro == member.id_miembro,
-                    Pago.estado == 1  # Solo pagos activos
-                ).order_by(Pago.fecha_pago.desc()).first()
+                for member in members:
+                    # Obtener el último pago del miembro con carga eager
+                    last_payment = session.query(Pago).options(
+                        joinedload(Pago.metodo_pago)
+                    ).filter(
+                        Pago.id_miembro == member.id_miembro,
+                        Pago.estado == 1  # Solo pagos activos
+                    ).order_by(Pago.fecha_pago.desc()).first()
 
-                if last_payment:
-                    # Calcular días desde el último pago
-                    days_since_payment = (datetime.now() - last_payment.fecha_pago).days
-                    
-                    # Si han pasado más de 30 días, agregar a la lista de vencidos
-                    if days_since_payment > 30:
-                        overdue_members.append({
-                            'member': member,
-                            'days_overdue': days_since_payment,
-                            'last_payment_date': last_payment.fecha_pago,
-                            'last_payment_amount': last_payment.monto,
-                            'payment_method': last_payment.metodo_pago.descripcion
-                        })
+                    if last_payment:
+                        # Calcular días desde el último pago
+                        days_since_payment = (datetime.now() - last_payment.fecha_pago).days
+                        
+                        # Si han pasado más de 30 días, agregar a la lista de vencidos
+                        if days_since_payment > 30:
+                            overdue_members.append({
+                                'member': member,
+                                'days_overdue': days_since_payment,
+                                'last_payment_date': last_payment.fecha_pago,
+                                'last_payment_amount': last_payment.monto,
+                                'payment_method': last_payment.metodo_pago.descripcion
+                            })
 
             if overdue_members:
                 # Crear el contenido de la alerta
