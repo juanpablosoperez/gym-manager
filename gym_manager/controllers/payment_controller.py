@@ -6,6 +6,7 @@ from gym_manager.models.payment_receipt import ComprobantePago
 from gym_manager.utils.database import session_scope
 from sqlalchemy.exc import DBAPIError, PendingRollbackError, SQLAlchemyError
 from sqlalchemy import func, extract
+from sqlalchemy.orm import joinedload
 import logging
 
 class PaymentController:
@@ -18,7 +19,11 @@ class PaymentController:
         Obtiene la lista de pagos con filtros opcionales
         """
         try:
-            query = self.db_session.query(Pago)
+            # Cargar eagerly las relaciones necesarias para evitar DetachedInstanceError
+            query = self.db_session.query(Pago).options(
+                joinedload(Pago.miembro),
+                joinedload(Pago.metodo_pago)
+            )
             
             if filters:
                 if filters.get('member_name'):
