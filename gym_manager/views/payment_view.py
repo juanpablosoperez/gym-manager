@@ -1345,26 +1345,37 @@ class PaymentsView(ModuleView):
         # Buscar miembros que coincidan con el texto de búsqueda usando session_scope
         try:
             with session_scope() as session:
-                members = session.query(Miembro).filter(
+                members_query = session.query(Miembro).filter(
                     (Miembro.nombre.ilike(f"%{search_text}%")) |
                     (Miembro.apellido.ilike(f"%{search_text}%")) |
                     (Miembro.documento.ilike(f"%{search_text}%"))
                 ).limit(5).all()
+                
+                # Extraer todos los datos inmediatamente mientras la sesión está activa
+                members_data = []
+                for member in members_query:
+                    member_data = type('MemberData', (), {
+                        'id_miembro': member.id_miembro,
+                        'nombre': member.nombre,
+                        'apellido': member.apellido,
+                        'documento': member.documento
+                    })
+                    members_data.append(member_data)
         except Exception as e:
             print(f"Error al buscar miembros: {str(e)}")
-            members = []
+            members_data = []
 
         self.member_search_results.controls.clear()
         
-        if members:
-            for member in members:
+        if members_data:
+            for member_data in members_data:
                 self.member_search_results.controls.append(
                     ft.Container(
                         content=ft.ListTile(
                             leading=ft.Icon(ft.icons.PERSON),
-                            title=ft.Text(f"{member.nombre} {member.apellido}"),
-                            subtitle=ft.Text(f"Documento: {member.documento}"),
-                            on_click=lambda e, m=member: self.select_member(m)
+                            title=ft.Text(f"{member_data.nombre} {member_data.apellido}"),
+                            subtitle=ft.Text(f"Documento: {member_data.documento}"),
+                            on_click=lambda e, m=member_data: self.select_member(m)
                         ),
                         border=ft.border.all(1, ft.colors.GREY_300),
                         border_radius=8,
@@ -1394,7 +1405,8 @@ class PaymentsView(ModuleView):
         self.selected_member_data = {
             'id': member.id_miembro,
             'nombre': member.nombre,
-            'apellido': member.apellido
+            'apellido': member.apellido,
+            'documento': member.documento
         }
         self.new_payment_client_field.value = f"{member.nombre} {member.apellido}"
         self.member_search_results.visible = False
