@@ -1088,6 +1088,10 @@ class PaymentsView(ModuleView):
                     return
                 
                 self.selected_payment = payment_fresh
+                # Almacenar datos importantes para evitar problemas de sesión
+                self.selected_payment_id = payment_fresh.id_pago
+                self.selected_payment_member_id = payment_fresh.miembro.id_miembro
+                
                 self.edit_payment_client_field.value = f"{payment_fresh.miembro.nombre} {payment_fresh.miembro.apellido}"
                 self.edit_payment_date_value = payment_fresh.fecha_pago
                 self.edit_payment_date_picker.value = payment_fresh.fecha_pago
@@ -1111,6 +1115,9 @@ class PaymentsView(ModuleView):
         self.edit_payment_observations_field.value = ""
         self.edit_payment_modal.open = False
         self.selected_payment = None
+        # Limpiar también los IDs almacenados
+        self.selected_payment_id = None
+        self.selected_payment_member_id = None
         self.page.update()
 
     def on_edit_payment_date_change(self, e):
@@ -1120,7 +1127,7 @@ class PaymentsView(ModuleView):
         self.page.update()
 
     def update_payment(self, e):
-        if not self.selected_payment:
+        if not hasattr(self, 'selected_payment_id') or not self.selected_payment_id:
             self.show_message("No hay pago seleccionado para editar", ft.colors.RED)
             return
         if not self.edit_payment_date_value:
@@ -1132,14 +1139,16 @@ class PaymentsView(ModuleView):
         if not self.edit_payment_method_field.value:
             self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
             return
+        
         payment_data = {
             'fecha_pago': self.edit_payment_date_value,
             'monto': float(self.edit_payment_amount_field.value),
-            'id_miembro': self.selected_payment.miembro.id_miembro,
+            'id_miembro': self.selected_payment_member_id,  # Usar el ID almacenado
             'id_metodo_pago': self.get_payment_method_id(self.edit_payment_method_field.value),
             'referencia': self.edit_payment_observations_field.value
         }
-        success, message = self.payment_controller.update_payment(self.selected_payment.id_pago, payment_data)
+        
+        success, message = self.payment_controller.update_payment(self.selected_payment_id, payment_data)
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
