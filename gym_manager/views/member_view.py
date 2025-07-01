@@ -105,6 +105,14 @@ class MembersView(ModuleView):
             on_change=self.apply_filters
         )
 
+        # Contador de registros
+        self.records_counter = ft.Text(
+            "0 miembros",
+            size=14,
+            color=ft.colors.GREY_600,
+            weight=ft.FontWeight.W_500,
+        )
+
         self.status_filter = ft.Dropdown(
             label="Estado",
             width=150,
@@ -171,143 +179,104 @@ class MembersView(ModuleView):
         self.is_editing = False
         self.editing_member_id = None
         self.new_member_modal = ft.AlertDialog(
-            title=ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD),
+            title=ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
             content=ft.Container(
+                bgcolor=ft.colors.WHITE,
+                border_radius=20,
+                shadow=ft.BoxShadow(blur_radius=18, color=ft.colors.GREY_300, offset=ft.Offset(0, 4)),
+                padding=ft.padding.symmetric(horizontal=32, vertical=24),
+                width=700,
                 content=ft.Column(
-                    controls=[
-                        ft.Text("Información Personal", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.TextField(
-                                label="Nombre",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_name
-                            ),
-                            ft.TextField(
-                                label="Apellido",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_lastname
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=8),
-                        ft.Row([
-                            ft.TextField(
-                                label="Documento",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_document
-                            ),
-                            ft.TextField(
-                                label="Email",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_email
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=8),
-                        ft.Row([
-                            ft.ElevatedButton(
-                                self.get_birth_date_btn_text(),
-                                icon=ft.icons.CALENDAR_TODAY,
-                                on_click=self.show_birth_date_picker,
-                                ref=self.new_member_birth_date,
-                                style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=12, vertical=10)),
-                            ),
-                            ft.Dropdown(
-                                label="Género",
-                                width=240,
-                                options=[
-                                    ft.dropdown.Option("Masculino"),
-                                    ft.dropdown.Option("Femenino"),
-                                    ft.dropdown.Option("Otro")
-                                ],
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_gender
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Información de Contacto", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.TextField(
-                                label="Teléfono",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_phone
-                            ),
-                            ft.TextField(
-                                label="Dirección",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_address
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Información de Membresía", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.Dropdown(
-                                label="Tipo de Membresía",
-                                width=240,
-                                options=[
-                                    ft.dropdown.Option("Mensual"),
-                                    ft.dropdown.Option("Trimestral"),
-                                    ft.dropdown.Option("Semestral"),
-                                    ft.dropdown.Option("Anual")
-                                ],
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_membership
-                            ),
-                            ft.ElevatedButton(
-                                self.get_start_date_btn_text(),
-                                icon=ft.icons.CALENDAR_TODAY,
-                                on_click=self.show_start_date_picker,
-                                ref=self.new_member_start_date,
-                                style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=12, vertical=10)),
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Estado del Miembro", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.Dropdown(
-                                label="Estado",
-                                width=240,
-                                options=[
-                                    ft.dropdown.Option("Activo"),
-                                    ft.dropdown.Option("Inactivo")
-                                ],
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_status,
-                                disabled=not self.is_editing,  # Solo habilitado en modo edición
-                                value="Activo"  # Valor por defecto
-                            ),
-                        ], alignment=ft.MainAxisAlignment.START, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Información Médica", size=16, weight=ft.FontWeight.BOLD),
+                    [
+                        ft.Divider(),
+                        ft.Row(
+                            [
+                                ft.Column(
+                                    [
+                                        ft.TextField(label="Nombre", ref=self.new_member_name, border_radius=10, text_size=16, expand=True),
+                                        ft.TextField(label="Documento", ref=self.new_member_document, border_radius=10, text_size=16, expand=True),
+                                        ft.Dropdown(
+                                            label="Género",
+                                            options=[ft.dropdown.Option("Masculino"), ft.dropdown.Option("Femenino"), ft.dropdown.Option("Otro")],
+                                            ref=self.new_member_gender,
+                                            border_radius=10,
+                                            text_size=16,
+                                            expand=True
+                                        ),
+                                        ft.TextField(label="Teléfono", ref=self.new_member_phone, border_radius=10, text_size=16, expand=True),
+                                        ft.Dropdown(
+                                            label="Tipo de Membresía",
+                                            options=[ft.dropdown.Option("Mensual"), ft.dropdown.Option("Trimestral"), ft.dropdown.Option("Anual")],
+                                            ref=self.new_member_membership,
+                                            border_radius=10,
+                                            text_size=16,
+                                            expand=True
+                                        ),
+                                    ],
+                                    expand=True,
+                                    spacing=12
+                                ),
+                                ft.Column(
+                                    [
+                                        ft.TextField(label="Apellido", ref=self.new_member_lastname, border_radius=10, text_size=16, expand=True),
+                                        ft.TextField(label="Email", ref=self.new_member_email, border_radius=10, text_size=16, expand=True),
+                                        ft.ElevatedButton(
+                                            self.get_birth_date_btn_text(),
+                                            on_click=self.show_birth_date_picker,
+                                            icon=ft.icons.CALENDAR_MONTH,
+                                            style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_100, color=ft.colors.BLUE_900, shape=ft.RoundedRectangleBorder(radius=10)),
+                                            expand=True,
+                                            ref=self.new_member_birth_date,
+                                        ),
+                                        ft.TextField(label="Dirección", ref=self.new_member_address, border_radius=10, text_size=16, expand=True),
+                                        ft.Row(
+                                            [
+                                                ft.ElevatedButton(
+                                                    self.get_start_date_btn_text(),
+                                                    on_click=self.show_start_date_picker,
+                                                    icon=ft.icons.CALENDAR_MONTH,
+                                                    style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_100, color=ft.colors.BLUE_900, shape=ft.RoundedRectangleBorder(radius=10)),
+                                                    expand=True,
+                                                    ref=self.new_member_start_date,
+                                                ),
+                                                ft.Dropdown(
+                                                    label="Estado",
+                                                    options=[ft.dropdown.Option("Activo"), ft.dropdown.Option("Inactivo")],
+                                                    border_radius=10,
+                                                    text_size=16,
+                                                    ref=self.new_member_status,
+                                                    value="Activo",
+                                                    expand=True
+                                                ),
+                                            ],
+                                            spacing=12,
+                                            expand=True
+                                        ),
+                                    ],
+                                    expand=True,
+                                    spacing=12
+                                ),
+                            ],
+                            spacing=24
+                        ),
+                        ft.Divider(),
+                        ft.Text("Información Médica", size=16, weight=ft.FontWeight.W_600, color=ft.colors.GREY_800),
                         ft.TextField(
                             label="Información Médica",
-                            width=480,
-                            border_radius=8,
+                            border_radius=10,
                             text_size=16,
                             ref=self.new_member_medical,
                             multiline=True,
                             min_lines=3,
                             max_lines=5,
-                            helper_text="Ingrese cualquier información médica relevante del miembro"
+                            helper_text="Ingrese cualquier información médica relevante del miembro",
+                            expand=True,
                         ),
                     ],
-                    spacing=0,
+                    spacing=16,
+                    height=500,
+                    scroll=ft.ScrollMode.AUTO,
                 ),
-                width=540,
-                padding=20,
             ),
             actions=[
                 ft.TextButton("Cancelar", on_click=self.close_modal),
@@ -316,6 +285,9 @@ class MembersView(ModuleView):
                     style=ft.ButtonStyle(
                         bgcolor=ft.colors.BLUE,
                         color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                        padding=ft.padding.symmetric(horizontal=32, vertical=14),
+                        text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD)
                     ),
                     on_click=self.save_member,
                 ),
@@ -364,39 +336,48 @@ class MembersView(ModuleView):
         content = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Row(
-                        controls=[
-                            self.welcome_title,
-                            ft.Row(
-                                controls=[
-                                    self.new_member_btn,
-                                    self.export_excel_btn,
-                                    self.export_pdf_btn,
-                                ],
-                                alignment=ft.MainAxisAlignment.END,
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    # Header fijo con título y botones
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.welcome_title,
+                                ft.Row(
+                                    controls=[
+                                        self.new_member_btn,
+                                        self.export_excel_btn,
+                                        self.export_pdf_btn,
+                                    ],
+                                    alignment=ft.MainAxisAlignment.END,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=20),
                     ),
-                    ft.Container(height=20),
-                    ft.Row(
-                        controls=[
-                            self.search_field,
-                            self.status_filter,
-                            self.membership_type,
-                            self.clear_btn,
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    # Filtros fijos
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.search_field,
+                                self.records_counter,
+                                self.status_filter,
+                                self.membership_type,
+                                self.clear_btn,
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=20),
                     ),
-                    ft.Container(height=20),
-                    ft.Column(
-                        controls=[self.members_table],
-                        scroll=ft.ScrollMode.AUTO,
+                    # Tabla con scroll
+                    ft.Container(
+                        content=self.members_table,
                         expand=True,
+                        height=600,  # Altura más grande para mejor visualización
                     ),
                 ],
                 spacing=0,
                 expand=True,
+                scroll=ft.ScrollMode.AUTO,  # Scroll para toda la columna
             ),
             padding=20,
             expand=True,
@@ -425,6 +406,11 @@ class MembersView(ModuleView):
         Actualiza la tabla con los miembros
         """
         self.members_table.rows.clear()
+        
+        # Actualizar contador de registros
+        count = len(miembros)
+        self.records_counter.value = f"{count} {'miembro' if count == 1 else 'miembros'}"
+        
         for member in miembros:
             # Crear la celda de acciones
             action_buttons = [
@@ -435,9 +421,9 @@ class MembersView(ModuleView):
                     on_click=lambda e, m=member: self.edit_member(m)
                 ),
                 ft.IconButton(
-                    icon=ft.icons.DELETE,
-                    icon_color=ft.colors.RED,
-                    tooltip="Eliminar",
+                    icon=ft.icons.BLOCK,
+                    icon_color=ft.colors.ORANGE,
+                    tooltip="Desactivar",
                     on_click=lambda e, m=member: self.delete_member(m)
                 ),
             ]
@@ -508,7 +494,6 @@ class MembersView(ModuleView):
         self.clear_member_fields()
         self.new_member_modal.title = ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD)
         self.new_member_modal.actions[1].text = "Guardar"
-        self.new_member_status.current.disabled = True  # Deshabilitar el dropdown en nuevo miembro
         self.new_member_status.current.value = "Activo"  # Establecer valor por defecto
         if self.new_member_modal not in self.page.overlay:
             self.page.overlay.append(self.new_member_modal)
@@ -576,6 +561,8 @@ class MembersView(ModuleView):
                 "fecha_nacimiento": self.birth_date_picker.value,
                 "genero": self.new_member_gender.current.value,
                 "tipo_membresia": self.new_member_membership.current.value,
+                "telefono": self.new_member_phone.current.value,
+                "direccion": self.new_member_address.current.value,
             }
 
             # Recolectar campos faltantes
@@ -611,8 +598,8 @@ class MembersView(ModuleView):
                 "fecha_nacimiento": required_fields["fecha_nacimiento"],
                 "genero": required_fields["genero"],
                 "tipo_membresia": required_fields["tipo_membresia"],
-                "telefono": self.new_member_phone.current.value.strip() if self.new_member_phone.current.value else None,
-                "direccion": self.new_member_address.current.value.strip() if self.new_member_address.current.value else None,
+                "telefono": required_fields["telefono"].strip() if required_fields["telefono"] else None,
+                "direccion": required_fields["direccion"].strip() if required_fields["direccion"] else None,
                 "informacion_medica": self.new_member_medical.current.value.strip() if self.new_member_medical.current.value else None,
             }
 
@@ -663,7 +650,6 @@ class MembersView(ModuleView):
         self.start_date_picker.value = member.fecha_registro if hasattr(member, 'fecha_registro') else None
         self.new_member_start_date.current.text = self.get_start_date_btn_text()
         self.new_member_medical.current.value = member.informacion_medica or ""
-        self.new_member_status.current.disabled = False  # Habilitar el dropdown en edición
         self.new_member_status.current.value = "Activo" if member.estado else "Inactivo"
         if self.new_member_modal not in self.page.overlay:
             self.page.overlay.append(self.new_member_modal)
@@ -694,14 +680,14 @@ class MembersView(ModuleView):
         # Crear diálogo de confirmación
         confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Confirmar eliminación"),
-            content=ft.Text(f"¿Está seguro que desea eliminar a {member.nombre} {member.apellido}?"),
+            title=ft.Text("Confirmar desactivación"),
+            content=ft.Text(f"¿Está seguro que desea desactivar a {member.nombre} {member.apellido}?"),
             actions=[
                 ft.TextButton("Cancelar", on_click=lambda e: self._close_dialog(confirm_dialog)),
                 ft.ElevatedButton(
-                    "Eliminar",
+                    "Desactivar",
                     style=ft.ButtonStyle(
-                        bgcolor=ft.colors.RED,
+                        bgcolor=ft.colors.ORANGE,
                         color=ft.colors.WHITE,
                     ),
                     on_click=lambda e: self._confirm_delete_member(member, confirm_dialog)
