@@ -115,7 +115,7 @@ class RoutineController:
         session = get_db_session()
         try:
             # Solo tomar los campos válidos
-            valid_fields = ['nombre', 'descripcion', 'documento_rutina', 'nivel_dificultad', 'fecha_creacion', 'fecha_horario', 'id_miembro']
+            valid_fields = ['nombre', 'descripcion', 'documento_rutina', 'nivel_dificultad', 'fecha_creacion', 'fecha_horario']
             filtered_data = {k: v for k, v in routine_data.items() if k in valid_fields}
             routine = Rutina(**filtered_data)
             session.add(routine)

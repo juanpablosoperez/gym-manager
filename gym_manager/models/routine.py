@@ -17,4 +17,4 @@ class Rutina(Base):
     miembros = relationship("Miembro", backref="rutina_asignada", overlaps="rutina")
 
     def __repr__(self):
-        return f"<Rutina(id={self.id_rutina}, nombre='{self.nombre}', nivel_dificultad='{self.nivel_dificultad}')>" 
+        return f"<Rutina(id={self.id_rutina}, nombre='{self.nombre}', nivel_dificultad='{self.nivel_dificultad}')>"

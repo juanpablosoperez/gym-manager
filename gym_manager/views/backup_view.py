@@ -96,43 +96,86 @@ class BackupView(BaseView):
         """Configura la vista de backup"""
         self.page.title = "Gestión de Backups"
         self.page.theme_mode = ft.ThemeMode.LIGHT
-        self.page.padding = 20
-        self.page.window_width = 1200
-        self.page.window_height = 800
+        self.page.padding = 0
         self.page.window_resizable = True
         self.page.window_maximizable = True
         self.page.window_minimizable = True
+
+        # Título principal
+        self.welcome_title = ft.Text(
+            "Gestión de Backups",
+            size=28,
+            weight=ft.FontWeight.BOLD,
+            color=ft.colors.BLACK,
+            text_align=ft.TextAlign.LEFT,
+        )
 
         # Crear botón para nuevo backup
         self.new_backup_button = ft.ElevatedButton(
             "Nuevo Backup",
             icon=ft.icons.BACKUP,
-            on_click=self.create_backup
+            on_click=self.create_backup,
+            style=ft.ButtonStyle(
+                color=ft.colors.WHITE,
+                bgcolor=ft.colors.BLUE,
+                padding=ft.padding.symmetric(horizontal=20, vertical=10),
+            ),
         )
 
         # Crear tabla de backups
         self.backup_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Nombre")),
-                ft.DataColumn(ft.Text("Fecha")),
-                ft.DataColumn(ft.Text("Tamaño")),
-                ft.DataColumn(ft.Text("Estado")),
-                ft.DataColumn(ft.Text("Creado por")),
-                ft.DataColumn(ft.Text("Acciones")),
+                ft.DataColumn(ft.Text("Nombre", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Fecha", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Tamaño", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Estado", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Creado por", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Acciones", size=16, weight=ft.FontWeight.BOLD)),
             ],
-            rows=[]  # Las filas se actualizarán en load_backups
+            rows=[],
+            border=ft.border.all(1, ft.colors.GREY_300),
+            border_radius=12,
+            vertical_lines=ft.border.all(1, ft.colors.GREY_300),
+            horizontal_lines=ft.border.all(1, ft.colors.GREY_300),
+            column_spacing=60,
+            heading_row_color=ft.colors.GREY_100,
+            heading_row_height=60,
+            data_row_color=ft.colors.WHITE,
+            data_row_min_height=56,
+            expand=True,
+            width=1200,
         )
 
-        # Crear el contenido principal
-        self.content = ft.Column(
-            [
-                ft.Row(
-                    [self.new_backup_button],
-                    alignment=ft.MainAxisAlignment.END
-                ),
-                self.backup_table
-            ],
-            spacing=20
+        # Layout principal
+        self.content = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.welcome_title,
+                                ft.Container(
+                                    content=self.new_backup_button,
+                                    alignment=ft.alignment.center_right,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=30, top=20, left=20, right=20),
+                        alignment=ft.alignment.top_left,
+                    ),
+                    ft.Container(
+                        content=self.backup_table,
+                        padding=ft.padding.symmetric(horizontal=20),
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            expand=True,
+            padding=0,
+            bgcolor=ft.colors.WHITE,
         )
 
     def load_backups(self):
