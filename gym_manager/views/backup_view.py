@@ -16,10 +16,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class BackupView(BaseView):
-    def __init__(self, page: ft.Page, db_path: str, db_session):
+    def __init__(self, page: ft.Page, db_path: str, db_session, current_user: str = "Sistema"):
         super().__init__(page)
         self.db_path = db_path
         self.db_session = db_session
+        self.current_user = current_user  # Usuario logueado actualmente
         self.backup_service = BackupService(db_session)
         self.restore_service = RestoreService(db_session, page=page)
         self.current_backup_thread: Optional[threading.Thread] = None
@@ -297,7 +298,7 @@ class BackupView(BaseView):
             
             def backup_thread():
                 try:
-                    backup = self.backup_service.create_backup()
+                    backup = self.backup_service.create_backup(created_by=self.current_user)
                     self.show_message(f"Backup creado exitosamente: {backup.name}", ft.colors.GREEN)
                     self.load_backups()  # Recargar la lista de backups
                 except Exception as e:
