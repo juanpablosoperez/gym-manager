@@ -228,6 +228,20 @@ class UsersView(ModuleView):
                             ),
                             padding=ft.padding.only(bottom=25),  # Espaciado fijo entre campos
                         ),
+                        # Contenedor para mensaje de error general
+                        ft.Container(
+                            content=ft.Text(
+                                "",
+                                size=14,
+                                color=ft.colors.RED,
+                                weight=ft.FontWeight.BOLD,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            height=40,
+                            alignment=ft.alignment.center,
+                            visible=False,
+                            key="error_general_container"
+                        ),
                     ],
                     spacing=0,
                 ),
@@ -483,10 +497,13 @@ class UsersView(ModuleView):
             self.page.overlay.append(self.user_modal)
         self.user_modal.open = True
         self.page.update()
+        # Limpiar error después de que el modal esté en la página
+        self.limpiar_error_formulario()
 
     def cancelar_formulario(self, e):
         self.usuario_editando = None
         self.resetear_campos()
+        self.limpiar_error_formulario()
         self.user_modal.open = False
         self.page.update()
 
@@ -559,7 +576,11 @@ class UsersView(ModuleView):
             self.load_data()
 
         except Exception as ex:
-            self.show_message(f"Error al guardar: {str(ex)}", ft.colors.RED)
+            # Mostrar error en el formulario
+            if "ya existe" in str(ex).lower():
+                self.mostrar_error_formulario("El usuario ya existe en el sistema. Por favor, utiliza un nombre y apellido diferentes.")
+            else:
+                self.mostrar_error_formulario(f"Error al guardar: {str(ex)}")
 
         self.page.update()
 
@@ -583,6 +604,8 @@ class UsersView(ModuleView):
         self.user_modal.title = ft.Text("Editar Usuario", size=26, weight=ft.FontWeight.BOLD)
         self.user_modal.open = True
         self.page.update()
+        # Limpiar error después de que el modal esté en la página
+        self.limpiar_error_formulario()
 
     def setup_confirm_dialog(self):
         """
@@ -619,6 +642,8 @@ class UsersView(ModuleView):
             shape=ft.RoundedRectangleBorder(radius=15),
         )
 
+
+
     def toggle_estado_usuario(self, usuario):
         """
         Muestra el diálogo de confirmación antes de cambiar el estado
@@ -636,6 +661,46 @@ class UsersView(ModuleView):
         self.confirm_dialog.open = False
         self.usuario_a_toggle = None
         self.page.update()
+
+
+
+    def mostrar_error_formulario(self, mensaje: str):
+        """
+        Muestra un mensaje de error en el formulario
+        """
+        # Buscar el contenedor de error general
+        for control in self.user_modal.content.content.controls:
+            if hasattr(control, 'key') and control.key == "error_general_container":
+                error_container = control
+                error_text = error_container.content
+                error_text.value = mensaje
+                error_container.visible = True
+                # Solo actualizar si el contenedor está en la página
+                try:
+                    if hasattr(error_container, '_page') and error_container._page:
+                        error_container.update()
+                except:
+                    pass  # Ignorar errores si el contenedor no está en la página
+                break
+
+    def limpiar_error_formulario(self):
+        """
+        Limpia el mensaje de error del formulario
+        """
+        # Buscar el contenedor de error general
+        for control in self.user_modal.content.content.controls:
+            if hasattr(control, 'key') and control.key == "error_general_container":
+                error_container = control
+                error_text = error_container.content
+                error_text.value = ""
+                error_container.visible = False
+                # Solo actualizar si el contenedor está en la página
+                try:
+                    if hasattr(error_container, '_page') and error_container._page:
+                        error_container.update()
+                except:
+                    pass  # Ignorar errores si el contenedor no está en la página
+                break
 
     def confirm_toggle_estado(self, e):
         """
