@@ -88,6 +88,14 @@ class RoutinesView(ModuleView):
             on_change=self.apply_filters
         )
 
+        # Contador de registros
+        self.records_counter = ft.Text(
+            "0 rutinas",
+            size=14,
+            color=ft.colors.GREY_600,
+            weight=ft.FontWeight.W_500,
+        )
+
         self.difficulty_filter = ft.Dropdown(
             label="Dificultad",
             width=200,
@@ -139,38 +147,47 @@ class RoutinesView(ModuleView):
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Row(
-                        controls=[
-                            self.welcome_title,
-                            ft.Row(
-                                controls=[
-                                    self.new_routine_btn,
-                                    self.export_excel_btn,
-                                    self.export_pdf_btn,
-                                ],
-                                alignment=ft.MainAxisAlignment.END,
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    # Header fijo con título y botones
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.welcome_title,
+                                ft.Row(
+                                    controls=[
+                                        self.new_routine_btn,
+                                        self.export_excel_btn,
+                                        self.export_pdf_btn,
+                                    ],
+                                    alignment=ft.MainAxisAlignment.END,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=20),
                     ),
-                    ft.Container(height=20),
-                    ft.Row(
-                        controls=[
-                            self.search_field,
-                            self.difficulty_filter,
-                            self.clear_btn,
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    # Filtros fijos
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.search_field,
+                                self.records_counter,
+                                self.difficulty_filter,
+                                self.clear_btn,
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=20),
                     ),
-                    ft.Container(height=20),
-                    ft.Column(
-                        controls=[self.routines_table],
-                        scroll=ft.ScrollMode.AUTO,
+                    # Tabla con scroll
+                    ft.Container(
+                        content=self.routines_table,
                         expand=True,
+                        height=600,  # Altura más grande para mejor visualización
                     ),
                 ],
                 spacing=0,
                 expand=True,
+                scroll=ft.ScrollMode.AUTO,  # Scroll para toda la columna
             ),
             padding=20,
             expand=True,
@@ -274,6 +291,10 @@ class RoutinesView(ModuleView):
         """
         print(f"[DEBUG - Rutinas] Actualizando tabla con {len(rutinas)} rutinas")
         self.routines_table.rows.clear()
+        
+        # Actualizar contador de registros
+        count = len(rutinas)
+        self.records_counter.value = f"{count} {'rutina' if count == 1 else 'rutinas'}"
         
         if not rutinas:
             print("[DEBUG - Rutinas] No hay rutinas para mostrar")
