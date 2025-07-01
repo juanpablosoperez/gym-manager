@@ -48,6 +48,9 @@ class MembersView(ModuleView):
         self.page.overlay.append(self.birth_date_picker)
         self.page.overlay.append(self.start_date_picker)
         
+        # Variable para mensaje de error en el modal
+        self.member_modal_error = ft.Text("", color=ft.colors.RED, size=16, visible=False)
+        
         self.setup_member_view()
         self.load_data()
 
@@ -188,6 +191,7 @@ class MembersView(ModuleView):
                 width=700,
                 content=ft.Column(
                     [
+                        self.member_modal_error,
                         ft.Divider(),
                         ft.Row(
                             [
@@ -552,62 +556,54 @@ class MembersView(ModuleView):
         Guarda un nuevo miembro o actualiza uno existente
         """
         try:
-            # Validar campos requeridos
+            # Validar campos requeridos (excepto información médica)
             required_fields = {
-                "nombre": self.new_member_name.current.value,
-                "apellido": self.new_member_lastname.current.value,
-                "documento": self.new_member_document.current.value,
-                "email": self.new_member_email.current.value,
-                "fecha_nacimiento": self.birth_date_picker.value,
-                "genero": self.new_member_gender.current.value,
-                "tipo_membresia": self.new_member_membership.current.value,
-                "telefono": self.new_member_phone.current.value,
-                "direccion": self.new_member_address.current.value,
+                "Nombre": self.new_member_name.current.value,
+                "Apellido": self.new_member_lastname.current.value,
+                "Documento": self.new_member_document.current.value,
+                "Email": self.new_member_email.current.value,
+                "Fecha de Nacimiento": self.birth_date_picker.value,
+                "Género": self.new_member_gender.current.value,
+                "Tipo de Membresía": self.new_member_membership.current.value,
+                "Teléfono": self.new_member_phone.current.value,
+                "Dirección": self.new_member_address.current.value,
+                "Estado": self.new_member_status.current.value,
             }
 
             # Recolectar campos faltantes
-            missing_fields = []
-            for field, value in required_fields.items():
-                if not value:
-                    # Convertir el nombre del campo a un formato más amigable
-                    field_name = field.replace('_', ' ').title()
-                    missing_fields.append(field_name)
+            missing_fields = [field for field, value in required_fields.items() if not value]
 
             # Si hay campos faltantes, mostrar mensaje
             if missing_fields:
-                error_message = "Por favor complete los siguientes campos:\n" + "\n".join(f"• {field}" for field in missing_fields)
+                error_message = "Por favor complete los siguientes campos obligatorios:\n" + "\n".join(f"• {field}" for field in missing_fields)
                 self.show_message(error_message, ft.colors.RED)
+                self.page.update()
                 return
 
             # Validar formato de email
-            if not "@" in required_fields["email"]:
+            if not "@" in required_fields["Email"]:
                 self.show_message("El email no tiene un formato válido", ft.colors.RED)
                 return
 
             # Validar documento (solo números)
-            if not required_fields["documento"].isdigit():
+            if not required_fields["Documento"].isdigit():
                 self.show_message("El documento debe contener solo números", ft.colors.RED)
                 return
 
             # Preparar datos del miembro
             member_data = {
-                "nombre": required_fields["nombre"].strip(),
-                "apellido": required_fields["apellido"].strip(),
-                "documento": required_fields["documento"].strip(),
-                "correo_electronico": required_fields["email"].strip(),
-                "fecha_nacimiento": required_fields["fecha_nacimiento"],
-                "genero": required_fields["genero"],
-                "tipo_membresia": required_fields["tipo_membresia"],
-                "telefono": required_fields["telefono"].strip() if required_fields["telefono"] else None,
-                "direccion": required_fields["direccion"].strip() if required_fields["direccion"] else None,
+                "nombre": required_fields["Nombre"].strip(),
+                "apellido": required_fields["Apellido"].strip(),
+                "documento": required_fields["Documento"].strip(),
+                "correo_electronico": required_fields["Email"].strip(),
+                "fecha_nacimiento": required_fields["Fecha de Nacimiento"],
+                "genero": required_fields["Género"],
+                "tipo_membresia": required_fields["Tipo de Membresía"],
+                "telefono": required_fields["Teléfono"].strip() if required_fields["Teléfono"] else None,
+                "direccion": required_fields["Dirección"].strip() if required_fields["Dirección"] else None,
                 "informacion_medica": self.new_member_medical.current.value.strip() if self.new_member_medical.current.value else None,
+                "estado": required_fields["Estado"] == "Activo"
             }
-
-            # Agregar estado solo si estamos editando
-            if self.is_editing:
-                member_data["estado"] = self.new_member_status.current.value == "Activo"
-            else:
-                member_data["estado"] = True  # Por defecto, el miembro se crea activo
 
             if self.is_editing:
                 # Actualizar miembro existente
@@ -1243,18 +1239,17 @@ class MembersView(ModuleView):
             self.show_message(f"Error al generar PDF: {str(e)}", ft.colors.RED)
 
     def show_message(self, content, bgcolor: str):
-        """
-        Muestra un mensaje al usuario
-        """
-        self.page.snack_bar = ft.SnackBar(
-            content=ft.Text(content, color=ft.colors.WHITE),
-            bgcolor=bgcolor,
-            duration=5000,  # 5 segundos
-            action="Cerrar",
-            action_color=ft.colors.WHITE,
-        )
-        self.page.snack_bar.open = True
-        self.page.update()
+        # Si el modal de miembro está abierto, mostrar el mensaje ahí
+        if self.new_member_modal.open:
+            self.member_modal_error.value = content
+            self.member_modal_error.color = bgcolor
+            self.member_modal_error.visible = True
+            self.page.update()
+        else:
+            # Si no, usar el método original (snackbar, etc.)
+            self.page.snack_bar = ft.SnackBar(ft.Text(content), bgcolor=bgcolor)
+            self.page.snack_bar.open = True
+            self.page.update()
 
     def open_whatsapp(self, member):
         """
