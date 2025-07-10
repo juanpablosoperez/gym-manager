@@ -15,6 +15,72 @@ from typing import Optional
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+class BackupProgressModal:
+    def __init__(self, page: ft.Page):
+        self.page = page
+        self.progress_bar = ft.ProgressBar(width=400)
+        self.status_text = ft.Text("", size=16)
+        self.detail_text = ft.Text("", size=14, color=ft.colors.GREY_600)
+        self.time_estimate = ft.Text("", size=12, color=ft.colors.GREY_500)
+        self.cancel_button = ft.TextButton(
+            "Cancelar Operación", 
+            on_click=self.cancel_operation,
+            style=ft.ButtonStyle(color=ft.colors.RED_600)
+        )
+        self.cancelled = False
+        
+        self.modal = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Procesando...", size=20, weight=ft.FontWeight.BOLD),
+            content=ft.Column([
+                self.progress_bar,
+                self.status_text,
+                self.detail_text,
+                self.time_estimate,
+                self.cancel_button
+            ], spacing=15),
+            actions_alignment=ft.MainAxisAlignment.END
+        )
+    
+    def show(self, title: str = "Procesando..."):
+        """Muestra el modal de progreso"""
+        self.modal.title.value = title
+        self.progress_bar.value = 0
+        self.status_text.value = "Iniciando..."
+        self.detail_text.value = ""
+        self.time_estimate.value = ""
+        self.cancelled = False
+        self.modal.open = True
+        self.page.update()
+    
+    def hide(self):
+        """Oculta el modal de progreso"""
+        self.modal.open = False
+        self.page.update()
+    
+    def update_progress(self, progress: float, status: str, detail: str = "", time_estimate: str = ""):
+        """Actualiza el progreso del modal"""
+        if self.cancelled:
+            return
+        
+        self.progress_bar.value = progress / 100
+        self.status_text.value = status
+        self.detail_text.value = detail
+        self.time_estimate.value = time_estimate
+        self.page.update()
+    
+    def cancel_operation(self, e):
+        """Cancela la operación en curso"""
+        self.cancelled = True
+        self.status_text.value = "Cancelando..."
+        self.detail_text.value = "Esperando que termine la operación actual..."
+        self.cancel_button.disabled = True
+        self.page.update()
+    
+    def is_cancelled(self) -> bool:
+        """Verifica si la operación fue cancelada"""
+        return self.cancelled
+
 class BackupView(BaseView):
     def __init__(self, page: ft.Page, db_path: str, db_session, current_user: str = "Sistema"):
         super().__init__(page)
@@ -24,6 +90,9 @@ class BackupView(BaseView):
         self.backup_service = BackupService(db_session)
         self.restore_service = RestoreService(db_session, page=page)
         self.current_backup_thread: Optional[threading.Thread] = None
+        
+        # Inicializar modal de progreso
+        self.progress_modal = BackupProgressModal(page)
         
         # Definir diálogo de restauración
         self.restore_dialog = ft.AlertDialog(
@@ -76,6 +145,7 @@ class BackupView(BaseView):
         
         # Agregar diálogos a la página
         self.page.overlay.extend([
+            self.progress_modal.modal,
             self.restore_dialog,
             self.restore_success_dialog,
             self.restore_error_dialog
@@ -116,6 +186,7 @@ class BackupView(BaseView):
             "Nuevo Backup",
             icon=ft.icons.BACKUP,
             on_click=self.create_backup,
+            tooltip="Crear un nuevo backup de la base de datos",
             style=ft.ButtonStyle(
                 color=ft.colors.WHITE,
                 bgcolor=ft.colors.BLUE,
@@ -257,30 +328,34 @@ class BackupView(BaseView):
             backup_id = int(self.restore_dialog.content.value)
             self._close_dialog(self.restore_dialog)
             
-            # Deshabilitar botones durante la restauración
-            self._set_buttons_state(False)
+            # Mostrar modal de progreso
+            self.progress_modal.show("Restaurando backup...")
+            
+            def progress_callback(progress, status, detail, time_estimate):
+                self.progress_modal.update_progress(progress, status, detail, time_estimate)
             
             def restore_thread():
                 try:
-                    success, message = self.restore_service.restore_backup(backup_id)
+                    success, message = self.restore_service.restore_backup_with_progress(
+                        backup_id, 
+                        progress_callback=progress_callback
+                    )
+                    
+                    self.progress_modal.hide()
                     
                     if success:
                         # Mostrar diálogo de éxito
                         self.page.dialog = self.restore_success_dialog
                         self.restore_success_dialog.open = True
                     else:
-                        # Actualizar y mostrar diálogo de error
-                        self.restore_error_dialog.content.value = message
-                        self.page.dialog = self.restore_error_dialog
-                        self.restore_error_dialog.open = True
+                        # Mostrar mensaje de error
+                        self.show_error_message(f"Error en la restauración: {message}")
                     
                     self.page.update()
                     
                 except Exception as e:
-                    self.show_message(f"Error al restaurar el backup: {str(e)}", ft.colors.RED)
-                finally:
-                    self._set_buttons_state(True)
-                    self.page.update()
+                    self.progress_modal.hide()
+                    self.show_error_message(f"Error al restaurar el backup: {str(e)}")
             
             # Iniciar restauración en un hilo separado
             self.current_backup_thread = threading.Thread(target=restore_thread)
@@ -288,26 +363,28 @@ class BackupView(BaseView):
             
         except Exception as e:
             self._handle_error("Error al restaurar backup", e)
-            self._set_buttons_state(True)
 
     def create_backup(self, e):
         """Crea un nuevo backup"""
         try:
-            # Deshabilitar botones durante el backup
-            self._set_buttons_state(False)
+            # Mostrar modal de progreso
+            self.progress_modal.show("Creando backup...")
+            
+            def progress_callback(progress, status, detail, time_estimate):
+                self.progress_modal.update_progress(progress, status, detail, time_estimate)
             
             def backup_thread():
                 try:
-                    backup = self.backup_service.create_backup(created_by=self.current_user)
-                    self.show_message(f"Backup creado exitosamente: {backup.name}", ft.colors.GREEN)
-                    self.load_backups()  # Recargar la lista de backups
+                    backup = self.backup_service.create_backup_with_progress(
+                        progress_callback=progress_callback,
+                        created_by=self.current_user
+                    )
+                    self.progress_modal.hide()
+                    self.show_success_message(f"Backup creado exitosamente: {backup.name}")
+                    self.load_backups()  # Recargar la lista
                 except Exception as e:
-                    logger.error(f"Error al crear backup: {str(e)}")
-                    logger.error(traceback.format_exc())
-                    self.show_message(f"Error al crear backup: {str(e)}", ft.colors.RED)
-                finally:
-                    self._set_buttons_state(True)
-                    self.page.update()
+                    self.progress_modal.hide()
+                    self.show_error_message(f"Error al crear backup: {str(e)}")
             
             # Iniciar backup en un hilo separado
             self.current_backup_thread = threading.Thread(target=backup_thread)
@@ -315,7 +392,6 @@ class BackupView(BaseView):
             
         except Exception as e:
             self._handle_error("Error al crear backup", e)
-            self._set_buttons_state(True)
 
     def delete_backup(self, backup_id: int):
         """Elimina un backup"""
@@ -354,3 +430,19 @@ class BackupView(BaseView):
         )
         self.page.snack_bar.open = True
         self.page.update()
+
+    def show_success_message(self, message: str):
+        """Muestra un mensaje de éxito"""
+        self.show_message(message, ft.colors.GREEN)
+
+    def show_error_message(self, message: str):
+        """Muestra un mensaje de error"""
+        # Mejorar mensajes específicos
+        if "no se pudo eliminar" in message.lower():
+            message = "No se pudo eliminar el archivo de backup. Verifique permisos."
+        elif "archivo de backup no encontrado" in message.lower():
+            message = "El archivo de backup no existe. Puede haber sido eliminado manualmente."
+        elif "error al crear backup" in message.lower():
+            message = "Error al crear el backup. Verifique el espacio en disco y permisos."
+        
+        self.show_message(message, ft.colors.RED)
