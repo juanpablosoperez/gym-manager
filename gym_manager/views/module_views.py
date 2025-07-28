@@ -95,12 +95,12 @@ class UsersView(ModuleView):
         self.page.update()
 
 class BackupsView(ModuleView):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, current_user: str = "Sistema"):
         super().__init__(page, "Gestión de Backups")
         from gym_manager.views.backup_view import BackupView as BackupViewImpl
         # Obtener la ruta de la base de datos
         db_path = db_session.get_bind().url.database
         # Crear la vista de backup con los argumentos necesarios
-        self.backup_view = BackupViewImpl(page, db_path, db_session)
+        self.backup_view = BackupViewImpl(page, db_path, db_session, current_user)
         self.content = self.backup_view.get_content()
         self.page.update() 

@@ -25,4 +25,4 @@ class Miembro(Base):
     rutina = relationship("Rutina", foreign_keys=[id_rutina], overlaps="rutina_asignada")
     
     def __repr__(self):
-        return f"<Miembro(id_miembro={self.id_miembro}, nombre={self.nombre}, apellido={self.apellido})>" 
+        return f"<Miembro(id_miembro={self.id_miembro}, nombre={self.nombre}, apellido={self.apellido})>"

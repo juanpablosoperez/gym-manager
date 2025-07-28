@@ -361,7 +361,7 @@ class HomeView:
             self.main_content.content = view.get_content()
         elif index == 8:  # Gestión de Backups
             self.section_title = "Gestión de Backups"
-            view = BackupsView(self.page)
+            view = BackupsView(self.page, self.user_name)
             self.main_content.content = view.get_content()
         
         # Actualizar el header con el nuevo título
