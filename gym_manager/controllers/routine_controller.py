@@ -2,6 +2,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from gym_manager.models.routine import Rutina
 from gym_manager.utils.database import get_db_session
 import os
+import datetime
 
 class RoutineController:
     def __init__(self):
@@ -115,7 +116,25 @@ class RoutineController:
         session = get_db_session()
         try:
             # Solo tomar los campos válidos
+<<<<<<< HEAD
             valid_fields = ['nombre', 'descripcion', 'documento_rutina', 'nivel_dificultad', 'fecha_creacion', 'fecha_horario']
+=======
+            valid_fields = ['nombre', 'descripcion', 'documento_rutina', 'nivel_dificultad', 'fecha_creacion', 'fecha_horario', 'id_miembro']
+            now = datetime.datetime.now()
+            # Refuerzo: si faltan los campos, los agrego
+            if 'fecha_creacion' not in routine_data or not routine_data['fecha_creacion']:
+                routine_data['fecha_creacion'] = now
+            if 'fecha_horario' not in routine_data or not routine_data['fecha_horario']:
+                routine_data['fecha_horario'] = now
+            
+            # Validar tamaño del archivo si existe
+            if 'documento_rutina' in routine_data and routine_data['documento_rutina']:
+                MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB en bytes
+                file_size = len(routine_data['documento_rutina'])
+                if file_size > MAX_FILE_SIZE:
+                    return False, f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB"
+            
+>>>>>>> develop
             filtered_data = {k: v for k, v in routine_data.items() if k in valid_fields}
             routine = Rutina(**filtered_data)
             session.add(routine)
@@ -136,6 +155,13 @@ class RoutineController:
             routine = session.query(Rutina).filter(Rutina.id_rutina == routine_id).first()
             if not routine:
                 return False, "Rutina no encontrada"
+
+            # Validar tamaño del archivo si se está actualizando
+            if 'documento_rutina' in routine_data and routine_data['documento_rutina']:
+                MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB en bytes
+                file_size = len(routine_data['documento_rutina'])
+                if file_size > MAX_FILE_SIZE:
+                    return False, f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB"
 
             for key, value in routine_data.items():
                 setattr(routine, key, value)
