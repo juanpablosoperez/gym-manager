@@ -5,7 +5,7 @@ import os
 import datetime
 
 class RoutineController:
-    def __init__(self):
+    def _init_(self):
         pass  # Ya no se guarda una sesión
 
     def assign_routine(self, member_id, file_path, nombre, descripcion, nivel_dificultad, fecha_horario=None):
@@ -187,4 +187,4 @@ class RoutineController:
             session.rollback()
             return False, str(e)
         finally:
-            session.close() 
+            session.close()

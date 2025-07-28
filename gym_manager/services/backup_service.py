@@ -162,6 +162,111 @@ class BackupService:
                 self.db_session.commit()
             raise
 
+    def create_backup_with_progress(self, progress_callback=None, description: str = None, created_by: str = None) -> Backup:
+        """
+        Crea un nuevo backup de la base de datos con progreso.
+        
+        Args:
+            progress_callback: Función callback para actualizar el progreso
+            description (str, optional): Descripción del backup
+            created_by (str, optional): Usuario que crea el backup
+            
+        Returns:
+            Backup: Objeto Backup creado
+            
+        Raises:
+            Exception: Si hay un error al crear el backup
+        """
+        self.logger.info("[Backup] Iniciando creación de backup con progreso...")
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_name = f"backup_{timestamp}.sql"
+        backup_path = self.backup_dir / backup_name
+
+        try:
+            # Paso 1: Inicialización (0%)
+            if progress_callback:
+                progress_callback(0, "Inicializando backup...", "Preparando archivo y estructura", "~2 minutos")
+            
+            backup = Backup(
+                name=backup_name,
+                file_path=str(backup_path),
+                size_mb=0,
+                status='in_progress',
+                description=description,
+                created_by=created_by
+            )
+            self.db_session.add(backup)
+            self.db_session.commit()
+
+            # Inicializar archivo de backup
+            with open(backup_path, 'w', encoding='utf-8') as f:
+                f.write("-- Backup generado por Gym Manager\n")
+                f.write("SET FOREIGN_KEY_CHECKS=0;\n\n")
+
+            # Paso 2: Obtener estructura de tablas (20%)
+            if progress_callback:
+                progress_callback(20, "Obteniendo estructura de tablas...", "Analizando esquema de la base de datos", "~1.5 minutos")
+            
+            with self.engine.connect() as conn:
+                tables = [row[0] for row in conn.execute(text("SHOW TABLES")) if row[0] != 'backups']
+                total_tables = len(tables)
+                
+                # Paso 3: Procesar cada tabla (20% - 90%)
+                for i, table in enumerate(tables):
+                    if progress_callback:
+                        progress = 20 + (i / total_tables) * 70  # 20% a 90%
+                        progress_callback(
+                            progress, 
+                            f"Procesando tabla: {table}", 
+                            f"Tabla {i+1} de {total_tables} ({table})", 
+                            f"~{int((total_tables - i) * 0.5)} minutos"
+                        )
+                    
+                    self._write_table_to_backup(conn, table, backup_path)
+                    
+                    # Verificar si fue cancelado
+                    if progress_callback and hasattr(progress_callback, 'is_cancelled') and progress_callback.is_cancelled():
+                        raise Exception("Operación cancelada por el usuario")
+
+            # Paso 4: Finalización (90% - 100%)
+            if progress_callback:
+                progress_callback(90, "Finalizando backup...", "Validando archivo y calculando tamaño", "~30 segundos")
+
+            # Cerrar formalmente el archivo de backup
+            with open(backup_path, 'a', encoding='utf-8') as f:
+                f.write("-- Fin del backup\n")
+                f.write("\n")
+
+            # Validación final del archivo
+            if not backup_path.exists() or backup_path.stat().st_size == 0:
+                error_msg = "[Backup] El archivo está vacío o no se creó correctamente"
+                self.logger.error(error_msg)
+                backup.status = 'failed'
+                backup.error_message = error_msg
+                self.db_session.commit()
+                raise ValueError(error_msg)
+
+            # Guardar tamaño final y estado
+            backup.size_mb = backup_path.stat().st_size / (1024 * 1024)
+            backup.status = 'completed'
+            self.db_session.commit()
+
+            if progress_callback:
+                progress_callback(100, "Backup completado", f"Archivo: {backup_name} ({backup.size_mb:.2f} MB)", "")
+
+            self.logger.info(f"[Backup] Backup {backup_name} creado correctamente ({backup.size_mb:.2f} MB)")
+            return backup
+
+        except Exception as e:
+            self.logger.error(f"[Backup] Error al crear backup: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            if 'backup' in locals():
+                backup.status = 'failed'
+                backup.error_message = str(e)
+                self.db_session.commit()
+            raise
+
     def _write_backup_file(self, backup_path: Path):
         """Escribe el archivo de backup con la estructura y datos de la base de datos."""
         with open(backup_path, 'w', encoding='utf-8') as f:
@@ -238,6 +343,67 @@ class BackupService:
             # Cierre formal del archivo de backup
             f.write("-- Fin del backup\n")
             f.write("\n")
+
+    def _write_table_to_backup(self, conn, table: str, backup_path: Path):
+        """Escribe una tabla específica al archivo de backup"""
+        with open(backup_path, 'a', encoding='utf-8') as f:
+            self.logger.info(f"[Backup] Procesando tabla: {table}")
+
+            # Estructura de la tabla
+            create_stmt = conn.execute(text(f"SHOW CREATE TABLE {table}")).fetchone()[1]
+            create_stmt = create_stmt.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+            f.write(f"-- Estructura de la tabla {table}\n")
+            f.write(f"{create_stmt};\n\n")
+
+            # Obtener información de las columnas
+            columns_info = conn.execute(text(f"SHOW COLUMNS FROM {table}")).fetchall()
+            blob_columns = [col[0] for col in columns_info if 'BLOB' in col[1].upper()]
+            
+            if blob_columns:
+                self.logger.info(f"[Backup] Columnas BLOB detectadas en {table}: {', '.join(blob_columns)}")
+
+            # Datos
+            primary_key = None
+            try:
+                result = conn.execute(text(f"SHOW KEYS FROM {table} WHERE Key_name = 'PRIMARY'"))
+                primary_key = result.fetchone()
+                if primary_key:
+                    primary_key = primary_key[4]
+            except Exception as e:
+                self.logger.warning(f"[Backup] No se pudo obtener la clave primaria de {table}: {str(e)}")
+
+            query = f"SELECT * FROM {table}"
+            if primary_key:
+                query += f" ORDER BY {primary_key}"
+            
+            result = conn.execute(text(query))
+            rows = result.fetchall()
+            columns = result.keys()
+
+            if rows:
+                self.logger.info(f"[Backup] {len(rows)} filas encontradas en {table}")
+                f.write(f"-- Datos de la tabla {table}\n")
+
+                for row in rows:
+                    values = []
+                    for col_name, val in zip(columns, row):
+                        if val is None:
+                            values.append("NULL")
+                        elif col_name in blob_columns and isinstance(val, bytes):
+                            encoded = base64.b64encode(val).decode('utf-8')
+                            values.append(f"'{encoded}'")
+                        elif isinstance(val, (int, float)):
+                            values.append(str(val))
+                        else:
+                            escaped = str(val).replace("'", "''")
+                            values.append(f"'{escaped}'")
+                    
+                    values_str = ', '.join(values)
+                    columns_str = ', '.join(f"`{col}`" for col in columns)
+                    f.write(f"INSERT INTO `{table}` ({columns_str}) VALUES ({values_str});\n")
+                f.write("\n")
+            else:
+                self.logger.info(f"[Backup] Tabla {table} vacía")
 
     def get_backups(self) -> list[Backup]:
         """

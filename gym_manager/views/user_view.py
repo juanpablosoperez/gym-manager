@@ -7,6 +7,9 @@ from gym_manager.controllers.user_controller import UserController
 
 class UsersView(ModuleView):
     def __init__(self, page: ft.Page):
+        # Inicializar las banderas antes de llamar a setup_view
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
+        self.intento_guardar = False
         super().__init__(page, "Gestión de Usuarios")
         self.user_controller = UserController()
         self.setup_confirm_dialog()
@@ -77,6 +80,28 @@ class UsersView(ModuleView):
         )
 
         # Campos del formulario
+        def crear_campo_con_error(campo, nombre_campo):
+            # Crear contenedor de error separado
+            error_container = ft.Container(
+                ft.Text(
+                    "",
+                    size=12,
+                    color=ft.colors.RED
+                ),
+                height=20,
+                padding=ft.padding.only(left=8, top=2),
+                alignment=ft.alignment.top_left,
+                visible=False
+            )
+            
+            # Guardar referencia para poder actualizarlo después
+            setattr(self, f"error_container_{nombre_campo}", error_container)
+            
+            return ft.Column([
+                campo,
+                error_container
+            ], spacing=0)
+
         self.nombre = ft.TextField(
             label="Nombre",
             prefix_icon=ft.icons.PERSON,
@@ -84,7 +109,10 @@ class UsersView(ModuleView):
             width=500,
             height=40,
             max_length=50,
-            on_change=self.validar_campos
+            on_change=lambda e: self.validar_campo_con_tocado("nombre"),
+            on_blur=lambda e: self.marcar_tocado("nombre"),
+            focused_border_color=ft.colors.BLUE,
+            border_color=ft.colors.GREY_400
         )
         self.apellido = ft.TextField(
             label="Apellido",
@@ -93,7 +121,10 @@ class UsersView(ModuleView):
             width=500,
             height=40,
             max_length=50,
-            on_change=self.validar_campos
+            on_change=lambda e: self.validar_campo_con_tocado("apellido"),
+            on_blur=lambda e: self.marcar_tocado("apellido"),
+            focused_border_color=ft.colors.BLUE,
+            border_color=ft.colors.GREY_400
         )
         self.rol = ft.Dropdown(
             label="Rol",
@@ -104,7 +135,9 @@ class UsersView(ModuleView):
                 ft.dropdown.Option("user"),
             ],
             border_radius=8,
-            on_change=self.validar_campos
+            on_change=self.validar_campos,
+            focused_border_color=ft.colors.BLUE,
+            border_color=ft.colors.GREY_400
         )
         self.contrasena = ft.TextField(
             label="Contraseña",
@@ -115,7 +148,10 @@ class UsersView(ModuleView):
             width=500,
             height=40,
             max_length=50,
-            on_change=self.validar_campos
+            on_change=lambda e: self.validar_campo_con_tocado("contrasena"),
+            on_blur=lambda e: self.marcar_tocado("contrasena"),
+            focused_border_color=ft.colors.BLUE,
+            border_color=ft.colors.GREY_400
         )
 
         # Modal de nuevo/editar usuario
@@ -141,11 +177,11 @@ class UsersView(ModuleView):
                                         weight=ft.FontWeight.BOLD,
                                         color=ft.colors.BLACK87,
                                     ),
-                                    self.nombre,
+                                    crear_campo_con_error(self.nombre, 'nombre'),
                                 ],
                                 spacing=8,
                             ),
-                            padding=ft.padding.only(bottom=15),
+                            padding=ft.padding.only(bottom=25),  # Espaciado fijo entre campos
                         ),
                         ft.Container(
                             content=ft.Column(
@@ -156,11 +192,11 @@ class UsersView(ModuleView):
                                         weight=ft.FontWeight.BOLD,
                                         color=ft.colors.BLACK87,
                                     ),
-                                    self.apellido,
+                                    crear_campo_con_error(self.apellido, 'apellido'),
                                 ],
                                 spacing=8,
                             ),
-                            padding=ft.padding.only(bottom=15),
+                            padding=ft.padding.only(bottom=25),  # Espaciado fijo entre campos
                         ),
                         ft.Container(
                             content=ft.Column(
@@ -175,7 +211,7 @@ class UsersView(ModuleView):
                                 ],
                                 spacing=8,
                             ),
-                            padding=ft.padding.only(bottom=15),
+                            padding=ft.padding.only(bottom=25),  # Espaciado fijo entre campos
                         ),
                         ft.Container(
                             content=ft.Column(
@@ -186,16 +222,30 @@ class UsersView(ModuleView):
                                         weight=ft.FontWeight.BOLD,
                                         color=ft.colors.BLACK87,
                                     ),
-                                    self.contrasena,
+                                    crear_campo_con_error(self.contrasena, 'contrasena'),
                                 ],
                                 spacing=8,
                             ),
-                            padding=ft.padding.only(bottom=15),
+                            padding=ft.padding.only(bottom=25),  # Espaciado fijo entre campos
+                        ),
+                        # Contenedor para mensaje de error general
+                        ft.Container(
+                            content=ft.Text(
+                                "",
+                                size=14,
+                                color=ft.colors.RED,
+                                weight=ft.FontWeight.BOLD,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            height=40,
+                            alignment=ft.alignment.center,
+                            visible=False,
+                            key="error_general_container"
                         ),
                     ],
                     spacing=0,
                 ),
-                padding=ft.padding.symmetric(horizontal=20, vertical=10),
+                padding=ft.padding.symmetric(horizontal=20, vertical=15),
             ),
             actions=[
                 ft.Container(
@@ -447,23 +497,33 @@ class UsersView(ModuleView):
             self.page.overlay.append(self.user_modal)
         self.user_modal.open = True
         self.page.update()
+        # Limpiar error después de que el modal esté en la página
+        self.limpiar_error_formulario()
 
     def cancelar_formulario(self, e):
         self.usuario_editando = None
         self.resetear_campos()
+        self.limpiar_error_formulario()
         self.user_modal.open = False
         self.page.update()
 
     def resetear_campos(self):
         self.nombre.value = ""
-        self.nombre.error_text = None
         self.apellido.value = ""
-        self.apellido.error_text = None
         self.rol.value = None
         self.contrasena.value = ""
-        self.contrasena.error_text = None
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
+        self.intento_guardar = False
+        
+        # Limpiar contenedores de error solo si existen
+        for campo in ['nombre', 'apellido', 'contrasena']:
+            if hasattr(self, f"error_container_{campo}"):
+                self.actualizar_error_campo(campo, None)
 
     def guardar_usuario(self, e):
+        self.intento_guardar = True
+        self.tocado = {"nombre": True, "apellido": True, "contrasena": True}
+        self.validar_campos()
         # Validar campos obligatorios
         campos_faltantes = []
         if not self.nombre.value:
@@ -516,7 +576,11 @@ class UsersView(ModuleView):
             self.load_data()
 
         except Exception as ex:
-            self.show_message(f"Error al guardar: {str(ex)}", ft.colors.RED)
+            # Mostrar error en el formulario
+            if "ya existe" in str(ex).lower():
+                self.mostrar_error_formulario("El usuario ya existe en el sistema. Por favor, utiliza un nombre y apellido diferentes.")
+            else:
+                self.mostrar_error_formulario(f"Error al guardar: {str(ex)}")
 
         self.page.update()
 
@@ -526,12 +590,22 @@ class UsersView(ModuleView):
         self.apellido.value = usuario.apellido
         self.rol.value = usuario.rol
         self.contrasena.value = ""
+        # Resetear las banderas de validación para que no se muestren errores al abrir
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
+        self.intento_guardar = False
+        
+        # Limpiar contenedores de error solo si existen
+        for campo in ['nombre', 'apellido', 'contrasena']:
+            if hasattr(self, f"error_container_{campo}"):
+                self.actualizar_error_campo(campo, None)
 
         if self.user_modal not in self.page.overlay:
             self.page.overlay.append(self.user_modal)
         self.user_modal.title = ft.Text("Editar Usuario", size=26, weight=ft.FontWeight.BOLD)
         self.user_modal.open = True
         self.page.update()
+        # Limpiar error después de que el modal esté en la página
+        self.limpiar_error_formulario()
 
     def setup_confirm_dialog(self):
         """
@@ -568,6 +642,8 @@ class UsersView(ModuleView):
             shape=ft.RoundedRectangleBorder(radius=15),
         )
 
+
+
     def toggle_estado_usuario(self, usuario):
         """
         Muestra el diálogo de confirmación antes de cambiar el estado
@@ -585,6 +661,46 @@ class UsersView(ModuleView):
         self.confirm_dialog.open = False
         self.usuario_a_toggle = None
         self.page.update()
+
+
+
+    def mostrar_error_formulario(self, mensaje: str):
+        """
+        Muestra un mensaje de error en el formulario
+        """
+        # Buscar el contenedor de error general
+        for control in self.user_modal.content.content.controls:
+            if hasattr(control, 'key') and control.key == "error_general_container":
+                error_container = control
+                error_text = error_container.content
+                error_text.value = mensaje
+                error_container.visible = True
+                # Solo actualizar si el contenedor está en la página
+                try:
+                    if hasattr(error_container, '_page') and error_container._page:
+                        error_container.update()
+                except:
+                    pass  # Ignorar errores si el contenedor no está en la página
+                break
+
+    def limpiar_error_formulario(self):
+        """
+        Limpia el mensaje de error del formulario
+        """
+        # Buscar el contenedor de error general
+        for control in self.user_modal.content.content.controls:
+            if hasattr(control, 'key') and control.key == "error_general_container":
+                error_container = control
+                error_text = error_container.content
+                error_text.value = ""
+                error_container.visible = False
+                # Solo actualizar si el contenedor está en la página
+                try:
+                    if hasattr(error_container, '_page') and error_container._page:
+                        error_container.update()
+                except:
+                    pass  # Ignorar errores si el contenedor no está en la página
+                break
 
     def confirm_toggle_estado(self, e):
         """
@@ -647,26 +763,78 @@ class UsersView(ModuleView):
         self.load_data()
         self.page.update()
 
+    def actualizar_error_campo(self, nombre_campo, mensaje_error):
+        """
+        Actualiza el mensaje de error de un campo específico
+        """
+        error_container = getattr(self, f"error_container_{nombre_campo}", None)
+        if error_container:
+            error_text = error_container.content
+            mostrar = self.tocado[nombre_campo] or self.intento_guardar
+            
+            if mensaje_error and mostrar:
+                error_text.value = mensaje_error
+                error_container.visible = True
+            else:
+                error_text.value = ""
+                error_container.visible = False
+            
+            # Solo actualizar si el contenedor está en la página
+            try:
+                if hasattr(error_container, '_page') and error_container._page:
+                    error_container.update()
+            except:
+                pass  # Ignorar errores si el contenedor no está en la página
+
+    def validar_campo_con_tocado(self, nombre_campo):
+        """
+        Valida un campo específico y lo marca como tocado
+        """
+        self.tocado[nombre_campo] = True
+        
+        if nombre_campo == 'nombre':
+            if self.nombre.value and len(self.nombre.value.strip()) < 2:
+                self.actualizar_error_campo('nombre', "El nombre debe tener al menos 2 caracteres")
+            else:
+                self.actualizar_error_campo('nombre', None)
+        elif nombre_campo == 'apellido':
+            if self.apellido.value and len(self.apellido.value.strip()) < 2:
+                self.actualizar_error_campo('apellido', "El apellido debe tener al menos 2 caracteres")
+            else:
+                self.actualizar_error_campo('apellido', None)
+        elif nombre_campo == 'contrasena':
+            if not self.usuario_editando or self.contrasena.value:
+                if self.contrasena.value and len(self.contrasena.value) < 6:
+                    self.actualizar_error_campo('contrasena', "La contraseña debe tener al menos 6 caracteres")
+                else:
+                    self.actualizar_error_campo('contrasena', None)
+
+        self.page.update()
+
     def validar_campos(self, e=None):
         """
-        Valida los campos del formulario en tiempo real
+        Valida todos los campos del formulario (usado para validación completa)
         """
         # Validar longitud de nombre y apellido
         if self.nombre.value and len(self.nombre.value.strip()) < 2:
-            self.nombre.error_text = "El nombre debe tener al menos 2 caracteres"
+            self.actualizar_error_campo('nombre', "El nombre debe tener al menos 2 caracteres")
         else:
-            self.nombre.error_text = None
+            self.actualizar_error_campo('nombre', None)
 
         if self.apellido.value and len(self.apellido.value.strip()) < 2:
-            self.apellido.error_text = "El apellido debe tener al menos 2 caracteres"
+            self.actualizar_error_campo('apellido', "El apellido debe tener al menos 2 caracteres")
         else:
-            self.apellido.error_text = None
+            self.actualizar_error_campo('apellido', None)
 
         # Validar contraseña solo si es nuevo usuario o se está cambiando
         if not self.usuario_editando or self.contrasena.value:
             if self.contrasena.value and len(self.contrasena.value) < 6:
-                self.contrasena.error_text = "La contraseña debe tener al menos 6 caracteres"
+                self.actualizar_error_campo('contrasena', "La contraseña debe tener al menos 6 caracteres")
             else:
-                self.contrasena.error_text = None
+                self.actualizar_error_campo('contrasena', None)
 
+        self.page.update()
+
+    def marcar_tocado(self, campo):
+        self.tocado[campo] = True
         self.page.update()
