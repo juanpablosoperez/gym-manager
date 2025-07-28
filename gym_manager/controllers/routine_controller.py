@@ -5,7 +5,7 @@ import os
 import datetime
 
 class RoutineController:
-    def __init__(self):
+    def _init_(self):
         pass  # Ya no se guarda una sesión
 
     def assign_routine(self, member_id, file_path, nombre, descripcion, nivel_dificultad, fecha_horario=None):
@@ -116,9 +116,6 @@ class RoutineController:
         session = get_db_session()
         try:
             # Solo tomar los campos válidos
-<<<<<<< HEAD
-            valid_fields = ['nombre', 'descripcion', 'documento_rutina', 'nivel_dificultad', 'fecha_creacion', 'fecha_horario']
-=======
             valid_fields = ['nombre', 'descripcion', 'documento_rutina', 'nivel_dificultad', 'fecha_creacion', 'fecha_horario', 'id_miembro']
             now = datetime.datetime.now()
             # Refuerzo: si faltan los campos, los agrego
@@ -134,7 +131,6 @@ class RoutineController:
                 if file_size > MAX_FILE_SIZE:
                     return False, f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB"
             
->>>>>>> develop
             filtered_data = {k: v for k, v in routine_data.items() if k in valid_fields}
             routine = Rutina(**filtered_data)
             session.add(routine)
@@ -191,4 +187,4 @@ class RoutineController:
             session.rollback()
             return False, str(e)
         finally:
-            session.close() 
+            session.close()
