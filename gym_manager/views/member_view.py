@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 from gym_manager.views.module_views import ModuleView
 from gym_manager.models.member import Miembro
+from pathlib import Path
 
 class MembersView(ModuleView):
     def __init__(self, page: ft.Page):
@@ -29,6 +30,7 @@ class MembersView(ModuleView):
         self.new_member_membership = ft.Ref[ft.Dropdown]()
         self.new_member_start_date = ft.Ref[ft.ElevatedButton]()
         self.new_member_medical = ft.Ref[ft.TextField]()
+        self.new_member_status = ft.Ref[ft.Dropdown]()
         
         # DatePickers
         self.birth_date_picker = ft.DatePicker(
@@ -45,6 +47,9 @@ class MembersView(ModuleView):
         # Agregar DatePickers al overlay de la página
         self.page.overlay.append(self.birth_date_picker)
         self.page.overlay.append(self.start_date_picker)
+        
+        # Variable para mensaje de error en el modal
+        self.member_modal_error = ft.Text("", color=ft.colors.RED, size=16, visible=False)
         
         self.setup_member_view()
         self.load_data()
@@ -101,6 +106,14 @@ class MembersView(ModuleView):
             height=48,
             text_size=16,
             on_change=self.apply_filters
+        )
+
+        # Contador de registros
+        self.records_counter = ft.Text(
+            "0 miembros",
+            size=14,
+            color=ft.colors.GREY_600,
+            weight=ft.FontWeight.W_500,
         )
 
         self.status_filter = ft.Dropdown(
@@ -169,126 +182,105 @@ class MembersView(ModuleView):
         self.is_editing = False
         self.editing_member_id = None
         self.new_member_modal = ft.AlertDialog(
-            title=ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD),
+            title=ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
             content=ft.Container(
+                bgcolor=ft.colors.WHITE,
+                border_radius=20,
+                shadow=ft.BoxShadow(blur_radius=18, color=ft.colors.GREY_300, offset=ft.Offset(0, 4)),
+                padding=ft.padding.symmetric(horizontal=32, vertical=24),
+                width=700,
                 content=ft.Column(
-                    controls=[
-                        ft.Text("Información Personal", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.TextField(
-                                label="Nombre",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_name
-                            ),
-                            ft.TextField(
-                                label="Apellido",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_lastname
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=8),
-                        ft.Row([
-                            ft.TextField(
-                                label="Documento",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_document
-                            ),
-                            ft.TextField(
-                                label="Email",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_email
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=8),
-                        ft.Row([
-                            ft.ElevatedButton(
-                                self.get_birth_date_btn_text(),
-                                icon=ft.icons.CALENDAR_TODAY,
-                                on_click=self.show_birth_date_picker,
-                                ref=self.new_member_birth_date,
-                                style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=12, vertical=10)),
-                            ),
-                            ft.Dropdown(
-                                label="Género",
-                                width=240,
-                                options=[
-                                    ft.dropdown.Option("Masculino"),
-                                    ft.dropdown.Option("Femenino"),
-                                    ft.dropdown.Option("Otro")
-                                ],
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_gender
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Información de Contacto", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.TextField(
-                                label="Teléfono",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_phone
-                            ),
-                            ft.TextField(
-                                label="Dirección",
-                                width=240,
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_address
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Información de Membresía", size=16, weight=ft.FontWeight.BOLD),
-                        ft.Row([
-                            ft.Dropdown(
-                                label="Tipo de Membresía",
-                                width=240,
-                                options=[
-                                    ft.dropdown.Option("Mensual"),
-                                    ft.dropdown.Option("Trimestral"),
-                                    ft.dropdown.Option("Semestral"),
-                                    ft.dropdown.Option("Anual")
-                                ],
-                                border_radius=8,
-                                text_size=16,
-                                ref=self.new_member_membership
-                            ),
-                            ft.ElevatedButton(
-                                self.get_start_date_btn_text(),
-                                icon=ft.icons.CALENDAR_TODAY,
-                                on_click=self.show_start_date_picker,
-                                ref=self.new_member_start_date,
-                                style=ft.ButtonStyle(padding=ft.padding.symmetric(horizontal=12, vertical=10)),
-                            ),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.START),
-                        ft.Container(height=16),
-                        ft.Text("Información Médica", size=16, weight=ft.FontWeight.BOLD),
+                    [
+                        self.member_modal_error,
+                        ft.Divider(),
+                        ft.Row(
+                            [
+                                ft.Column(
+                                    [
+                                        ft.TextField(label="Nombre", ref=self.new_member_name, border_radius=10, text_size=16, expand=True),
+                                        ft.TextField(label="Documento", ref=self.new_member_document, border_radius=10, text_size=16, expand=True),
+                                        ft.Dropdown(
+                                            label="Género",
+                                            options=[ft.dropdown.Option("Masculino"), ft.dropdown.Option("Femenino"), ft.dropdown.Option("Otro")],
+                                            ref=self.new_member_gender,
+                                            border_radius=10,
+                                            text_size=16,
+                                            expand=True
+                                        ),
+                                        ft.TextField(label="Teléfono", ref=self.new_member_phone, border_radius=10, text_size=16, expand=True),
+                                        ft.Dropdown(
+                                            label="Tipo de Membresía",
+                                            options=[ft.dropdown.Option("Mensual"), ft.dropdown.Option("Trimestral"), ft.dropdown.Option("Anual")],
+                                            ref=self.new_member_membership,
+                                            border_radius=10,
+                                            text_size=16,
+                                            expand=True
+                                        ),
+                                    ],
+                                    expand=True,
+                                    spacing=12
+                                ),
+                                ft.Column(
+                                    [
+                                        ft.TextField(label="Apellido", ref=self.new_member_lastname, border_radius=10, text_size=16, expand=True),
+                                        ft.TextField(label="Email", ref=self.new_member_email, border_radius=10, text_size=16, expand=True),
+                                        ft.ElevatedButton(
+                                            self.get_birth_date_btn_text(),
+                                            on_click=self.show_birth_date_picker,
+                                            icon=ft.icons.CALENDAR_MONTH,
+                                            style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_100, color=ft.colors.BLUE_900, shape=ft.RoundedRectangleBorder(radius=10)),
+                                            expand=True,
+                                            ref=self.new_member_birth_date,
+                                        ),
+                                        ft.TextField(label="Dirección", ref=self.new_member_address, border_radius=10, text_size=16, expand=True),
+                                        ft.Row(
+                                            [
+                                                ft.ElevatedButton(
+                                                    self.get_start_date_btn_text(),
+                                                    on_click=self.show_start_date_picker,
+                                                    icon=ft.icons.CALENDAR_MONTH,
+                                                    style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_100, color=ft.colors.BLUE_900, shape=ft.RoundedRectangleBorder(radius=10)),
+                                                    expand=True,
+                                                    ref=self.new_member_start_date,
+                                                ),
+                                                ft.Dropdown(
+                                                    label="Estado",
+                                                    options=[ft.dropdown.Option("Activo"), ft.dropdown.Option("Inactivo")],
+                                                    border_radius=10,
+                                                    text_size=16,
+                                                    ref=self.new_member_status,
+                                                    value="Activo",
+                                                    expand=True
+                                                ),
+                                            ],
+                                            spacing=12,
+                                            expand=True
+                                        ),
+                                    ],
+                                    expand=True,
+                                    spacing=12
+                                ),
+                            ],
+                            spacing=24
+                        ),
+                        ft.Divider(),
+                        ft.Text("Información Médica", size=16, weight=ft.FontWeight.W_600, color=ft.colors.GREY_800),
                         ft.TextField(
                             label="Información Médica",
-                            width=480,
-                            border_radius=8,
+                            border_radius=10,
                             text_size=16,
                             ref=self.new_member_medical,
                             multiline=True,
                             min_lines=3,
                             max_lines=5,
-                            helper_text="Ingrese cualquier información médica relevante del miembro"
+                            helper_text="Ingrese cualquier información médica relevante del miembro",
+                            expand=True,
                         ),
                     ],
-                    spacing=0,
+                    spacing=16,
+                    height=500,
+                    scroll=ft.ScrollMode.AUTO,
                 ),
-                width=540,
-                padding=20,
             ),
             actions=[
                 ft.TextButton("Cancelar", on_click=self.close_modal),
@@ -297,6 +289,9 @@ class MembersView(ModuleView):
                     style=ft.ButtonStyle(
                         bgcolor=ft.colors.BLUE,
                         color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                        padding=ft.padding.symmetric(horizontal=32, vertical=14),
+                        text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD)
                     ),
                     on_click=self.save_member,
                 ),
@@ -304,38 +299,89 @@ class MembersView(ModuleView):
             actions_alignment=ft.MainAxisAlignment.END,
         )
 
+        # Modal de exportación
+        self.export_dialog = ft.AlertDialog(
+            title=ft.Text("Confirmar Exportación", size=22, weight=ft.FontWeight.BOLD),
+            content=ft.Text(
+                "¿Deseas exportar los miembros?\n"
+                "El archivo se guardará en tu carpeta de Descargas.",
+                size=16
+            ),
+            actions=[
+                ft.TextButton(
+                    "Cancelar",
+                    on_click=self.close_export_dialog,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.WHITE,
+                        color=ft.colors.BLACK87,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+                ft.ElevatedButton(
+                    "Exportar",
+                    on_click=self.confirm_export,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE_900,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
+                    )
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            modal=True,
+        )
+        self.page.overlay.append(self.export_dialog)
+
     def get_content(self):
         content = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Row(
-                        controls=[
-                            self.welcome_title,
-                            ft.Row(
-                                controls=[
-                                    self.new_member_btn,
-                                    self.export_excel_btn,
-                                    self.export_pdf_btn,
-                                ],
-                                alignment=ft.MainAxisAlignment.END,
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    # Header fijo con título y botones
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.welcome_title,
+                                ft.Row(
+                                    controls=[
+                                        self.new_member_btn,
+                                        self.export_excel_btn,
+                                        self.export_pdf_btn,
+                                    ],
+                                    alignment=ft.MainAxisAlignment.END,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=20),
                     ),
-                    ft.Container(height=20),
-                    ft.Row(
-                        controls=[
-                            self.search_field,
-                            self.status_filter,
-                            self.membership_type,
-                            self.clear_btn,
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    # Filtros fijos
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.search_field,
+                                self.records_counter,
+                                self.status_filter,
+                                self.membership_type,
+                                self.clear_btn,
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=ft.padding.only(bottom=20),
                     ),
-                    ft.Container(height=20),
-                    self.members_table,
+                    # Tabla con scroll
+                    ft.Container(
+                        content=self.members_table,
+                        expand=True,
+                        height=600,  # Altura más grande para mejor visualización
+                    ),
                 ],
                 spacing=0,
+                expand=True,
+                scroll=ft.ScrollMode.AUTO,  # Scroll para toda la columna
             ),
             padding=20,
             expand=True,
@@ -364,6 +410,11 @@ class MembersView(ModuleView):
         Actualiza la tabla con los miembros
         """
         self.members_table.rows.clear()
+        
+        # Actualizar contador de registros
+        count = len(miembros)
+        self.records_counter.value = f"{count} {'miembro' if count == 1 else 'miembros'}"
+        
         for member in miembros:
             # Crear la celda de acciones
             action_buttons = [
@@ -374,9 +425,9 @@ class MembersView(ModuleView):
                     on_click=lambda e, m=member: self.edit_member(m)
                 ),
                 ft.IconButton(
-                    icon=ft.icons.DELETE,
-                    icon_color=ft.colors.RED,
-                    tooltip="Eliminar",
+                    icon=ft.icons.BLOCK,
+                    icon_color=ft.colors.ORANGE,
+                    tooltip="Desactivar",
                     on_click=lambda e, m=member: self.delete_member(m)
                 ),
             ]
@@ -447,6 +498,7 @@ class MembersView(ModuleView):
         self.clear_member_fields()
         self.new_member_modal.title = ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD)
         self.new_member_modal.actions[1].text = "Guardar"
+        self.new_member_status.current.value = "Activo"  # Establecer valor por defecto
         if self.new_member_modal not in self.page.overlay:
             self.page.overlay.append(self.new_member_modal)
         self.new_member_modal.open = True
@@ -477,18 +529,16 @@ class MembersView(ModuleView):
         """
         Maneja el cambio de fecha de nacimiento
         """
-        if e.date:
-            self.new_member_birth_date.current.text = e.date.strftime("%d/%m/%Y")
-            self.birth_date_picker.value = e.date
+        if self.birth_date_picker.value:
+            self.new_member_birth_date.current.text = self.birth_date_picker.value.strftime("%d/%m/%Y")
             self.page.update()
 
     def on_start_date_change(self, e):
         """
         Maneja el cambio de fecha de inicio de membresía
         """
-        if e.date:
-            self.new_member_start_date.current.text = e.date.strftime("%d/%m/%Y")
-            self.start_date_picker.value = e.date
+        if self.start_date_picker.value:
+            self.new_member_start_date.current.text = self.start_date_picker.value.strftime("%d/%m/%Y")
             self.page.update()
 
     def get_birth_date_btn_text(self):
@@ -505,56 +555,55 @@ class MembersView(ModuleView):
         """
         Guarda un nuevo miembro o actualiza uno existente
         """
-        print("Iniciando guardado de miembro...")  # Debug log
         try:
-            # Validar campos requeridos
+            # Validar campos requeridos (excepto información médica)
             required_fields = {
-                "nombre": self.new_member_name.current.value,
-                "apellido": self.new_member_lastname.current.value,
-                "documento": self.new_member_document.current.value,
-                "email": self.new_member_email.current.value,
-                "fecha_nacimiento": self.birth_date_picker.value,
-                "genero": self.new_member_gender.current.value,
-                "tipo_membresia": self.new_member_membership.current.value,
+                "Nombre": self.new_member_name.current.value,
+                "Apellido": self.new_member_lastname.current.value,
+                "Documento": self.new_member_document.current.value,
+                "Email": self.new_member_email.current.value,
+                "Fecha de Nacimiento": self.birth_date_picker.value,
+                "Género": self.new_member_gender.current.value,
+                "Tipo de Membresía": self.new_member_membership.current.value,
+                "Teléfono": self.new_member_phone.current.value,
+                "Dirección": self.new_member_address.current.value,
+                "Estado": self.new_member_status.current.value,
             }
 
-            print("Valores de los campos:", required_fields)  # Debug log
+            # Recolectar campos faltantes
+            missing_fields = [field for field, value in required_fields.items() if not value]
 
-            # Validar campos obligatorios
-            for field, value in required_fields.items():
-                if not value:
-                    print(f"Campo requerido faltante: {field}")  # Debug log
-                    self.show_message(f"El campo {field} es requerido", ft.colors.RED)
-                    return
+            # Si hay campos faltantes, mostrar mensaje
+            if missing_fields:
+                error_message = "Por favor complete los siguientes campos obligatorios:\n" + "\n".join(f"• {field}" for field in missing_fields)
+                self.show_message(error_message, ft.colors.RED)
+                self.page.update()
+                return
 
             # Validar formato de email
-            if not "@" in required_fields["email"]:
-                print("Email inválido")  # Debug log
+            if not "@" in required_fields["Email"]:
                 self.show_message("El email no tiene un formato válido", ft.colors.RED)
                 return
 
             # Validar documento (solo números)
-            if not required_fields["documento"].isdigit():
-                print("Documento inválido")  # Debug log
+            if not required_fields["Documento"].isdigit():
                 self.show_message("El documento debe contener solo números", ft.colors.RED)
                 return
 
             # Preparar datos del miembro
             member_data = {
-                "nombre": required_fields["nombre"].strip(),
-                "apellido": required_fields["apellido"].strip(),
-                "documento": required_fields["documento"].strip(),
-                "correo_electronico": required_fields["email"].strip(),
-                "fecha_nacimiento": required_fields["fecha_nacimiento"],
-                "genero": required_fields["genero"],
-                "tipo_membresia": required_fields["tipo_membresia"],
-                "telefono": self.new_member_phone.current.value.strip() if self.new_member_phone.current.value else None,
-                "direccion": self.new_member_address.current.value.strip() if self.new_member_address.current.value else None,
+                "nombre": required_fields["Nombre"].strip(),
+                "apellido": required_fields["Apellido"].strip(),
+                "documento": required_fields["Documento"].strip(),
+                "correo_electronico": required_fields["Email"].strip(),
+                "fecha_nacimiento": required_fields["Fecha de Nacimiento"],
+                "genero": required_fields["Género"],
+                "tipo_membresia": required_fields["Tipo de Membresía"],
+                "telefono": required_fields["Teléfono"].strip() if required_fields["Teléfono"] else None,
+                "direccion": required_fields["Dirección"].strip() if required_fields["Dirección"] else None,
                 "informacion_medica": self.new_member_medical.current.value.strip() if self.new_member_medical.current.value else None,
-                "estado": True  # Por defecto, el miembro se crea activo
+                "estado": required_fields["Estado"] == "Activo"
             }
-
-            print("Datos del miembro a guardar:", member_data)  # Debug log
 
             if self.is_editing:
                 # Actualizar miembro existente
@@ -576,7 +625,6 @@ class MembersView(ModuleView):
                     self.show_message(f"Error al crear el miembro: {message}", ft.colors.RED)
 
         except Exception as e:
-            print(f"Error inesperado al guardar miembro: {str(e)}")  # Debug log
             self.show_message(f"Error inesperado: {str(e)}", ft.colors.RED)
 
     def edit_member(self, member):
@@ -598,6 +646,7 @@ class MembersView(ModuleView):
         self.start_date_picker.value = member.fecha_registro if hasattr(member, 'fecha_registro') else None
         self.new_member_start_date.current.text = self.get_start_date_btn_text()
         self.new_member_medical.current.value = member.informacion_medica or ""
+        self.new_member_status.current.value = "Activo" if member.estado else "Inactivo"
         if self.new_member_modal not in self.page.overlay:
             self.page.overlay.append(self.new_member_modal)
         self.new_member_modal.open = True
@@ -617,18 +666,57 @@ class MembersView(ModuleView):
         self.start_date_picker.value = None
         self.new_member_start_date.current.text = self.get_start_date_btn_text()
         self.new_member_medical.current.value = ""
+        self.new_member_status.current.value = None
         self.page.update()
 
     def delete_member(self, member):
         """
-        Elimina un miembro
+        Elimina un miembro o muestra un mensaje si no se puede eliminar
         """
-        success, message = self.member_controller.delete_member(member.id_miembro)
-        if success:
-            self.show_message(message, ft.colors.GREEN)
-            self.load_data()
-        else:
-            self.show_message(message, ft.colors.RED)
+        # Crear diálogo de confirmación
+        confirm_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Confirmar desactivación"),
+            content=ft.Text(f"¿Está seguro que desea desactivar a {member.nombre} {member.apellido}?"),
+            actions=[
+                ft.TextButton("Cancelar", on_click=lambda e: self._close_dialog(confirm_dialog)),
+                ft.ElevatedButton(
+                    "Desactivar",
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.ORANGE,
+                        color=ft.colors.WHITE,
+                    ),
+                    on_click=lambda e: self._confirm_delete_member(member, confirm_dialog)
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        if confirm_dialog not in self.page.overlay:
+            self.page.overlay.append(confirm_dialog)
+        confirm_dialog.open = True
+        self.page.update()
+
+    def _confirm_delete_member(self, member, dialog):
+        """
+        Confirma la eliminación del miembro
+        """
+        try:
+            success, message = self.member_controller.delete_member(member.id_miembro)
+            if success:
+                self.show_message(message, ft.colors.GREEN)
+                self.load_data()
+            else:
+                # Si el mensaje indica que tiene pagos asociados, mostrar en rojo
+                if "tiene pagos asociados" in message:
+                    self.show_message(message, ft.colors.RED)
+                else:
+                    self.show_message(message, ft.colors.ORANGE)
+        except Exception as e:
+            self.show_message(f"Error al eliminar el miembro: {str(e)}", ft.colors.RED)
+        finally:
+            dialog.open = False
+            self.page.update()
 
     def view_member_routine(self, member):
         """
@@ -788,51 +876,380 @@ class MembersView(ModuleView):
 
     def export_to_excel(self, e):
         """
-        Exporta los datos a Excel
+        Exporta los miembros actuales a un archivo Excel
         """
         try:
-            members = self.member_controller.get_members()
-            file_path = export_members_to_excel(members)
-            self.show_success_dialog(file_path)
-        except Exception as ex:
-            self.show_message(
-                ft.Row([
-                    ft.Icon(ft.icons.ERROR, color=ft.colors.RED),
-                    ft.Text(f"Error al exportar a Excel: {str(ex)}", color=ft.colors.RED)
-                ]),
-                ft.colors.RED_50
-            )
+            self.export_type = "excel"  # Establecer tipo de exportación
+            
+            # Obtener los miembros filtrados actuales
+            filters = {}
+            
+            if self.search_field.value:
+                filters['name'] = self.search_field.value
+            
+            if self.status_filter.value and self.status_filter.value != "Todos":
+                filters['status'] = self.status_filter.value
+
+            members = self.member_controller.get_members(filters)
+            
+            if not members:
+                self.show_message("No hay miembros para exportar", ft.colors.ORANGE)
+                return
+
+            # Actualizar el contenido del diálogo con el número de miembros
+            self.export_dialog.content.value = f"¿Deseas exportar {len(members)} miembros a Excel?\nEl archivo se guardará en tu carpeta de Descargas."
+            
+            # Guardar los miembros en una variable de instancia para usarla en confirm_export
+            self.members_to_export = members
+            
+            # Mostrar el diálogo
+            self.export_dialog.open = True
+            self.page.update()
+
+        except Exception as e:
+            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
 
     def export_to_pdf(self, e):
         """
-        Exporta los datos a PDF
+        Exporta los miembros actuales a un archivo PDF
         """
         try:
-            members = self.member_controller.get_members()
-            file_path = export_members_to_pdf(members)
-            self.show_success_dialog(file_path)
-        except Exception as ex:
-            self.show_message(
-                ft.Row([
-                    ft.Icon(ft.icons.ERROR, color=ft.colors.RED),
-                    ft.Text(f"Error al exportar a PDF: {str(ex)}", color=ft.colors.RED)
-                ]),
-                ft.colors.RED_50
+            self.export_type = "pdf"  # Establecer tipo de exportación
+            
+            # Obtener los miembros filtrados actuales
+            filters = {}
+            
+            if self.search_field.value:
+                filters['name'] = self.search_field.value
+            
+            if self.status_filter.value and self.status_filter.value != "Todos":
+                filters['status'] = self.status_filter.value
+
+            members = self.member_controller.get_members(filters)
+            
+            if not members:
+                self.show_message("No hay miembros para exportar", ft.colors.ORANGE)
+                return
+
+            # Actualizar el contenido del diálogo con el número de miembros
+            self.export_dialog.content.value = f"¿Deseas exportar {len(members)} miembros a PDF?\nEl archivo se guardará en tu carpeta de Descargas."
+            
+            # Guardar los miembros en una variable de instancia para usarla en confirm_export
+            self.members_to_export = members
+            
+            # Mostrar el diálogo
+            self.export_dialog.open = True
+            self.page.update()
+
+        except Exception as e:
+            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
+
+    def confirm_export(self, e):
+        """
+        Confirma la exportación y genera el archivo
+        """
+        try:
+            # Obtener la ruta de la carpeta de descargas
+            downloads_path = str(Path.home() / "Downloads")
+
+            # Usar los miembros guardados en export_to_excel/export_to_pdf
+            members = getattr(self, 'members_to_export', [])
+            if not members:
+                self.show_message("No hay miembros para exportar", ft.colors.ORANGE)
+                return
+
+            # Determinar el tipo de exportación
+            if self.export_type == "excel":
+                self._export_to_excel(members, downloads_path)
+            elif self.export_type == "pdf":
+                self._export_to_pdf(members, downloads_path)
+            else:
+                self.show_message("Error: Tipo de exportación no válido", ft.colors.RED)
+                return
+
+            # Limpiar los miembros guardados
+            self.members_to_export = None
+
+            # Cerrar el diálogo de confirmación
+            self.close_export_dialog(e)
+
+        except Exception as e:
+            self.show_message(f"Error al exportar: {str(e)}", ft.colors.RED)
+
+    def close_export_dialog(self, e):
+        """
+        Cierra el diálogo de exportación
+        """
+        self.export_dialog.open = False
+        self.export_type = None  # Resetear el tipo de exportación
+        self.page.update()
+
+    def _export_to_excel(self, members, downloads_path):
+        """
+        Exporta los miembros a Excel
+        """
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from datetime import datetime
+        
+        # Crear un nuevo libro de Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Miembros"
+
+        # Estilos
+        header_font = Font(bold=True, size=12, color="FFFFFF")
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        date_format = 'dd/mm/yyyy'
+
+        # Configurar ancho de columnas
+        ws.column_dimensions['A'].width = 25  # Nombre
+        ws.column_dimensions['B'].width = 25  # Apellido
+        ws.column_dimensions['C'].width = 20  # Documento
+        ws.column_dimensions['D'].width = 20  # Teléfono
+        ws.column_dimensions['E'].width = 30  # Email
+        ws.column_dimensions['F'].width = 20  # Fecha Registro
+        ws.column_dimensions['G'].width = 20  # Estado
+        ws.column_dimensions['H'].width = 25  # Rutina Asignada
+
+        # Escribir encabezados
+        headers = ["Nombre", "Apellido", "Documento", "Teléfono", "Email", "Fecha Registro", "Estado", "Rutina Asignada"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = border
+
+        # Escribir datos
+        for row, member in enumerate(members, 2):
+            # Nombre
+            cell = ws.cell(row=row, column=1)
+            cell.value = member.nombre
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # Apellido
+            cell = ws.cell(row=row, column=2)
+            cell.value = member.apellido
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # Documento
+            cell = ws.cell(row=row, column=3)
+            cell.value = member.documento
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Teléfono
+            cell = ws.cell(row=row, column=4)
+            cell.value = member.telefono
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Email
+            cell = ws.cell(row=row, column=5)
+            cell.value = member.correo_electronico if member.correo_electronico else ""
+            cell.border = border
+            cell.alignment = Alignment(horizontal='left', vertical='center')
+
+            # Fecha Registro
+            cell = ws.cell(row=row, column=6)
+            if hasattr(member, 'fecha_registro') and member.fecha_registro:
+                cell.value = member.fecha_registro
+                cell.number_format = date_format
+            else:
+                cell.value = ""
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Estado
+            cell = ws.cell(row=row, column=7)
+            cell.value = "Activo" if member.estado else "Inactivo"
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            # Color de fondo según estado
+            if member.estado:
+                cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            else:
+                cell.fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")
+
+            # Rutina Asignada
+            cell = ws.cell(row=row, column=8)
+            if hasattr(member, 'rutina') and member.rutina:
+                cell.value = member.rutina.nombre
+            else:
+                cell.value = "Sin rutina"
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Congelar la primera fila
+        ws.freeze_panes = 'A2'
+
+        # Generar nombre del archivo
+        filename = f"miembros_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filepath = os.path.join(downloads_path, filename)
+
+        # Guardar archivo
+        wb.save(filepath)
+
+        # Mostrar mensaje de éxito
+        self.show_message(f"Archivo Excel guardado en: {filepath}", ft.colors.GREEN)
+
+    def _export_to_pdf(self, members, downloads_path):
+        """
+        Exporta los miembros a PDF
+        """
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from datetime import datetime
+
+            # Generar nombre del archivo
+            filename = f"miembros_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filepath = os.path.join(downloads_path, filename)
+
+            # Crear el documento PDF
+            doc = SimpleDocTemplate(
+                filepath,
+                pagesize=landscape(letter),
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
             )
 
+            # Estilos
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                alignment=1  # Centrado
+            )
+
+            # Contenido del PDF
+            elements = []
+
+            # Título
+            title = Paragraph("Reporte de Miembros", title_style)
+            elements.append(title)
+            elements.append(Spacer(1, 20))
+
+            # Información de filtros aplicados
+            filter_info = []
+            if self.search_field.value:
+                filter_info.append(f"Nombre: {self.search_field.value}")
+            if self.status_filter.value and self.status_filter.value != "Todos":
+                filter_info.append(f"Estado: {self.status_filter.value}")
+
+            if filter_info:
+                filter_text = " | ".join(filter_info)
+                filter_paragraph = Paragraph(f"Filtros aplicados: {filter_text}", styles["Normal"])
+                elements.append(filter_paragraph)
+                elements.append(Spacer(1, 20))
+
+            # Datos de la tabla
+            data = [["Nombre", "Apellido", "Documento", "Teléfono", "Email", "Fecha Registro", "Estado", "Rutina"]]
+            
+            for member in members:
+                data.append([
+                    member.nombre,
+                    member.apellido,
+                    member.documento,
+                    member.telefono,
+                    member.correo_electronico if member.correo_electronico else "",
+                    member.fecha_registro.strftime("%d/%m/%Y") if hasattr(member, 'fecha_registro') and member.fecha_registro else "",
+                    "Activo" if member.estado else "Inactivo",
+                    member.rutina.nombre if hasattr(member, 'rutina') and member.rutina else "Sin rutina"
+                ])
+
+            # Crear la tabla
+            table = Table(data, colWidths=[1.5*inch, 1.5*inch, 1.2*inch, 1.2*inch, 2*inch, 1.2*inch, 1*inch, 1.5*inch])
+            
+            # Estilo de la tabla
+            table_style = TableStyle([
+                # Encabezados
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                
+                # Alineación específica
+                ('ALIGN', (0, 1), (1, -1), 'LEFT'),  # Nombre y Apellido
+                ('ALIGN', (4, 1), (4, -1), 'LEFT'),  # Email
+            ])
+
+            # Agregar colores de fondo según estado
+            for i, member in enumerate(members, 1):
+                if member.estado:
+                    table_style.add('BACKGROUND', (6, i), (6, i), colors.HexColor('#E2EFDA'))
+                else:
+                    table_style.add('BACKGROUND', (6, i), (6, i), colors.HexColor('#FFD9D9'))
+
+            table.setStyle(table_style)
+            elements.append(table)
+
+            # Pie de página con fecha y hora
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(footer)
+
+            # Generar el PDF
+            doc.build(elements)
+
+            # Mostrar mensaje de éxito
+            self.show_message(f"Archivo PDF guardado en: {filepath}", ft.colors.GREEN)
+
+        except Exception as e:
+            self.show_message(f"Error al generar PDF: {str(e)}", ft.colors.RED)
+
     def show_message(self, content, bgcolor: str):
-        """
-        Muestra un mensaje al usuario
-        """
-        self.page.snack_bar = ft.SnackBar(
-            content=content,
-            bgcolor=bgcolor,
-            duration=5000,  # 5 segundos
-            action="Cerrar",
-            action_color=ft.colors.WHITE,
-        )
-        self.page.snack_bar.open = True
-        self.page.update()
+        # Si el modal de miembro está abierto, mostrar el mensaje ahí
+        if self.new_member_modal.open:
+            self.member_modal_error.value = content
+            self.member_modal_error.color = bgcolor
+            self.member_modal_error.visible = True
+            self.page.update()
+        else:
+            # Si no, usar el método original (snackbar, etc.)
+            self.page.snack_bar = ft.SnackBar(ft.Text(content), bgcolor=bgcolor)
+            self.page.snack_bar.open = True
+            self.page.update()
 
     def open_whatsapp(self, member):
         """
@@ -912,10 +1329,10 @@ class MembersView(ModuleView):
             self.show_message("Seleccione una rutina", ft.colors.RED)
             return
         
-        # Actualizar el miembro con la nueva rutina
-        success, message = self.member_controller.update_member(
+        # Usar el método específico para asignar rutina
+        success, message = self.member_controller.assign_routine_to_member(
             self.selected_member.id_miembro,
-            {'id_rutina': int(rutina_id)}
+            int(rutina_id)
         )
         
         if success:
