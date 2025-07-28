@@ -14,6 +14,15 @@ import os
 from pathlib import Path
 from gym_manager.models.monthly_fee import CuotaMensual
 from gym_manager.utils.database import session_scope
+from sqlalchemy.orm import joinedload
+import subprocess
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
@@ -29,12 +38,11 @@ class PaymentsView(ModuleView):
 
     def setup_payment_view(self):
         # Título amigable arriba de los filtros, en negro y bien arriba
-        self.welcome_title = ft.Text(
-            "¡Administra y consulta los pagos de tus miembros!",
-            size=28,
+        self.title = ft.Text(
+            "Gestión de Pagos",
+            size=32,
             weight=ft.FontWeight.BOLD,
             color=ft.colors.BLACK,
-            text_align=ft.TextAlign.LEFT,
         )
 
         # Botón Nuevo Pago
@@ -281,8 +289,17 @@ class PaymentsView(ModuleView):
             height=60,
             hint_text="Agregar observaciones...",
         )
+        # Mensaje de validación para el comprobante
+        self.receipt_validation_text = ft.Text(
+            "",
+            color=ft.colors.GREEN,
+            size=12,
+            visible=False
+        )
+
+        # Modal de nuevo pago
         self.new_payment_modal = ft.AlertDialog(
-            title=ft.Text("Registrar Nuevo Pago", size=26, weight=ft.FontWeight.BOLD),
+            title=ft.Text("Nuevo Pago", size=22, weight=ft.FontWeight.BOLD),
             content=ft.Column(
                 controls=[
                     ft.Text("Miembro", size=16, weight=ft.FontWeight.BOLD),
@@ -297,24 +314,39 @@ class PaymentsView(ModuleView):
                     self.new_payment_method_field,
                     ft.Text("Observaciones", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_observations_field,
-                ],
-                spacing=18,
-                width=540,
-            ),
-            actions=[
-                ft.TextButton("Cancelar", on_click=self.close_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
-                ft.ElevatedButton(
-                    "Guardar",
-                    style=ft.ButtonStyle(
-                        bgcolor=ft.colors.BLUE_900,
-                        color=ft.colors.WHITE,
-                        shape=ft.RoundedRectangleBorder(radius=8),
-                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
-                        text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                    self.receipt_validation_text,  # Agregar el texto de validación
+                    ft.Row(
+                        controls=[
+                            ft.TextButton("Cancelar", on_click=self.close_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
+                            ft.ElevatedButton(
+                                "Comprobante",
+                                icon=ft.icons.RECEIPT,
+                                style=ft.ButtonStyle(
+                                    bgcolor=ft.colors.GREEN_700,
+                                    color=ft.colors.WHITE,
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                    padding=ft.padding.symmetric(horizontal=20, vertical=12),
+                                    text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
+                                ),
+                                on_click=self.generate_receipt_from_form
+                            ),
+                            ft.ElevatedButton(
+                                "Guardar",
+                                style=ft.ButtonStyle(
+                                    bgcolor=ft.colors.BLUE_900,
+                                    color=ft.colors.WHITE,
+                                    shape=ft.RoundedRectangleBorder(radius=8),
+                                    padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                                    text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                                ),
+                                on_click=self.save_payment
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.END,
                     ),
-                    on_click=self.save_payment
-                ),
-            ],
+                ],
+                spacing=20,
+            ),
             actions_alignment=ft.MainAxisAlignment.END,
             modal=True,
         )
@@ -434,43 +466,6 @@ class PaymentsView(ModuleView):
         self.page.overlay.append(self.delete_confirm_modal)
         self.selected_payment_to_delete = None
 
-        # Modal de exportación
-        self.export_dialog = ft.AlertDialog(
-            title=ft.Text("Confirmar Exportación", size=22, weight=ft.FontWeight.BOLD),
-            content=ft.Text(
-                "¿Deseas exportar los pagos?\n"
-                "El archivo se guardará en tu carpeta de Descargas.",
-                size=16
-            ),
-            actions=[
-                ft.TextButton(
-                    "Cancelar",
-                    on_click=self.close_export_dialog,
-                    style=ft.ButtonStyle(
-                        bgcolor=ft.colors.WHITE,
-                        color=ft.colors.BLACK87,
-                        shape=ft.RoundedRectangleBorder(radius=8),
-                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
-                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
-                    )
-                ),
-                ft.ElevatedButton(
-                    "Exportar",
-                    on_click=self.confirm_export,
-                    style=ft.ButtonStyle(
-                        bgcolor=ft.colors.BLUE_900,
-                        color=ft.colors.WHITE,
-                        shape=ft.RoundedRectangleBorder(radius=8),
-                        padding=ft.padding.symmetric(horizontal=28, vertical=12),
-                        text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD)
-                    )
-                ),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-            modal=True,
-        )
-        self.page.overlay.append(self.export_dialog)
-
         # Modal de confirmación de comprobante
         self.receipt_confirm_modal = ft.AlertDialog(
             title=ft.Text("Generar Comprobante", size=22, weight=ft.FontWeight.BOLD),
@@ -566,6 +561,7 @@ class PaymentsView(ModuleView):
             prefix_icon=ft.icons.ATTACH_MONEY,
             border_radius=8,
             width=300,
+            height=200,
             value=str(self.monthly_fee_controller.get_current_fee().monto) if self.monthly_fee_controller.get_current_fee() else "0.00"
         )
 
@@ -664,7 +660,8 @@ class PaymentsView(ModuleView):
                     spread_radius=1,
                     blur_radius=10,
                     color=ft.colors.GREY_300,
-                )
+                ),
+                height=300  # Altura máxima del modal
             ),
             actions=[
                 ft.TextButton(
@@ -695,12 +692,43 @@ class PaymentsView(ModuleView):
         )
         self.page.overlay.append(self.edit_fee_modal)
 
+        # Modal de éxito al guardar pago
+        self.success_modal = ft.AlertDialog(
+            title=ft.Text("¡Éxito!", size=20, weight=ft.FontWeight.BOLD),
+            content=ft.Column(
+                controls=[
+                    ft.Icon(ft.icons.CHECK_CIRCLE, color=ft.colors.GREEN, size=40),
+                    ft.Text("El pago se ha guardado correctamente", size=14),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10,
+                width=300,
+                height=100,
+            ),
+            actions=[
+                ft.ElevatedButton(
+                    "Aceptar",
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.GREEN_700,
+                        color=ft.colors.WHITE,
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.padding.symmetric(horizontal=20, vertical=8),
+                        text_style=ft.TextStyle(size=14, weight=ft.FontWeight.BOLD),
+                    ),
+                    on_click=lambda e: self.close_success_modal(e)
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.CENTER,
+            modal=True,
+        )
+        self.page.overlay.append(self.success_modal)
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
                     ft.Container(
-                        content=self.welcome_title,
+                        content=self.title,
                         padding=ft.padding.only(bottom=30, top=0, left=10, right=10),
                         alignment=ft.alignment.top_left,
                         width=900,
@@ -823,17 +851,21 @@ class PaymentsView(ModuleView):
         self.page.update()
 
     def close_modal(self, e):
+        """
+        Cierra el modal de nuevo pago y limpia los campos
+        """
         self.new_payment_client_field.value = ""
-        self.selected_member_data = None
-        self.member_search_results.visible = False
         self.new_payment_date_value = None
         self.new_payment_date_picker.value = None
         self.new_payment_date_field.content.controls[0].value = "Seleccionar fecha"
         self.new_payment_amount_field.value = "0.00"
-        self.amount_warning_text.visible = False  # Ocultar el mensaje al cerrar
         self.new_payment_method_field.value = None
         self.new_payment_observations_field.value = ""
-        self.new_payment_observations_field.height = 100
+        self.selected_member_data = None
+        self.member_search_results.visible = False
+        self.member_search_results_container.height = 0
+        self.amount_warning_text.visible = False
+        self.receipt_validation_text.visible = False  # Ocultar el mensaje de validación
         self.new_payment_modal.open = False
         self.page.update()
 
@@ -841,9 +873,16 @@ class PaymentsView(ModuleView):
         """
         Carga los datos iniciales de la vista
         """
-        # Cargar pagos
-        payments = [p for p in self.payment_controller.get_payments() if p.estado == 1]
-        self.update_payments_table(payments)
+        # Cargar pagos usando session_scope para evitar problemas de sesión
+        try:
+            with session_scope() as session:
+                # Recrear el controlador con la nueva sesión
+                temp_controller = PaymentController(session)
+                payments = [p for p in temp_controller.get_payments() if p.estado == 1]
+                self.update_payments_table(payments)
+        except Exception as e:
+            print(f"Error al cargar datos: {str(e)}")
+            self.update_payments_table([])
 
         # Cargar la cuota mensual actual
         try:
@@ -854,19 +893,24 @@ class PaymentsView(ModuleView):
             print(f"Error al cargar cuota mensual: {str(e)}")
             self.current_monthly_fee = None
 
-        # Cargar métodos de pago activos
-        active_payment_methods = self.db_session.query(MetodoPago).filter_by(estado=True).all()
-        self.new_payment_method_field.options = [
-            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-        ]
-        self.edit_payment_method_field.options = [
-            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-        ]
-        self.payment_method.options = [
-            ft.dropdown.Option("Todos")
-        ] + [
-            ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-        ]
+        # Cargar métodos de pago activos usando session_scope
+        try:
+            with session_scope() as session:
+                active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
+                self.new_payment_method_field.options = [
+                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                ]
+                self.edit_payment_method_field.options = [
+                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                ]
+                self.payment_method.options = [
+                    ft.dropdown.Option("Todos")
+                ] + [
+                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                ]
+        except Exception as e:
+            print(f"Error al cargar métodos de pago: {str(e)}")
+        
         self.page.update()
 
     def update_payments_table(self, payments):
@@ -917,21 +961,33 @@ class PaymentsView(ModuleView):
             for payment in payments:
                 estado_texto = "Pagado" if payment.estado == 1 else "Cancelado"
                 color_estado = ft.colors.GREEN if payment.estado == 1 else ft.colors.RED
+                
+                # Crear un objeto ligero con solo los datos necesarios para evitar problemas de sesión
+                payment_data = type('PaymentData', (), {
+                    'id_pago': payment.id_pago,
+                    'fecha_pago': payment.fecha_pago,
+                    'monto': payment.monto,
+                    'referencia': payment.referencia,
+                    'estado': payment.estado,
+                    'miembro_nombre': f"{payment.miembro.nombre} {payment.miembro.apellido}",
+                    'metodo_pago_descripcion': payment.metodo_pago.descripcion
+                })
+                
                 self.payments_table.rows.append(
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text(f"{payment.miembro.nombre} {payment.miembro.apellido}")),
-                            ft.DataCell(ft.Text(payment.fecha_pago.strftime("%d/%m/%Y"))),
-                            ft.DataCell(ft.Text(f"${payment.monto}")),
-                            ft.DataCell(ft.Text(payment.metodo_pago.descripcion)),
-                            ft.DataCell(ft.Text(payment.referencia if payment.referencia else "")),
+                            ft.DataCell(ft.Text(payment_data.miembro_nombre)),
+                            ft.DataCell(ft.Text(payment_data.fecha_pago.strftime("%d/%m/%Y"))),
+                            ft.DataCell(ft.Text(f"${payment_data.monto}")),
+                            ft.DataCell(ft.Text(payment_data.metodo_pago_descripcion)),
+                            ft.DataCell(ft.Text(payment_data.referencia if payment_data.referencia else "")),
                             ft.DataCell(
                                 ft.Container(
                                     content=ft.Text(
                                         estado_texto,
                                         color=color_estado
                                     ),
-                                    bgcolor=ft.colors.GREY_100 if payment.estado == 1 else ft.colors.RED_100,
+                                    bgcolor=ft.colors.GREY_100 if payment_data.estado == 1 else ft.colors.RED_100,
                                     border_radius=8,
                                     padding=5,
                                 )
@@ -943,19 +999,13 @@ class PaymentsView(ModuleView):
                                             icon=ft.icons.EDIT,
                                             icon_color=ft.colors.BLUE,
                                             tooltip="Editar",
-                                            on_click=lambda e, p=payment: self.edit_payment(p)
+                                            on_click=lambda e, p=payment_data: self.edit_payment(p)
                                         ),
                                         ft.IconButton(
                                             icon=ft.icons.DELETE,
                                             icon_color=ft.colors.RED,
                                             tooltip="Eliminar",
-                                            on_click=lambda e, p=payment: self.delete_payment(p)
-                                        ),
-                                        ft.IconButton(
-                                            icon=ft.icons.RECEIPT,
-                                            icon_color=ft.colors.GREEN,
-                                            tooltip="Generar Comprobante",
-                                            on_click=lambda e, p=payment: self.generate_receipt(p)
+                                            on_click=lambda e, p=payment_data: self.delete_payment(p)
                                         ),
                                     ],
                                     spacing=0,
@@ -993,11 +1043,18 @@ class PaymentsView(ModuleView):
             filters['estado'] = 0
         # Si es "Todos", no se agrega filtro
         
-        payments = self.payment_controller.get_payments(filters)
-        # Si el filtro es por estado, filtrar aquí también por si acaso
-        if 'estado' in filters:
-            payments = [p for p in payments if p.estado == filters['estado']]
-        self.update_payments_table(payments)
+        try:
+            with session_scope() as session:
+                # Recrear el controlador con la nueva sesión
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments(filters)
+                # Si el filtro es por estado, filtrar aquí también por si acaso
+                if 'estado' in filters:
+                    payments = [p for p in payments if p.estado == filters['estado']]
+                self.update_payments_table(payments)
+        except Exception as e:
+            print(f"Error al aplicar filtros: {str(e)}")
+            self.update_payments_table([])
 
     def clear_filters(self, e):
         """
@@ -1018,16 +1075,35 @@ class PaymentsView(ModuleView):
         """
         Abre el modal para editar un pago, cargando los datos del pago seleccionado
         """
-        self.selected_payment = payment
-        self.edit_payment_client_field.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
-        self.edit_payment_date_value = payment.fecha_pago
-        self.edit_payment_date_picker.value = payment.fecha_pago
-        self.edit_payment_date_field.content.controls[0].value = payment.fecha_pago.strftime("%d/%m/%Y")
-        self.edit_payment_amount_field.value = str(payment.monto)
-        self.edit_payment_method_field.value = payment.metodo_pago.descripcion
-        self.edit_payment_observations_field.value = payment.referencia if payment.referencia else ""
-        self.edit_payment_modal.open = True
-        self.page.update()
+        try:
+            # Recargar el pago desde la base de datos con todas las relaciones
+            with session_scope() as session:
+                payment_fresh = session.query(Pago).options(
+                    joinedload(Pago.miembro),
+                    joinedload(Pago.metodo_pago)
+                ).filter_by(id_pago=payment.id_pago).first()
+                
+                if not payment_fresh:
+                    self.show_message("No se pudo encontrar el pago", ft.colors.RED)
+                    return
+                
+                self.selected_payment = payment_fresh
+                # Almacenar datos importantes para evitar problemas de sesión
+                self.selected_payment_id = payment_fresh.id_pago
+                self.selected_payment_member_id = payment_fresh.miembro.id_miembro
+                
+                self.edit_payment_client_field.value = f"{payment_fresh.miembro.nombre} {payment_fresh.miembro.apellido}"
+                self.edit_payment_date_value = payment_fresh.fecha_pago
+                self.edit_payment_date_picker.value = payment_fresh.fecha_pago
+                self.edit_payment_date_field.content.controls[0].value = payment_fresh.fecha_pago.strftime("%d/%m/%Y")
+                self.edit_payment_amount_field.value = str(payment_fresh.monto)
+                self.edit_payment_method_field.value = payment_fresh.metodo_pago.descripcion
+                self.edit_payment_observations_field.value = payment_fresh.referencia if payment_fresh.referencia else ""
+                self.edit_payment_modal.open = True
+                self.page.update()
+        except Exception as e:
+            print(f"Error al cargar datos del pago: {str(e)}")
+            self.show_message(f"Error al cargar los datos del pago: {str(e)}", ft.colors.RED)
 
     def close_edit_modal(self, e):
         self.edit_payment_client_field.value = ""
@@ -1039,6 +1115,9 @@ class PaymentsView(ModuleView):
         self.edit_payment_observations_field.value = ""
         self.edit_payment_modal.open = False
         self.selected_payment = None
+        # Limpiar también los IDs almacenados
+        self.selected_payment_id = None
+        self.selected_payment_member_id = None
         self.page.update()
 
     def on_edit_payment_date_change(self, e):
@@ -1048,7 +1127,7 @@ class PaymentsView(ModuleView):
         self.page.update()
 
     def update_payment(self, e):
-        if not self.selected_payment:
+        if not hasattr(self, 'selected_payment_id') or not self.selected_payment_id:
             self.show_message("No hay pago seleccionado para editar", ft.colors.RED)
             return
         if not self.edit_payment_date_value:
@@ -1060,14 +1139,16 @@ class PaymentsView(ModuleView):
         if not self.edit_payment_method_field.value:
             self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
             return
+        
         payment_data = {
             'fecha_pago': self.edit_payment_date_value,
             'monto': float(self.edit_payment_amount_field.value),
-            'id_miembro': self.selected_payment.miembro.id_miembro,
+            'id_miembro': self.selected_payment_member_id,  # Usar el ID almacenado
             'id_metodo_pago': self.get_payment_method_id(self.edit_payment_method_field.value),
             'referencia': self.edit_payment_observations_field.value
         }
-        success, message = self.payment_controller.update_payment(self.selected_payment.id_pago, payment_data)
+        
+        success, message = self.payment_controller.update_payment(self.selected_payment_id, payment_data)
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
@@ -1079,6 +1160,7 @@ class PaymentsView(ModuleView):
         """
         Abre el modal de confirmación para eliminar un pago
         """
+        # Solo necesitamos el ID para eliminar, no las relaciones
         self.selected_payment_to_delete = payment
         self.delete_confirm_modal.open = True
         self.page.update()
@@ -1129,28 +1211,22 @@ class PaymentsView(ModuleView):
         Confirma la generación del comprobante
         """
         if not self.selected_payment_for_receipt:
-            self.show_message("No hay pago seleccionado", ft.colors.RED)
+            self.receipt_validation_text.value = "No hay pago seleccionado"
+            self.receipt_validation_text.color = ft.colors.RED
+            self.receipt_validation_text.visible = True
+            self.page.update()
             return
 
         try:
             print("Iniciando generación de comprobante...")  # Debug
-            from reportlab.lib import colors
-            from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.units import inch
-            from reportlab.pdfbase import pdfmetrics
-            from reportlab.pdfbase.ttfonts import TTFont
-
-            # Generar nombre del archivo
-            downloads_path = str(Path.home() / "Downloads")
-            filename = f"comprobante_pago_{self.selected_payment_for_receipt.id_pago}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            filepath = os.path.join(downloads_path, filename)
-            print(f"Ruta del comprobante: {filepath}")  # Debug
-
+            
             # Crear el documento PDF
+            downloads_path = os.path.expanduser("~/Downloads")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pdf_path = os.path.join(downloads_path, f"comprobante_pago_{timestamp}.pdf")
+            
             doc = SimpleDocTemplate(
-                filepath,
+                pdf_path,
                 pagesize=letter,
                 rightMargin=30,
                 leftMargin=30,
@@ -1158,109 +1234,51 @@ class PaymentsView(ModuleView):
                 bottomMargin=30
             )
 
-            # Estilos
+            # Crear los estilos
             styles = getSampleStyleSheet()
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
-                fontSize=28,
+                fontSize=24,
                 spaceAfter=30,
-                alignment=1,  # Centrado
-                textColor=colors.HexColor('#1F4E78')
-            )
-            subtitle_style = ParagraphStyle(
-                'Subtitle',
-                parent=styles['Normal'],
-                fontSize=16,
-                spaceAfter=12,
-                alignment=1,
-                textColor=colors.HexColor('#1F4E78')
-            )
-            normal_style = styles['Normal']
-            bold_style = ParagraphStyle(
-                'Bold',
-                parent=styles['Normal'],
-                fontSize=12,
-                fontName='Helvetica-Bold',
-                textColor=colors.HexColor('#1F4E78')
-            )
-            value_style = ParagraphStyle(
-                'Value',
-                parent=styles['Normal'],
-                fontSize=12,
-                textColor=colors.black
+                textColor=colors.HexColor('#1F4E78'),
+                alignment=1  # Centrado
             )
 
-            # Contenido del PDF
+            # Crear el contenido
             elements = []
 
-            # Título con línea decorativa
-            title = Paragraph("COMPROBANTE DE PAGO", title_style)
-            elements.append(title)
-            elements.append(Spacer(1, 10))
-            
-            # Línea decorativa
-            line = Table([['']], colWidths=[7*inch])
-            line_style = TableStyle([
-                ('LINEBELOW', (0, 0), (0, 0), 2, colors.HexColor('#1F4E78')),
-                ('TOPPADDING', (0, 0), (0, 0), 5),
-                ('BOTTOMPADDING', (0, 0), (0, 0), 5),
-            ])
-            line.setStyle(line_style)
-            elements.append(line)
+            # Título
+            elements.append(Paragraph("Comprobante de Pago", title_style))
             elements.append(Spacer(1, 20))
 
-            # Número de comprobante
-            receipt_number = Paragraph(f"N° {self.selected_payment_for_receipt.id_pago:06d}", subtitle_style)
-            elements.append(receipt_number)
-            elements.append(Spacer(1, 30))
-
-            # Información del pago con diseño mejorado
+            # Información del pago
             payment_info = [
-                ["Fecha:", self.selected_payment_for_receipt.fecha_pago.strftime("%d/%m/%Y")],
                 ["Miembro:", f"{self.selected_payment_for_receipt.miembro.nombre} {self.selected_payment_for_receipt.miembro.apellido}"],
-                ["Documento:", self.selected_payment_for_receipt.miembro.documento],
-                ["Método de Pago:", self.selected_payment_for_receipt.metodo_pago.descripcion],
+                ["Fecha:", self.selected_payment_for_receipt.fecha_pago.strftime("%d/%m/%Y")],
                 ["Monto:", f"${self.selected_payment_for_receipt.monto:,.2f}"],
-                ["Estado:", "PAGADO" if self.selected_payment_for_receipt.estado == 1 else "CANCELADO"]
+                ["Método de Pago:", self.selected_payment_for_receipt.metodo_pago.descripcion],
+                ["Referencia:", self.selected_payment_for_receipt.referencia or "-"]
             ]
 
-            # Crear tabla de información con estilo mejorado
-            table = Table(payment_info, colWidths=[2*inch, 4*inch])
-            table_style = TableStyle([
-                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            # Crear la tabla de información
+            table = Table(payment_info, colWidths=[150, 350])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 0), (-1, -1), 12),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1F4E78')),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('TOPPADDING', (0, 0), (-1, -1), 12),
                 ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
-                ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-            ])
-            table.setStyle(table_style)
+            ]))
+
             elements.append(table)
             elements.append(Spacer(1, 30))
 
-            # Observaciones si existen
-            if self.selected_payment_for_receipt.referencia:
-                elements.append(Paragraph("Observaciones:", bold_style))
-                elements.append(Spacer(1, 5))
-                elements.append(Paragraph(self.selected_payment_for_receipt.referencia, value_style))
-                elements.append(Spacer(1, 30))
-
-            # Línea decorativa
-            line = Table([['']], colWidths=[7*inch])
-            line_style = TableStyle([
-                ('LINEBELOW', (0, 0), (0, 0), 1, colors.HexColor('#E0E0E0')),
-                ('TOPPADDING', (0, 0), (0, 0), 5),
-                ('BOTTOMPADDING', (0, 0), (0, 0), 5),
-            ])
-            line.setStyle(line_style)
-            elements.append(line)
-            elements.append(Spacer(1, 20))
-
-            # Pie de página con fecha y hora
+            # Pie de página
             footer_style = ParagraphStyle(
                 'Footer',
                 parent=styles['Normal'],
@@ -1274,21 +1292,44 @@ class PaymentsView(ModuleView):
             )
             elements.append(footer)
 
-            # Generar el PDF
-            print("Construyendo comprobante...")  # Debug
+            # Construir el PDF
             doc.build(elements)
-            print("Comprobante generado exitosamente")  # Debug
 
-            # Mostrar mensaje de éxito
-            self.show_message(f"Comprobante guardado en: {filepath}", ft.colors.GREEN)
+            # Leer el contenido del PDF generado
+            with open(pdf_path, 'rb') as pdf_file:
+                pdf_content = pdf_file.read()
+
+            # Si es un pago temporal (desde el formulario), no guardamos en la base de datos
+            if hasattr(self.selected_payment_for_receipt, 'id_pago') and self.selected_payment_for_receipt.id_pago > 0:
+                # Guardar el comprobante en la base de datos
+                success, message = self.payment_controller.save_payment_receipt(
+                    self.selected_payment_for_receipt.id_pago,
+                    pdf_content
+                )
+                if not success:
+                    print(f"Error al guardar comprobante: {message}")  # Debug
+                    self.receipt_validation_text.value = f"Error al guardar el comprobante: {message}"
+                    self.receipt_validation_text.color = ft.colors.RED
+                else:
+                    self.receipt_validation_text.value = "Comprobante generado y guardado exitosamente"
+                    self.receipt_validation_text.color = ft.colors.GREEN
+            else:
+                self.receipt_validation_text.value = "Comprobante generado exitosamente, se ha guardado en la carpeta de descargas."
+                self.receipt_validation_text.color = ft.colors.GREEN
+            
+            self.receipt_validation_text.visible = True
             
             # Cerrar el modal
             self.close_receipt_modal(e)
 
         except Exception as e:
             print(f"Error al generar comprobante: {str(e)}")  # Debug
-            self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
-            self.close_receipt_modal(e)
+            
+            # Mostrar mensaje de error
+            self.receipt_validation_text.value = f"Error al generar el comprobante: {str(e)}"
+            self.receipt_validation_text.color = ft.colors.RED
+            self.receipt_validation_text.visible = True
+            self.page.update()
 
     def search_member(self, e):
         """
@@ -1301,24 +1342,40 @@ class PaymentsView(ModuleView):
             self.page.update()
             return
 
-        # Buscar miembros que coincidan con el texto de búsqueda
-        members = self.db_session.query(Miembro).filter(
-            (Miembro.nombre.ilike(f"%{search_text}%")) |
-            (Miembro.apellido.ilike(f"%{search_text}%")) |
-            (Miembro.documento.ilike(f"%{search_text}%"))
-        ).limit(5).all()
+        # Buscar miembros que coincidan con el texto de búsqueda usando session_scope
+        try:
+            with session_scope() as session:
+                members_query = session.query(Miembro).filter(
+                    (Miembro.nombre.ilike(f"%{search_text}%")) |
+                    (Miembro.apellido.ilike(f"%{search_text}%")) |
+                    (Miembro.documento.ilike(f"%{search_text}%"))
+                ).limit(5).all()
+                
+                # Extraer todos los datos inmediatamente mientras la sesión está activa
+                members_data = []
+                for member in members_query:
+                    member_data = type('MemberData', (), {
+                        'id_miembro': member.id_miembro,
+                        'nombre': member.nombre,
+                        'apellido': member.apellido,
+                        'documento': member.documento
+                    })
+                    members_data.append(member_data)
+        except Exception as e:
+            print(f"Error al buscar miembros: {str(e)}")
+            members_data = []
 
         self.member_search_results.controls.clear()
         
-        if members:
-            for member in members:
+        if members_data:
+            for member_data in members_data:
                 self.member_search_results.controls.append(
                     ft.Container(
                         content=ft.ListTile(
                             leading=ft.Icon(ft.icons.PERSON),
-                            title=ft.Text(f"{member.nombre} {member.apellido}"),
-                            subtitle=ft.Text(f"Documento: {member.documento}"),
-                            on_click=lambda e, m=member: self.select_member(m)
+                            title=ft.Text(f"{member_data.nombre} {member_data.apellido}"),
+                            subtitle=ft.Text(f"Documento: {member_data.documento}"),
+                            on_click=lambda e, m=member_data: self.select_member(m)
                         ),
                         border=ft.border.all(1, ft.colors.GREY_300),
                         border_radius=8,
@@ -1348,7 +1405,8 @@ class PaymentsView(ModuleView):
         self.selected_member_data = {
             'id': member.id_miembro,
             'nombre': member.nombre,
-            'apellido': member.apellido
+            'apellido': member.apellido,
+            'documento': member.documento
         }
         self.new_payment_client_field.value = f"{member.nombre} {member.apellido}"
         self.member_search_results.visible = False
@@ -1359,9 +1417,6 @@ class PaymentsView(ModuleView):
         """
         Guarda un nuevo pago
         """
-        print("Iniciando guardado de pago...")  # Debug log
-        
-        # Validaciones iniciales
         if not self.selected_member_data:
             self.show_message("Debe seleccionar un miembro", ft.colors.RED)
             return
@@ -1408,16 +1463,116 @@ class PaymentsView(ModuleView):
             }
             
             print("Llamando al controlador para crear el pago...")  # Debug log
-            success, message = self.payment_controller.create_payment(payment_data)
+            success, response = self.payment_controller.create_payment(payment_data)
             
             if success:
                 print("Pago creado exitosamente")  # Debug log
-                self.show_message(message, ft.colors.GREEN)
+                payment_id = response['id_pago']  # Obtener el ID del pago creado
+                
+                # Generar el comprobante para el pago recién creado
+                try:
+                    # Crear el documento PDF
+                    downloads_path = os.path.expanduser("~/Downloads")
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    pdf_path = os.path.join(downloads_path, f"comprobante_pago_{timestamp}.pdf")
+                    
+                    doc = SimpleDocTemplate(
+                        pdf_path,
+                        pagesize=letter,
+                        rightMargin=30,
+                        leftMargin=30,
+                        topMargin=30,
+                        bottomMargin=30
+                    )
+
+                    # Crear los estilos
+                    styles = getSampleStyleSheet()
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Heading1'],
+                        fontSize=24,
+                        spaceAfter=30,
+                        textColor=colors.HexColor('#1F4E78'),
+                        alignment=1  # Centrado
+                    )
+
+                    # Crear el contenido
+                    elements = []
+
+                    # Título
+                    elements.append(Paragraph("Comprobante de Pago", title_style))
+                    elements.append(Spacer(1, 20))
+
+                    # Información del pago
+                    payment_info = [
+                        ["Miembro:", f"{self.selected_member_data['nombre']} {self.selected_member_data['apellido']}"],
+                        ["Fecha:", self.new_payment_date_value.strftime("%d/%m/%Y")],
+                        ["Monto:", f"${monto:,.2f}"],
+                        ["Método de Pago:", self.new_payment_method_field.value],
+                        ["Referencia:", self.new_payment_observations_field.value or "-"]
+                    ]
+
+                    # Crear la tabla de información
+                    table = Table(payment_info, colWidths=[150, 350])
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#1F4E78')),
+                        ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 12),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                        ('TOPPADDING', (0, 0), (-1, -1), 12),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
+                    ]))
+
+                    elements.append(table)
+                    elements.append(Spacer(1, 30))
+
+                    # Pie de página
+                    footer_style = ParagraphStyle(
+                        'Footer',
+                        parent=styles['Normal'],
+                        fontSize=8,
+                        textColor=colors.gray,
+                        alignment=1
+                    )
+                    footer = Paragraph(
+                        f"Comprobante generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                        footer_style
+                    )
+                    elements.append(footer)
+
+                    # Construir el PDF
+                    doc.build(elements)
+
+                    # Leer el contenido del PDF generado
+                    with open(pdf_path, 'rb') as pdf_file:
+                        pdf_content = pdf_file.read()
+
+                    # Guardar el comprobante en la base de datos
+                    success, message = self.payment_controller.save_payment_receipt(
+                        payment_id,  # Usar el ID del pago recién creado
+                        pdf_content
+                    )
+                    if not success:
+                        print(f"Error al guardar comprobante: {message}")  # Debug
+                        self.show_message(f"Error al guardar el comprobante: {message}", ft.colors.RED)
+                    else:
+                        print("Comprobante guardado exitosamente en la base de datos")  # Debug
+
+                except Exception as ex:
+                    print(f"Error al generar comprobante automático: {str(ex)}")
+                    self.show_message(f"Error al generar el comprobante: {str(ex)}", ft.colors.RED)
+                
                 self.close_modal(e)
                 self.load_data()
+                # Mostrar modal de éxito
+                self.success_modal.open = True
+                self.page.update()
             else:
-                print(f"Error al crear el pago: {message}")  # Debug log
-                self.show_message(message, ft.colors.RED)
+                print(f"Error al crear el pago: {response}")  # Debug log
+                self.show_message(response, ft.colors.RED)
         except Exception as e:
             print(f"Error inesperado al guardar el pago: {str(e)}")  # Debug log
             self.show_message(f"Error al guardar el pago: {str(e)}", ft.colors.RED)
@@ -1468,436 +1623,127 @@ class PaymentsView(ModuleView):
         self.new_payment_date_field.content.controls[0].value = value
         self.page.update()
 
-    def export_to_excel(self, e):
+    def show_success_dialog(self, file_path: str):
         """
-        Exporta los pagos actuales a un archivo Excel
+        Muestra un diálogo de éxito con un botón para abrir la carpeta
         """
-        try:
-            self.export_type = "excel"  # Establecer tipo de exportación
-            
-            # Obtener los pagos filtrados actuales
-            filters = {}
-            
-            if self.search_field.value:
-                filters['member_name'] = self.search_field.value
-            
-            if self.date_from.value:
-                filters['date_from'] = self.date_from.value
-            
-            if self.date_to.value:
-                filters['date_to'] = self.date_to.value
-            
-            if self.payment_method.value and self.payment_method.value != "Todos":
-                filters['payment_method'] = self.payment_method.value
-            
-            # Aplicar filtro de estado
-            if self.status_filter.value == "Pagado":
-                filters['estado'] = 1
-            elif self.status_filter.value == "Cancelado":
-                filters['estado'] = 0
-
-            payments = self.payment_controller.get_payments(filters)
-            # Filtrar por estado aquí también para asegurarnos
-            if 'estado' in filters:
-                payments = [p for p in payments if p.estado == filters['estado']]
-            
-            if not payments:
-                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
-                return
-
-            # Actualizar el contenido del diálogo con el número de pagos
-            self.export_dialog.content.value = f"¿Deseas exportar {len(payments)} pagos a Excel?\nEl archivo se guardará en tu carpeta de Descargas."
-            
-            # Mostrar el diálogo
-            self.export_dialog.open = True
+        def open_folder(e):
+            folder_path = os.path.dirname(file_path)
+            if os.name == 'nt':  # Windows
+                os.startfile(folder_path)
+            elif os.name == 'posix':  # macOS y Linux
+                subprocess.run(['xdg-open', folder_path])
+            success_dialog.open = False
             self.page.update()
 
-        except Exception as e:
-            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
+        success_dialog = ft.AlertDialog(
+            title=ft.Row([
+                ft.Icon(ft.icons.CHECK_CIRCLE, color=ft.colors.GREEN, size=30),
+                ft.Text("¡Descargado con éxito!", size=20, weight=ft.FontWeight.BOLD),
+            ]),
+            content=ft.Column([
+                ft.Text(f"El archivo se ha guardado en:", size=14),
+                ft.Text(file_path, size=14, color=ft.colors.GREY_700),
+                ft.Container(height=20),
+                ft.ElevatedButton(
+                    "Abrir carpeta",
+                    icon=ft.icons.FOLDER_OPEN,
+                    on_click=open_folder,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.colors.BLUE,
+                        color=ft.colors.WHITE,
+                    ),
+                ),
+            ], tight=True, spacing=10),
+            actions=[
+                ft.TextButton("Cerrar", on_click=lambda e: self.close_success_dialog(success_dialog)),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        if success_dialog not in self.page.overlay:
+            self.page.overlay.append(success_dialog)
+        success_dialog.open = True
+        self.page.update()
+
+    def close_success_dialog(self, dialog):
+        """
+        Cierra el diálogo de éxito
+        """
+        dialog.open = False
+        self.page.update()
+
+    def export_to_excel(self, e):
+        """
+        Exporta los datos a Excel
+        """
+        try:
+            with session_scope() as session:
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments()
+                file_path = self._export_to_excel(payments, os.path.expanduser("~/Downloads"))
+                self.show_success_dialog(file_path)
+        except Exception as ex:
+            self.show_message(
+                ft.Row([
+                    ft.Icon(ft.icons.ERROR, color=ft.colors.RED),
+                    ft.Text(f"Error al exportar a Excel: {str(ex)}", color=ft.colors.RED)
+                ]),
+                ft.colors.RED_50
+            )
 
     def export_to_pdf(self, e):
         """
-        Exporta los pagos actuales a un archivo PDF
+        Exporta los datos a PDF
         """
         try:
-            print("Iniciando exportación a PDF...")  # Debug
-            self.export_type = "pdf"  # Establecer tipo de exportación
-            print(f"Tipo de exportación establecido: {self.export_type}")  # Debug
-            
-            # Obtener los pagos filtrados actuales
-            filters = {}
-            
-            if self.search_field.value:
-                filters['member_name'] = self.search_field.value
-            
-            if self.date_from.value:
-                filters['date_from'] = self.date_from.value
-            
-            if self.date_to.value:
-                filters['date_to'] = self.date_to.value
-            
-            if self.payment_method.value and self.payment_method.value != "Todos":
-                filters['payment_method'] = self.payment_method.value
-            
-            # Aplicar filtro de estado
-            if self.status_filter.value == "Pagado":
-                filters['estado'] = 1
-            elif self.status_filter.value == "Cancelado":
-                filters['estado'] = 0
-
-            payments = self.payment_controller.get_payments(filters)
-            # Filtrar por estado aquí también para asegurarnos
-            if 'estado' in filters:
-                payments = [p for p in payments if p.estado == filters['estado']]
-            
-            print(f"Número de pagos a exportar: {len(payments)}")  # Debug
-            
-            if not payments:
-                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
-                return
-
-            # Actualizar el contenido del diálogo con el número de pagos
-            self.export_dialog.content.value = f"¿Deseas exportar {len(payments)} pagos a PDF?\nEl archivo se guardará en tu carpeta de Descargas."
-            
-            # Guardar los pagos en una variable de instancia para usarla en confirm_export
-            self.payments_to_export = payments
-            
-            # Mostrar el diálogo
-            self.export_dialog.open = True
-            self.page.update()
-
-        except Exception as e:
-            print(f"Error en export_to_pdf: {str(e)}")  # Debug
-            self.show_message(f"Error al preparar la exportación: {str(e)}", ft.colors.RED)
-
-    def confirm_export(self, e):
-        """
-        Confirma la exportación y genera el archivo
-        """
-        try:
-            print("Iniciando confirmación de exportación...")  # Debug
-            print(f"Tipo de exportación actual: {self.export_type}")  # Debug
-            
-            # Obtener la ruta de la carpeta de descargas
-            downloads_path = str(Path.home() / "Downloads")
-            print(f"Ruta de descargas: {downloads_path}")  # Debug
-
-            # Usar los pagos guardados en export_to_pdf
-            payments = getattr(self, 'payments_to_export', [])
-            if not payments:
-                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
-                return
-
-            print(f"Número de pagos a exportar: {len(payments)}")  # Debug
-
-            # Determinar el tipo de exportación
-            if self.export_type == "excel":
-                print("Exportando a Excel...")  # Debug
-                self._export_to_excel(payments, downloads_path)
-            elif self.export_type == "pdf":
-                print("Exportando a PDF...")  # Debug
-                self._export_to_pdf(payments, downloads_path)
-            else:
-                print(f"Error: Tipo de exportación no válido: {self.export_type}")  # Debug
-                self.show_message("Error: Tipo de exportación no válido", ft.colors.RED)
-                return
-
-            # Limpiar los pagos guardados
-            self.payments_to_export = None
-
-            # Cerrar el diálogo de confirmación
-            self.close_export_dialog(e)
-
-        except Exception as e:
-            print(f"Error en confirm_export: {str(e)}")  # Debug
-            self.show_message(f"Error al exportar: {str(e)}", ft.colors.RED)
-
-    def close_export_dialog(self, e):
-        """
-        Cierra el diálogo de exportación
-        """
-        self.export_dialog.open = False
-        self.export_type = None  # Resetear el tipo de exportación
-        self.page.update()
-
-    def _export_to_excel(self, payments, downloads_path):
-        """
-        Exporta los pagos a Excel
-        """
-        # Crear un nuevo libro de Excel
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Pagos"
-
-        # Estilos
-        header_font = Font(bold=True, size=12, color="FFFFFF")
-        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-        money_format = '#,##0.00'
-        date_format = 'dd/mm/yyyy'
-
-        # Configurar ancho de columnas
-        ws.column_dimensions['A'].width = 30  # Miembro
-        ws.column_dimensions['B'].width = 15  # Fecha
-        ws.column_dimensions['C'].width = 15  # Monto
-        ws.column_dimensions['D'].width = 20  # Método
-        ws.column_dimensions['E'].width = 30  # Observaciones
-        ws.column_dimensions['F'].width = 15  # Estado
-
-        # Escribir encabezados
-        headers = ["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col)
-            cell.value = header
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_alignment
-            cell.border = border
-
-        # Escribir datos
-        for row, payment in enumerate(payments, 2):
-            # Miembro
-            cell = ws.cell(row=row, column=1)
-            cell.value = f"{payment.miembro.nombre} {payment.miembro.apellido}"
-            cell.border = border
-            cell.alignment = Alignment(horizontal='left', vertical='center')
-
-            # Fecha
-            cell = ws.cell(row=row, column=2)
-            cell.value = payment.fecha_pago
-            cell.number_format = date_format
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-            # Monto
-            cell = ws.cell(row=row, column=3)
-            cell.value = payment.monto
-            cell.number_format = money_format
-            cell.border = border
-            cell.alignment = Alignment(horizontal='right', vertical='center')
-
-            # Método
-            cell = ws.cell(row=row, column=4)
-            cell.value = payment.metodo_pago.descripcion
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-            # Observaciones
-            cell = ws.cell(row=row, column=5)
-            cell.value = payment.referencia if payment.referencia else ""
-            cell.border = border
-            cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
-
-            # Estado
-            cell = ws.cell(row=row, column=6)
-            cell.value = "Pagado" if payment.estado == 1 else "Cancelado"
-            cell.border = border
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            
-            # Color de fondo según estado
-            if payment.estado == 1:
-                cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-            else:
-                cell.fill = PatternFill(start_color="FFD9D9", end_color="FFD9D9", fill_type="solid")
-
-        # Congelar la primera fila
-        ws.freeze_panes = 'A2'
-
-        # Generar nombre del archivo
-        filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        filepath = os.path.join(downloads_path, filename)
-
-        # Guardar archivo
-        wb.save(filepath)
-
-        # Mostrar mensaje de éxito
-        self.show_message(f"Archivo Excel guardado en: {filepath}", ft.colors.GREEN)
-
-    def _export_to_pdf(self, payments, downloads_path):
-        """
-        Exporta los pagos a PDF
-        """
-        try:
-            print("Iniciando generación de PDF...")  # Debug
-            try:
-                from reportlab.lib import colors
-                from reportlab.lib.pagesizes import letter, landscape
-                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                from reportlab.lib.units import inch
-                from reportlab.pdfbase import pdfmetrics
-                from reportlab.pdfbase.ttfonts import TTFont
-            except ImportError as e:
-                print(f"Error al importar reportlab: {str(e)}")  # Debug
-                self.show_message("Error: No se pudo importar la biblioteca reportlab. Por favor, asegúrese de que está instalada correctamente.", ft.colors.RED)
-                return
-
-            # Generar nombre del archivo
-            filename = f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            filepath = os.path.join(downloads_path, filename)
-            print(f"Ruta del archivo PDF: {filepath}")  # Debug
-
-            # Crear el documento PDF
-            doc = SimpleDocTemplate(
-                filepath,
-                pagesize=landscape(letter),
-                rightMargin=30,
-                leftMargin=30,
-                topMargin=30,
-                bottomMargin=30
+            with session_scope() as session:
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments()
+                file_path = self._export_to_pdf(payments, os.path.expanduser("~/Downloads"))
+                self.show_success_dialog(file_path)
+        except Exception as ex:
+            self.show_message(
+                ft.Row([
+                    ft.Icon(ft.icons.ERROR, color=ft.colors.RED),
+                    ft.Text(f"Error al exportar a PDF: {str(ex)}", color=ft.colors.RED)
+                ]),
+                ft.colors.RED_50
             )
-
-            # Estilos
-            styles = getSampleStyleSheet()
-            title_style = ParagraphStyle(
-                'CustomTitle',
-                parent=styles['Heading1'],
-                fontSize=24,
-                spaceAfter=30,
-                alignment=1  # Centrado
-            )
-
-            # Contenido del PDF
-            elements = []
-
-            # Título
-            title = Paragraph("Reporte de Pagos", title_style)
-            elements.append(title)
-            elements.append(Spacer(1, 20))
-
-            # Información de filtros aplicados
-            filter_info = []
-            if self.search_field.value:
-                filter_info.append(f"Miembro: {self.search_field.value}")
-            if self.date_from.value:
-                filter_info.append(f"Desde: {self.date_from.value.strftime('%d/%m/%Y')}")
-            if self.date_to.value:
-                filter_info.append(f"Hasta: {self.date_to.value.strftime('%d/%m/%Y')}")
-            if self.payment_method.value and self.payment_method.value != "Todos":
-                filter_info.append(f"Método: {self.payment_method.value}")
-            if self.status_filter.value != "Todos":
-                filter_info.append(f"Estado: {self.status_filter.value}")
-
-            if filter_info:
-                filter_text = " | ".join(filter_info)
-                filter_paragraph = Paragraph(f"Filtros aplicados: {filter_text}", styles["Normal"])
-                elements.append(filter_paragraph)
-                elements.append(Spacer(1, 20))
-
-            # Datos de la tabla
-            data = [["Miembro", "Fecha", "Monto", "Método", "Observaciones", "Estado"]]
-            
-            for payment in payments:
-                data.append([
-                    f"{payment.miembro.nombre} {payment.miembro.apellido}",
-                    payment.fecha_pago.strftime("%d/%m/%Y"),
-                    f"${payment.monto:,.2f}",
-                    payment.metodo_pago.descripcion,
-                    payment.referencia if payment.referencia else "",
-                    "Pagado" if payment.estado == 1 else "Cancelado"
-                ])
-
-            # Crear la tabla
-            table = Table(data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.5*inch, 2.5*inch, 1.2*inch])
-            
-            # Estilo de la tabla
-            table_style = TableStyle([
-                # Encabezados
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('TOPPADDING', (0, 0), (-1, 0), 12),
-                
-                # Bordes
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 10),
-                ('TOPPADDING', (0, 1), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-                
-                # Alineación específica
-                ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Miembro
-                ('ALIGN', (2, 1), (2, -1), 'RIGHT'),  # Monto
-                ('ALIGN', (4, 1), (4, -1), 'LEFT'),  # Observaciones
-            ])
-
-            # Agregar colores de fondo según estado
-            for i, payment in enumerate(payments, 1):
-                if payment.estado == 1:
-                    table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#E2EFDA'))
-                else:
-                    table_style.add('BACKGROUND', (5, i), (5, i), colors.HexColor('#FFD9D9'))
-
-            table.setStyle(table_style)
-            elements.append(table)
-
-            # Pie de página con fecha y hora
-            footer_style = ParagraphStyle(
-                'Footer',
-                parent=styles['Normal'],
-                fontSize=8,
-                textColor=colors.gray,
-                alignment=1
-            )
-            footer = Paragraph(
-                f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-                footer_style
-            )
-            elements.append(Spacer(1, 20))
-            elements.append(footer)
-
-            # Generar el PDF
-            print("Construyendo PDF...")  # Debug
-            doc.build(elements)
-            print("PDF generado exitosamente")  # Debug
-
-            # Mostrar mensaje de éxito
-            self.show_message(f"Archivo PDF guardado en: {filepath}", ft.colors.GREEN)
-
-        except Exception as e:
-            print(f"Error en _export_to_pdf: {str(e)}")  # Debug
-            self.show_message(f"Error al generar PDF: {str(e)}", ft.colors.RED)
-            raise  # Re-lanzar la excepción para ver el error completo
 
     def check_overdue_payments(self):
         """
         Verifica los pagos vencidos y muestra una alerta
         """
         try:
-            # Obtener todos los miembros
-            members = self.db_session.query(Miembro).all()
-            overdue_members = []
+            # Obtener todos los miembros usando session_scope
+            with session_scope() as session:
+                # Cargar miembros con sus pagos y métodos de pago eagerly
+                members = session.query(Miembro).all()
+                overdue_members = []
 
-            for member in members:
-                # Obtener el último pago del miembro
-                last_payment = self.db_session.query(Pago).filter(
-                    Pago.id_miembro == member.id_miembro,
-                    Pago.estado == 1  # Solo pagos activos
-                ).order_by(Pago.fecha_pago.desc()).first()
+                for member in members:
+                    # Obtener el último pago del miembro con carga eager
+                    last_payment = session.query(Pago).options(
+                        joinedload(Pago.metodo_pago)
+                    ).filter(
+                        Pago.id_miembro == member.id_miembro,
+                        Pago.estado == 1  # Solo pagos activos
+                    ).order_by(Pago.fecha_pago.desc()).first()
 
-                if last_payment:
-                    # Calcular días desde el último pago
-                    days_since_payment = (datetime.now() - last_payment.fecha_pago).days
-                    
-                    # Si han pasado más de 30 días, agregar a la lista de vencidos
-                    if days_since_payment > 30:
-                        overdue_members.append({
-                            'member': member,
-                            'days_overdue': days_since_payment,
-                            'last_payment_date': last_payment.fecha_pago,
-                            'last_payment_amount': last_payment.monto,
-                            'payment_method': last_payment.metodo_pago.descripcion
-                        })
+                    if last_payment:
+                        # Calcular días desde el último pago
+                        days_since_payment = (datetime.now() - last_payment.fecha_pago).days
+                        
+                        # Si han pasado más de 30 días, agregar a la lista de vencidos
+                        if days_since_payment > 30:
+                            overdue_members.append({
+                                'member': member,
+                                'days_overdue': days_since_payment,
+                                'last_payment_date': last_payment.fecha_pago,
+                                'last_payment_amount': last_payment.monto,
+                                'payment_method': last_payment.metodo_pago.descripcion
+                            })
 
             if overdue_members:
                 # Crear el contenido de la alerta
@@ -2185,3 +2031,274 @@ class PaymentsView(ModuleView):
             # Si el valor no es un número válido, ocultamos la advertencia
             self.amount_warning_text.visible = False
             self.page.update()
+
+    def generate_receipt_from_form(self, e):
+        """
+        Genera un comprobante con los datos ingresados en el formulario
+        """
+        if not self.selected_member_data:
+            self.show_message("Debe seleccionar un miembro", ft.colors.RED)
+            return
+
+        if not self.new_payment_date_value:
+            self.show_message("Debe seleccionar una fecha", ft.colors.RED)
+            return
+
+        try:
+            monto = float(self.new_payment_amount_field.value)
+            if monto <= 0:
+                self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+                return
+        except ValueError:
+            self.show_message("El monto ingresado no es válido", ft.colors.RED)
+            return
+
+        if not self.new_payment_method_field.value:
+            self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
+            return
+
+        try:
+            # Crear un objeto temporal con los datos del formulario
+            temp_payment = type('TempPayment', (), {
+                'id_pago': 0,  # ID temporal
+                'fecha_pago': self.new_payment_date_value,
+                'monto': monto,
+                'miembro': type('TempMember', (), {
+                    'nombre': self.selected_member_data['nombre'],
+                    'apellido': self.selected_member_data['apellido'],
+                    'documento': self.selected_member_data.get('documento', '')
+                }),
+                'metodo_pago': type('TempPaymentMethod', (), {
+                    'descripcion': self.new_payment_method_field.value
+                }),
+                'referencia': self.new_payment_observations_field.value,
+                'estado': 1
+            })
+
+            # Guardar el pago temporal para la generación del comprobante
+            self.selected_payment_for_receipt = temp_payment
+            
+            # Generar el comprobante
+            self.confirm_generate_receipt(e)
+
+        except Exception as e:
+            self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
+
+    def close_success_modal(self, e):
+        """
+        Cierra el modal de éxito
+        """
+        self.success_modal.open = False
+        self.page.update()
+
+    def _export_to_excel(self, payments, downloads_path):
+        """
+        Realiza la exportación a Excel
+        """
+        try:
+            # Crear un nuevo libro de Excel
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Pagos"
+
+            # Estilos para los encabezados
+            header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True, size=12)
+            header_alignment = Alignment(horizontal="center", vertical="center")
+            header_border = Border(
+                left=Side(style="thin", color="000000"),
+                right=Side(style="thin", color="000000"),
+                top=Side(style="thin", color="000000"),
+                bottom=Side(style="thin", color="000000")
+            )
+
+            # Estilos para las celdas de datos
+            data_font = Font(size=11)
+            data_alignment = Alignment(horizontal="center", vertical="center")
+            data_border = Border(
+                left=Side(style="thin", color="000000"),
+                right=Side(style="thin", color="000000"),
+                top=Side(style="thin", color="000000"),
+                bottom=Side(style="thin", color="000000")
+            )
+            alternate_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+
+            # Agregar encabezados
+            headers = ["Miembro", "Fecha", "Monto", "Método de Pago", "Estado"]
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = header_alignment
+                cell.border = header_border
+
+            # Agregar datos
+            for row, payment in enumerate(payments, 2):
+                # Aplicar estilo alternado a las filas
+                if row % 2 == 0:
+                    row_fill = alternate_fill
+                else:
+                    row_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+
+                # Miembro
+                cell = ws.cell(row=row, column=1, value=f"{payment.miembro.nombre} {payment.miembro.apellido}")
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = data_border
+                cell.fill = row_fill
+
+                # Fecha
+                cell = ws.cell(row=row, column=2, value=payment.fecha_pago.strftime("%d/%m/%Y"))
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = data_border
+                cell.fill = row_fill
+
+                # Monto
+                cell = ws.cell(row=row, column=3, value=payment.monto)
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = data_border
+                cell.fill = row_fill
+                cell.number_format = '"$"#,##0.00;[Red]-"$"#,##0.00'
+
+                # Método de Pago
+                cell = ws.cell(row=row, column=4, value=payment.metodo_pago.descripcion)
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = data_border
+                cell.fill = row_fill
+
+                # Estado
+                cell = ws.cell(row=row, column=5, value="Activo" if payment.estado == 1 else "Inactivo")
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = data_border
+                cell.fill = row_fill
+
+            # Ajustar el ancho de las columnas
+            for col in ws.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                ws.column_dimensions[column].width = adjusted_width
+
+            # Asegurar que la columna de monto tenga suficiente ancho
+            ws.column_dimensions['C'].width = 15
+
+            # Guardar el archivo
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = os.path.join(downloads_path, f"pagos_{timestamp}.xlsx")
+            wb.save(file_path)
+            return file_path
+        except Exception as ex:
+            raise Exception(f"Error al exportar a Excel: {str(ex)}")
+
+    def _export_to_pdf(self, payments, downloads_path):
+        """
+        Realiza la exportación a PDF
+        """
+        try:
+            # Crear el documento PDF
+            doc = SimpleDocTemplate(
+                os.path.join(downloads_path, f"pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"),
+                pagesize=letter,
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+
+            # Crear los estilos
+            styles = getSampleStyleSheet()
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                textColor=colors.HexColor('#1F4E78'),
+                alignment=1  # Centrado
+            )
+            header_style = ParagraphStyle(
+                'CustomHeader',
+                parent=styles['Normal'],
+                fontSize=12,
+                textColor=colors.HexColor('#1F4E78'),
+                spaceAfter=12
+            )
+
+            # Crear el contenido
+            elements = []
+
+            # Título
+            elements.append(Paragraph("Reporte de Pagos", title_style))
+            elements.append(Spacer(1, 20))
+
+            # Tabla de datos
+            data = [["Miembro", "Fecha", "Monto", "Método de Pago", "Estado"]]
+            for payment in payments:
+                data.append([
+                    f"{payment.miembro.nombre} {payment.miembro.apellido}",
+                    payment.fecha_pago.strftime("%d/%m/%Y"),
+                    f"${payment.monto:,.2f}",
+                    payment.metodo_pago.descripcion,
+                    "Activo" if payment.estado == 1 else "Inactivo"
+                ])
+
+            # Crear la tabla
+            table = Table(data)
+            table.setStyle(TableStyle([
+                # Estilo del encabezado
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 12),
+                
+                # Estilo de las filas de datos
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('TOPPADDING', (0, 1), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+                
+                # Bordes y líneas
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
+                ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#1F4E78')),
+                
+                # Alineación
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+
+            elements.append(table)
+
+            # Pie de página con fecha y hora
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.gray,
+                alignment=1
+            )
+            footer = Paragraph(
+                f"Reporte generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                footer_style
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(footer)
+
+            # Construir el PDF
+            doc.build(elements)
+            return doc.filename
+        except Exception as ex:
+            raise Exception(f"Error al exportar a PDF: {str(ex)}")
