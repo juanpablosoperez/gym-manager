@@ -70,6 +70,10 @@ class MemberController:
         Crea un nuevo miembro
         """
         try:
+            # Validar si el documento ya existe
+            existing = self.db_session.query(Miembro).filter_by(documento=member_data['documento']).first()
+            if existing:
+                return False, "Ya existe un miembro con ese documento. Por favor, ingrese uno diferente."
             new_member = Miembro(
                 nombre=member_data['nombre'],
                 apellido=member_data['apellido'],
@@ -115,6 +119,8 @@ class MemberController:
             member.direccion = member_data.get('direccion')
             member.telefono = member_data.get('telefono')
             member.informacion_medica = member_data.get('informacion_medica')
+            if 'estado' in member_data:
+                member.estado = member_data['estado']
 
             self.db_session.commit()
             return True, "Miembro actualizado exitosamente"
@@ -129,22 +135,21 @@ class MemberController:
 
     def delete_member(self, member_id):
         """
-        Elimina un miembro (cambia su estado a inactivo)
+        Desactiva un miembro (cambia su estado a inactivo) en vez de eliminarlo físicamente.
         """
         try:
             member = self.db_session.query(Miembro).filter_by(id_miembro=member_id).first()
             if not member:
                 return False, "Miembro no encontrado"
-
             member.estado = False
             self.db_session.commit()
-            return True, "Miembro eliminado exitosamente"
+            return True, "Miembro desactivado exitosamente"
         except SQLAlchemyError as e:
-            self.logger.error(f"Error al eliminar miembro: {str(e)}")
+            self.logger.error(f"Error al desactivar miembro: {str(e)}")
             self.db_session.rollback()
-            return False, f"Error al eliminar el miembro: {str(e)}"
+            return False, f"Error al desactivar el miembro: {str(e)}"
         except Exception as e:
-            self.logger.error(f"Error inesperado al eliminar miembro: {str(e)}")
+            self.logger.error(f"Error inesperado al desactivar miembro: {str(e)}")
             self.db_session.rollback()
             return False, f"Error inesperado: {str(e)}"
 
@@ -207,3 +212,24 @@ class MemberController:
         except Exception as e:
             self.logger.error(f"Error al contar membresías vencidas: {str(e)}")
             return 0
+
+    def assign_routine_to_member(self, member_id, routine_id):
+        """
+        Asigna una rutina a un miembro (solo actualiza el campo id_rutina)
+        """
+        try:
+            member = self.db_session.query(Miembro).filter_by(id_miembro=member_id).first()
+            if not member:
+                return False, "Miembro no encontrado"
+
+            member.id_rutina = routine_id
+            self.db_session.commit()
+            return True, "Rutina asignada exitosamente"
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al asignar rutina al miembro: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error al asignar la rutina: {str(e)}"
+        except Exception as e:
+            self.logger.error(f"Error inesperado al asignar rutina: {str(e)}")
+            self.db_session.rollback()
+            return False, f"Error inesperado: {str(e)}"
