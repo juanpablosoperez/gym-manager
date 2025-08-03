@@ -37,6 +37,8 @@ def main(page: ft.Page):
     page.window_resizable = True
     page.window_maximizable = True
     page.window_minimizable = True
+    # La ventana no se maximiza al inicio, solo después del login
+    page.window_maximized = False  # Asegurar que no esté maximizada al inicio
     
     # Configuración de la base de datos
     DATABASE_URL = os.getenv('DATABASE_URL')

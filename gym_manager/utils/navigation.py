@@ -63,13 +63,32 @@ def navigate_to_home(page: ft.Page, user_rol: str, user_name: str):
     page.window_width = 1200
     page.window_height = 800
     page.window_resizable = True
-    page.update()
+    page.window_maximizable = True
+    page.window_minimizable = True
+    
+    # Configurar para maximizar automáticamente
+    page.window_maximized = True
     
     try:
         # Importar aquí para evitar circular import
         from gym_manager.views.home_view import HomeView
         # Crear y mostrar vista de home
         HomeView(page, user_rol, user_name)
+        
+        # Maximizar la ventana después de cargar la vista
+        page.window_maximized = True
+        page.update()
+        
+        # Forzar la maximización en Windows
+        import platform
+        if platform.system() == "Windows":
+            # En Windows, intentar maximizar de manera más agresiva
+            page.window_maximized = True
+            page.update()
+            import time
+            time.sleep(0.2)  # Pequeño retraso para Windows
+            page.window_maximized = True
+            page.update()
     except Exception as e:
         logger.error(f"Error al cargar la vista principal: {str(e)}")
         # Mostrar mensaje de error en la página
