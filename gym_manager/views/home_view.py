@@ -35,9 +35,8 @@ class HomeView:
         self.page.title = "Gym Manager - Home"
         self.page.padding = 0
         self.page.bgcolor = ft.colors.GREY_50
-        self.page.window_width = 1200
-        self.page.window_height = 800
-        self.page.window_resizable = True
+        # No configurar la ventana aquí para evitar sobrescribir la maximización
+        # La configuración de ventana se maneja en navigation.py
 
         # Título de sección por defecto
         self.section_title = "Dashboard"

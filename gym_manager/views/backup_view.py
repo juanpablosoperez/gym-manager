@@ -168,9 +168,8 @@ class BackupView(BaseView):
         self.page.title = "Gestión de Backups"
         self.page.theme_mode = ft.ThemeMode.LIGHT
         self.page.padding = 0
-        self.page.window_resizable = True
-        self.page.window_maximizable = True
-        self.page.window_minimizable = True
+        # No configurar la ventana aquí para evitar sobrescribir la maximización
+        # La configuración de ventana se maneja en navigation.py
 
         # Título principal
         self.welcome_title = ft.Text(

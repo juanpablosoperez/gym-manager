@@ -233,6 +233,13 @@ class RoutinesView(ModuleView):
         # Cargar datos iniciales
         self.load_data()
 
+    def get_content(self):
+        """
+        Retorna el contenido de la vista
+        """
+        self.page.update()
+        return self.content
+
     def setup_confirm_dialog(self):
         self.confirm_dialog = ft.AlertDialog(
             modal=True,
