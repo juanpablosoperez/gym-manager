@@ -881,7 +881,9 @@ class PaymentsView(ModuleView):
                 payments = [p for p in temp_controller.get_payments() if p.estado == 1]
                 self.update_payments_table(payments)
         except Exception as e:
-            print(f"Error al cargar datos: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al cargar datos: {str(e)}")
             self.update_payments_table([])
 
         # Cargar la cuota mensual actual
@@ -890,7 +892,9 @@ class PaymentsView(ModuleView):
                 current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
                 self.current_monthly_fee = current_fee.monto if current_fee else None
         except Exception as e:
-            print(f"Error al cargar cuota mensual: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al cargar cuota mensual: {str(e)}")
             self.current_monthly_fee = None
 
         # Cargar métodos de pago activos usando session_scope
@@ -909,7 +913,9 @@ class PaymentsView(ModuleView):
                     ft.dropdown.Option(method.descripcion) for method in active_payment_methods
                 ]
         except Exception as e:
-            print(f"Error al cargar métodos de pago: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al cargar métodos de pago: {str(e)}")
         
         self.page.update()
 
@@ -1053,7 +1059,9 @@ class PaymentsView(ModuleView):
                     payments = [p for p in payments if p.estado == filters['estado']]
                 self.update_payments_table(payments)
         except Exception as e:
-            print(f"Error al aplicar filtros: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al aplicar filtros: {str(e)}")
             self.update_payments_table([])
 
     def clear_filters(self, e):
@@ -1102,7 +1110,9 @@ class PaymentsView(ModuleView):
                 self.edit_payment_modal.open = True
                 self.page.update()
         except Exception as e:
-            print(f"Error al cargar datos del pago: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al cargar datos del pago: {str(e)}")
             self.show_message(f"Error al cargar los datos del pago: {str(e)}", ft.colors.RED)
 
     def close_edit_modal(self, e):
@@ -1218,7 +1228,9 @@ class PaymentsView(ModuleView):
             return
 
         try:
-            print("Iniciando generación de comprobante...")  # Debug
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("Iniciando generación de comprobante...")
             
             # Crear el documento PDF
             downloads_path = os.path.expanduser("~/Downloads")
@@ -1307,7 +1319,7 @@ class PaymentsView(ModuleView):
                     pdf_content
                 )
                 if not success:
-                    print(f"Error al guardar comprobante: {message}")  # Debug
+                    logger.error(f"Error al guardar comprobante: {message}")
                     self.receipt_validation_text.value = f"Error al guardar el comprobante: {message}"
                     self.receipt_validation_text.color = ft.colors.RED
                 else:
@@ -1323,7 +1335,7 @@ class PaymentsView(ModuleView):
             self.close_receipt_modal(e)
 
         except Exception as e:
-            print(f"Error al generar comprobante: {str(e)}")  # Debug
+            logger.error(f"Error al generar comprobante: {str(e)}")
             
             # Mostrar mensaje de error
             self.receipt_validation_text.value = f"Error al generar el comprobante: {str(e)}"
@@ -1362,7 +1374,9 @@ class PaymentsView(ModuleView):
                     })
                     members_data.append(member_data)
         except Exception as e:
-            print(f"Error al buscar miembros: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al buscar miembros: {str(e)}")
             members_data = []
 
         self.member_search_results.controls.clear()
@@ -1447,13 +1461,13 @@ class PaymentsView(ModuleView):
                     pass
                 self.db_session.close()
             
-            print("Obteniendo ID del método de pago...")  # Debug log
+            logger.info("Obteniendo ID del método de pago...")
             metodo_pago_id = self.get_payment_method_id(self.new_payment_method_field.value)
             if not metodo_pago_id:
                 self.show_message("Error al obtener el método de pago", ft.colors.RED)
                 return
 
-            print("Preparando datos del pago...")  # Debug log
+            logger.info("Preparando datos del pago...")
             payment_data = {
                 'fecha_pago': self.new_payment_date_value,
                 'monto': monto,
@@ -1462,11 +1476,11 @@ class PaymentsView(ModuleView):
                 'referencia': self.new_payment_observations_field.value
             }
             
-            print("Llamando al controlador para crear el pago...")  # Debug log
+            logger.info("Llamando al controlador para crear el pago...")
             success, response = self.payment_controller.create_payment(payment_data)
             
             if success:
-                print("Pago creado exitosamente")  # Debug log
+                logger.info("Pago creado exitosamente")
                 payment_id = response['id_pago']  # Obtener el ID del pago creado
                 
                 # Generar el comprobante para el pago recién creado
@@ -1556,13 +1570,13 @@ class PaymentsView(ModuleView):
                         pdf_content
                     )
                     if not success:
-                        print(f"Error al guardar comprobante: {message}")  # Debug
+                        logger.error(f"Error al guardar comprobante: {message}")
                         self.show_message(f"Error al guardar el comprobante: {message}", ft.colors.RED)
                     else:
-                        print("Comprobante guardado exitosamente en la base de datos")  # Debug
+                        logger.info("Comprobante guardado exitosamente en la base de datos")
 
                 except Exception as ex:
-                    print(f"Error al generar comprobante automático: {str(ex)}")
+                    logger.error(f"Error al generar comprobante automático: {str(ex)}")
                     self.show_message(f"Error al generar el comprobante: {str(ex)}", ft.colors.RED)
                 
                 self.close_modal(e)
@@ -1571,10 +1585,10 @@ class PaymentsView(ModuleView):
                 self.success_modal.open = True
                 self.page.update()
             else:
-                print(f"Error al crear el pago: {response}")  # Debug log
+                logger.error(f"Error al crear el pago: {response}")
                 self.show_message(response, ft.colors.RED)
         except Exception as e:
-            print(f"Error inesperado al guardar el pago: {str(e)}")  # Debug log
+            logger.error(f"Error inesperado al guardar el pago: {str(e)}")
             self.show_message(f"Error al guardar el pago: {str(e)}", ft.colors.RED)
 
     def get_payment_method_id(self, method_name):
@@ -1586,7 +1600,7 @@ class PaymentsView(ModuleView):
                 method = session.query(MetodoPago).filter_by(descripcion=method_name).first()
                 return method.id_metodo_pago if method else None
         except Exception as e:
-            print(f"Error al obtener método de pago: {str(e)}")
+            logger.error(f"Error al obtener método de pago: {str(e)}")
             return None
 
     def show_message(self, message: str, color: str):
@@ -1738,7 +1752,7 @@ class PaymentsView(ModuleView):
                         # Si han pasado más de 30 días, agregar a la lista de vencidos
                         if days_since_payment > 30:
                             overdue_members.append({
-                                'member': member,
+                                'member_name': f"{member.nombre} {member.apellido}",
                                 'days_overdue': days_since_payment,
                                 'last_payment_date': last_payment.fecha_pago,
                                 'last_payment_amount': last_payment.monto,
@@ -1797,7 +1811,7 @@ class PaymentsView(ModuleView):
                                                             size=24
                                                         ),
                                                         ft.Text(
-                                                            f"{m['member'].nombre} {m['member'].apellido}",
+                                                            m['member_name'],
                                                             size=16,
                                                             weight=ft.FontWeight.BOLD,
                                                             color=ft.colors.BLUE_900
@@ -1951,7 +1965,10 @@ class PaymentsView(ModuleView):
                 self.page.update()
 
         except Exception as e:
-            print(f"Error al verificar pagos vencidos: {str(e)}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al verificar pagos vencidos: {str(e)}")
+            # No mostrar el error al usuario para no interrumpir la experiencia
 
     def close_overdue_alert(self, e):
         """
