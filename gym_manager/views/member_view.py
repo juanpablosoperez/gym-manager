@@ -39,7 +39,7 @@ class MembersView(ModuleView):
             on_change=self.on_birth_date_change
         )
         self.start_date_picker = ft.DatePicker(
-            first_date=datetime.now(),
+            first_date=datetime(2020, 1, 1),
             last_date=datetime(2100, 12, 31),
             on_change=self.on_start_date_change
         )
@@ -214,7 +214,7 @@ class MembersView(ModuleView):
                                             ref=self.new_member_membership,
                                             border_radius=10,
                                             text_size=16,
-                                            expand=True
+                                            width=200
                                         ),
                                     ],
                                     expand=True,
