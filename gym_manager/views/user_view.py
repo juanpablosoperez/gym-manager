@@ -3,6 +3,7 @@ from gym_manager.views.module_views import ModuleView
 from gym_manager.utils.database import get_db_session
 from gym_manager.models.user import Usuario
 from gym_manager.controllers.user_controller import UserController
+from gym_manager.utils.pagination import PaginationController, PaginationWidget
 
 
 class UsersView(ModuleView):
@@ -10,10 +11,24 @@ class UsersView(ModuleView):
         # Inicializar las banderas antes de llamar a setup_view
         self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
         self.intento_guardar = False
-        super().__init__(page, "Gestión de Usuarios")
+        self.page = page
+        self.title = "Gestión de Usuarios"
+        self.content = None
+        
+        # Inicializar controlador
         self.user_controller = UserController()
+        
+        # Inicializar paginación ANTES de setup_view
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
+        # Ahora llamar setup_view después de inicializar todo
+        self.setup_view()
         self.setup_confirm_dialog()
-        self.load_data()
+        # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_view(self):
         # Título principal
@@ -368,6 +383,8 @@ class UsersView(ModuleView):
                         margin=ft.margin.only(top=20),
                         alignment=ft.alignment.center,
                     ),
+                    # Widget de paginación
+                    self.pagination_widget.get_widget(),
                 ],
                 spacing=0,
                 scroll=ft.ScrollMode.ALWAYS,
@@ -383,23 +400,67 @@ class UsersView(ModuleView):
         )
 
     def get_content(self):
+        # Llamar load_data después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_data_async())
         return self.content
+    
+    async def _load_data_async(self):
+        """Carga los datos de forma asíncrona después de que la vista esté lista"""
+        try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Usuarios] Iniciando load_data asíncrono")
+            usuarios = self.user_controller.get_users()
+            print(f"[DEBUG - Usuarios] Obtenidos {len(usuarios)} usuarios")
+            
+            self.pagination_controller.set_items(usuarios)
+            self.pagination_widget.update_items(usuarios)
+            print("[DEBUG - Usuarios] Paginación actualizada")
+            
+            self.update_users_table()
+            print("[DEBUG - Usuarios] Tabla actualizada")
+            
+        except Exception as ex:
+            print(f"[DEBUG - Usuarios] Error en load_data asíncrono: {str(ex)}")
+            self.show_message(f"Error al cargar los usuarios: {str(ex)}", ft.colors.RED)
 
     def load_data(self):
         """
         Carga los datos iniciales de la vista
         """
         try:
+            print("[DEBUG - Usuarios] Iniciando load_data")
             usuarios = self.user_controller.get_users()
-            self.update_users_table(usuarios)
+            print(f"[DEBUG - Usuarios] Obtenidos {len(usuarios)} usuarios")
+            
+            self.pagination_controller.set_items(usuarios)
+            self.pagination_widget.update_items(usuarios)
+            print("[DEBUG - Usuarios] Paginación actualizada")
+            
+            self.update_users_table()
+            print("[DEBUG - Usuarios] Tabla actualizada")
+            
         except Exception as ex:
+            print(f"[DEBUG - Usuarios] Error en load_data: {str(ex)}")
             self.show_message(f"Error al cargar los usuarios: {str(ex)}", ft.colors.RED)
 
-    def update_users_table(self, usuarios):
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_users_table()
+
+    def update_users_table(self, usuarios=None):
         """
         Actualiza la tabla de usuarios con datos reales
         """
+        print(f"[DEBUG - Usuarios] Actualizando tabla con {len(usuarios) if usuarios else 'None'} usuarios")
         self.users_table.rows.clear()
+        
+        # Obtener usuarios de la página actual
+        if usuarios is None:
+            usuarios = self.pagination_controller.get_current_page_items()
+            print(f"[DEBUG - Usuarios] Usuarios de página actual: {len(usuarios)}")
         
         if not usuarios:
             self.users_table.rows.append(
@@ -820,7 +881,10 @@ class UsersView(ModuleView):
             elif self.filtro_estado.value == "Inactivos":
                 usuarios_filtrados = [u for u in usuarios_filtrados if not u.estado]
 
-            self.update_users_table(usuarios_filtrados)
+            # Actualizar paginación con los datos filtrados
+            self.pagination_controller.set_items(usuarios_filtrados)
+            self.pagination_widget.update_items(usuarios_filtrados)
+            self.update_users_table()
         except Exception as ex:
             self.show_message(f"Error al aplicar filtros: {str(ex)}", ft.colors.RED)
 

@@ -8,10 +8,25 @@ import tempfile
 
 class PaymentReceiptView(ModuleView):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Comprobantes de Pago")
+        # Inicializar variables básicas
+        self.page = page
+        self.title = "Comprobantes de Pago"
+        self.content = None
+        
+        # Inicializar controlador
         self.payment_receipt_controller = PaymentReceiptController(get_db_session())
+        
+        # Inicializar paginación ANTES de setup_view
+        from gym_manager.utils.pagination import PaginationController, PaginationWidget
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
+        # Ahora llamar setup_view después de inicializar todo
         self.setup_view()
-        self.load_data()
+        # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_view(self):
         # Título principal
@@ -197,6 +212,12 @@ class PaymentReceiptView(ModuleView):
                         width=1200,
                         padding=ft.padding.only(top=20),
                     ),
+                    # Widget de paginación
+                    ft.Container(
+                        content=self.pagination_widget.get_widget(),
+                        padding=ft.padding.only(top=20, bottom=20),
+                        alignment=ft.alignment.center,
+                    ),
                 ],
                 spacing=0,
                 scroll=ft.ScrollMode.ALWAYS,
@@ -209,6 +230,46 @@ class PaymentReceiptView(ModuleView):
             margin=ft.margin.symmetric(horizontal=0, vertical=0),
             alignment=ft.alignment.top_left,
         )
+
+    def get_content(self):
+        # Llamar load_data después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_data_async())
+        return self.content
+    
+    async def _load_data_async(self):
+        """Carga los datos de forma asíncrona después de que la vista esté lista"""
+        try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Comprobantes] Iniciando load_data asíncrono")
+            
+            filters = {}
+            if self.date_from_value:
+                filters['fecha_desde'] = self.date_from_value
+            if self.date_to_value:
+                filters['fecha_hasta'] = self.date_to_value
+
+            receipts = self.payment_receipt_controller.get_receipts(filters)
+            print(f"[DEBUG - Comprobantes] Obtenidos {len(receipts)} comprobantes")
+            
+            # Actualizar paginación
+            self.pagination_controller.set_items(receipts)
+            self.pagination_widget.update_items(receipts)
+            print("[DEBUG - Comprobantes] Paginación actualizada")
+            
+            # Actualizar tabla
+            self.update_receipts_table(receipts)
+            print("[DEBUG - Comprobantes] Tabla actualizada")
+            
+        except Exception as e:
+            print(f"[DEBUG - Comprobantes] Error en load_data asíncrono: {str(e)}")
+            self.show_message(f"Error al cargar los comprobantes: {str(e)}", ft.colors.RED)
+    
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_receipts_table()
 
     def open_date_picker(self, picker):
         picker.open = True
@@ -243,11 +304,18 @@ class PaymentReceiptView(ModuleView):
         except Exception as e:
             self.show_message(f"Error al cargar los comprobantes: {str(e)}", ft.colors.RED)
 
-    def update_receipts_table(self, receipts):
+    def update_receipts_table(self, receipts=None):
         """
         Actualiza la tabla de comprobantes
         """
+        print(f"[DEBUG - Comprobantes] Actualizando tabla con {len(receipts) if receipts else 'None'} comprobantes")
         self.receipts_table.rows.clear()
+        
+        # Obtener comprobantes de la página actual
+        if receipts is None:
+            receipts = self.pagination_controller.get_current_page_items()
+            print(f"[DEBUG - Comprobantes] Comprobantes de página actual: {len(receipts)}")
+        
         for receipt in receipts:
             self.receipts_table.rows.append(
                 ft.DataRow(
@@ -304,7 +372,8 @@ class PaymentReceiptView(ModuleView):
         """
         Aplica los filtros seleccionados
         """
-        self.load_data()
+        # Recargar datos con filtros usando el método asíncrono
+        self.page.loop.create_task(self._load_data_async())
 
     def clear_filters(self, e):
         """
@@ -317,7 +386,8 @@ class PaymentReceiptView(ModuleView):
         self.date_from_field.content.controls[0].value = ""
         self.date_to_field.content.controls[0].value = ""
         self.page.update()
-        self.load_data()
+        # Recargar datos sin filtros usando el método asíncrono
+        self.page.loop.create_task(self._load_data_async())
 
     def show_message(self, message: str, color: str):
         """

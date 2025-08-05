@@ -30,15 +30,30 @@ logger = logging.getLogger(__name__)
 
 class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Gestión de Pagos")
+        # Inicializar variables básicas
+        self.page = page
+        self.title = "Gestión de Pagos"
+        self.content = None
+        
+        # Inicializar controladores
         self.payment_controller = PaymentController(get_db_session())
         self.monthly_fee_controller = MonthlyFeeController(get_db_session())
         self.db_session = get_db_session()
         self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
+        
+        # Inicializar paginación ANTES de setup_payment_view
+        from gym_manager.utils.pagination import PaginationController, PaginationWidget
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
+        # Ahora llamar setup_payment_view después de inicializar todo
         self.setup_payment_view()
-        self.load_data()
         self.export_type = None  # Agregar variable para el tipo de exportación
         self.check_overdue_payments()  # Verificar pagos vencidos al iniciar
+        # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_payment_view(self):
         # Título amigable arriba de los filtros, en negro y bien arriba
@@ -809,6 +824,12 @@ class PaymentsView(ModuleView):
                         width=1300,
                         padding=ft.padding.only(top=30),
                     ),
+                    # Widget de paginación
+                    ft.Container(
+                        content=self.pagination_widget.get_widget(),
+                        padding=ft.padding.only(top=20, bottom=20),
+                        alignment=ft.alignment.center,
+                    ),
                 ],
                 spacing=0,
                 scroll=ft.ScrollMode.ALWAYS,
@@ -823,7 +844,61 @@ class PaymentsView(ModuleView):
         )
 
     def get_content(self):
+        # Llamar load_data después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_data_async())
         return self.content
+    
+    async def _load_data_async(self):
+        """Carga los datos de forma asíncrona después de que la vista esté lista"""
+        try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Pagos] Iniciando load_data asíncrono")
+            
+            # Cargar pagos usando session_scope para evitar problemas de sesión
+            with session_scope() as session:
+                # Recrear el controlador con la nueva sesión
+                temp_controller = PaymentController(session)
+                payments = [p for p in temp_controller.get_payments() if p.estado == 1]
+                print(f"[DEBUG - Pagos] Obtenidos {len(payments)} pagos")
+                
+                # Actualizar paginación
+                self.pagination_controller.set_items(payments)
+                self.pagination_widget.update_items(payments)
+                print("[DEBUG - Pagos] Paginación actualizada")
+                
+                # Actualizar tabla
+                self.update_payments_table(payments)
+                print("[DEBUG - Pagos] Tabla actualizada")
+            
+            # Cargar la cuota mensual actual
+            try:
+                with session_scope() as session:
+                    current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
+                    self.current_monthly_fee = current_fee.monto if current_fee else None
+            except Exception as e:
+                print(f"[DEBUG - Pagos] Error al cargar cuota mensual: {str(e)}")
+                self.current_monthly_fee = None
+
+            # Cargar métodos de pago activos usando session_scope
+            try:
+                with session_scope() as session:
+                    active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
+                    self.new_payment_method_field.options = [
+                        ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                    ]
+            except Exception as e:
+                print(f"[DEBUG - Pagos] Error al cargar métodos de pago: {str(e)}")
+                
+        except Exception as e:
+            print(f"[DEBUG - Pagos] Error en load_data asíncrono: {str(e)}")
+            self.update_payments_table([])
+    
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_payments_table()
 
     def create_summary_card(self, title: str, value: str, icon: str, color: str):
         return ft.Container(
@@ -923,11 +998,17 @@ class PaymentsView(ModuleView):
         
         self.page.update()
 
-    def update_payments_table(self, payments):
+    def update_payments_table(self, payments=None):
         """
         Actualiza la tabla de pagos con datos reales
         """
+        print(f"[DEBUG - Pagos] Actualizando tabla con {len(payments) if payments else 'None'} pagos")
         self.payments_table.rows.clear()
+        
+        # Obtener pagos de la página actual
+        if payments is None:
+            payments = self.pagination_controller.get_current_page_items()
+            print(f"[DEBUG - Pagos] Pagos de página actual: {len(payments)}")
         
         if not payments:
             # Mostrar mensaje cuando no hay pagos
@@ -1061,7 +1142,11 @@ class PaymentsView(ModuleView):
                 # Si el filtro es por estado, filtrar aquí también por si acaso
                 if 'estado' in filters:
                     payments = [p for p in payments if p.estado == filters['estado']]
-                self.update_payments_table(payments)
+                
+                # Actualizar paginación con los datos filtrados
+                self.pagination_controller.set_items(payments)
+                self.pagination_widget.update_items(payments)
+                self.update_payments_table()
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
@@ -1080,8 +1165,8 @@ class PaymentsView(ModuleView):
         self.payment_method.value = "Todos"
         self.status_filter.value = "Pagado"
         self.page.update()
-        # Recargar datos sin filtros
-        self.load_data()
+        # Recargar datos sin filtros usando el método asíncrono
+        self.page.loop.create_task(self._load_data_async())
 
     def edit_payment(self, payment):
         """

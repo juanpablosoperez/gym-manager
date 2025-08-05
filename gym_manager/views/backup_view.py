@@ -91,6 +91,14 @@ class BackupView(BaseView):
         self.restore_service = RestoreService(db_session, page=page)
         self.current_backup_thread: Optional[threading.Thread] = None
         
+        # Inicializar paginación ANTES de setup_backup_view
+        from gym_manager.utils.pagination import PaginationController, PaginationWidget
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
         # Inicializar modal de progreso
         self.progress_modal = BackupProgressModal(page)
         
@@ -156,7 +164,37 @@ class BackupView(BaseView):
 
     def get_content(self):
         """Implementación del método requerido por BaseView"""
+        # Llamar load_backups después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_backups_async())
         return self.content
+    
+    async def _load_backups_async(self):
+        """Carga los backups de forma asíncrona después de que la vista esté lista"""
+        try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Backups] Iniciando load_backups asíncrono")
+            backups = self.backup_service.get_backups()
+            print(f"[DEBUG - Backups] Obtenidos {len(backups)} backups")
+            
+            # Actualizar paginación
+            self.pagination_controller.set_items(backups)
+            self.pagination_widget.update_items(backups)
+            print("[DEBUG - Backups] Paginación actualizada")
+            
+            # Actualizar tabla
+            self.update_backups_table(backups)
+            print("[DEBUG - Backups] Tabla actualizada")
+            
+        except Exception as e:
+            print(f"[DEBUG - Backups] Error en load_backups asíncrono: {str(e)}")
+            self.show_error_message(f"Error al cargar los backups: {str(e)}")
+    
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_backups_table()
 
     def _close_dialog(self, dialog: ft.AlertDialog):
         """Cierra un diálogo y actualiza la página"""
@@ -240,6 +278,12 @@ class BackupView(BaseView):
                         padding=ft.padding.symmetric(horizontal=20),
                         expand=True,
                     ),
+                    # Widget de paginación
+                    ft.Container(
+                        content=self.pagination_widget.get_widget(),
+                        padding=ft.padding.only(top=20, bottom=20),
+                        alignment=ft.alignment.center,
+                    ),
                 ],
                 spacing=0,
                 expand=True,
@@ -253,6 +297,19 @@ class BackupView(BaseView):
         """Carga la lista de backups"""
         try:
             backups = self.backup_service.get_backups()
+            self.update_backups_table(backups)
+        except Exception as e:
+            self._handle_error("Error cargando backups", e)
+    
+    def update_backups_table(self, backups=None):
+        """Actualiza la tabla de backups con paginación"""
+        print(f"[DEBUG - Backups] Actualizando tabla con {len(backups) if backups else 'None'} backups")
+        try:
+            # Obtener backups de la página actual
+            if backups is None:
+                backups = self.pagination_controller.get_current_page_items()
+                print(f"[DEBUG - Backups] Backups de página actual: {len(backups)}")
+            
             self.backup_table.rows = [
                 ft.DataRow(
                     cells=[
@@ -293,7 +350,8 @@ class BackupView(BaseView):
             logger.info("Tabla de backups actualizada exitosamente")
             
         except Exception as e:
-            self._handle_error("Error cargando backups", e)
+            print(f"[DEBUG - Backups] Error al actualizar tabla: {str(e)}")
+            self._handle_error("Error al actualizar la tabla de backups", e)
 
     def show_restore_dialog(self, backup_id: int):
         """Muestra el diálogo de confirmación para restaurar un backup"""

@@ -6,11 +6,26 @@ from gym_manager.controllers.payment_method_controller import PaymentMethodContr
 
 class PaymentMethodView(ModuleView):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Gestión de Métodos de Pago")
+        # Inicializar variables básicas
+        self.page = page
+        self.title = "Gestión de Métodos de Pago"
+        self.content = None
+        
+        # Inicializar controlador
         self.payment_method_controller = PaymentMethodController(get_db_session())
+        
+        # Inicializar paginación ANTES de setup_payment_method_view
+        from gym_manager.utils.pagination import PaginationController, PaginationWidget
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
+        # Ahora llamar setup_payment_method_view después de inicializar todo
         self.setup_payment_method_view()
         self.setup_history_modal()
-        self.load_data()
+        # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_payment_method_view(self):
         # Título principal
@@ -356,6 +371,12 @@ class PaymentMethodView(ModuleView):
                         width=1200,
                         padding=ft.padding.only(top=20),
                     ),
+                    # Widget de paginación
+                    ft.Container(
+                        content=self.pagination_widget.get_widget(),
+                        padding=ft.padding.only(top=20, bottom=20),
+                        alignment=ft.alignment.center,
+                    ),
                 ],
                 spacing=0,
                 scroll=ft.ScrollMode.ALWAYS,
@@ -408,7 +429,38 @@ class PaymentMethodView(ModuleView):
         self.page.overlay.append(self.history_modal)
 
     def get_content(self):
+        # Llamar load_data después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_data_async())
         return self.content
+    
+    async def _load_data_async(self):
+        """Carga los datos de forma asíncrona después de que la vista esté lista"""
+        try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Métodos de Pago] Iniciando load_data asíncrono")
+            methods = self.payment_method_controller.get_payment_methods()
+            print(f"[DEBUG - Métodos de Pago] Obtenidos {len(methods)} métodos")
+            
+            # Actualizar paginación
+            self.pagination_controller.set_items(methods)
+            self.pagination_widget.update_items(methods)
+            print("[DEBUG - Métodos de Pago] Paginación actualizada")
+            
+            # Actualizar tabla y estadísticas
+            self.update_methods_table(methods)
+            self.update_stats_cards(methods)
+            print("[DEBUG - Métodos de Pago] Tabla y estadísticas actualizadas")
+            
+        except Exception as e:
+            print(f"[DEBUG - Métodos de Pago] Error en load_data asíncrono: {str(e)}")
+            self.update_methods_table([])
+    
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_methods_table()
 
     def load_data(self):
         """
@@ -418,12 +470,18 @@ class PaymentMethodView(ModuleView):
         self.update_methods_table(methods)
         self.update_stats_cards(methods)
 
-    def update_methods_table(self, methods):
+    def update_methods_table(self, methods=None):
         """
         Actualiza la tabla de métodos de pago
         """
+        print(f"[DEBUG - Métodos de Pago] Actualizando tabla con {len(methods) if methods else 'None'} métodos")
         try:
             self.methods_table.rows.clear()
+            
+            # Obtener métodos de la página actual
+            if methods is None:
+                methods = self.pagination_controller.get_current_page_items()
+                print(f"[DEBUG - Métodos de Pago] Métodos de página actual: {len(methods)}")
             
             if not methods:
                 # Mostrar mensaje cuando no hay métodos
@@ -686,7 +744,11 @@ class PaymentMethodView(ModuleView):
                 filters['status'] = self.status_filter.value == "Activo"
             
             methods = self.payment_method_controller.get_payment_methods(filters)
-            self.update_methods_table(methods)
+            
+            # Actualizar paginación con los datos filtrados
+            self.pagination_controller.set_items(methods)
+            self.pagination_widget.update_items(methods)
+            self.update_methods_table()
             self.update_stats_cards(methods)
         except Exception as e:
             self.show_message(f"Error al aplicar filtros: {str(e)}", ft.colors.RED)
@@ -732,7 +794,8 @@ class PaymentMethodView(ModuleView):
         """
         self.search_field.value = ""
         self.status_filter.value = "Activo"
-        self.load_data()
+        # Recargar datos sin filtros usando el método asíncrono
+        self.page.loop.create_task(self._load_data_async())
 
     def show_message(self, message: str, color: str):
         """
