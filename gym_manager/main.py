@@ -1,74 +1,108 @@
+# Standard library imports
+import os
+import sys
+import logging
+import traceback
+
+# Third-party imports
 import flet as ft
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from gym_manager.views.login_view import LoginView
-from gym_manager.controllers.auth_controller import AuthController
-from gym_manager.models import Base
-from gym_manager.utils.navigation import set_db_session
-import os
 from dotenv import load_dotenv
 
-def main():
-    def init(page: ft.Page):
-        # Cargar variables de entorno
-        load_dotenv()
+# Local imports
+from gym_manager.views.login_view import LoginView
+from gym_manager.utils.navigation import init_db, navigate_to_login, set_db_session
+from gym_manager.controllers.auth_controller import AuthController
+from gym_manager.models import Base
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+def main(page: ft.Page):
+    # Cargar variables de entorno
+    load_dotenv('.env.dev')
+    
+    # Configurar la página
+    page.title = "Gym Manager"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.padding = 0
+    page.spacing = 0
+    page.window_width = 1200
+    page.window_height = 800
+    page.window_resizable = True
+    page.window_maximizable = True
+    page.window_minimizable = True
+    # La ventana no se maximiza al inicio, solo después del login
+    page.window_maximized = False  # Asegurar que no esté maximizada al inicio
+    
+    # Configuración de la base de datos
+    DATABASE_URL = os.getenv('DATABASE_URL')
+    if not DATABASE_URL:
+        logger.error("No se encontró la variable de entorno DATABASE_URL")
+        return
+    
+    # Inicializar la base de datos
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=3600
+    )
+    
+    try:
+        # Crear todas las tablas
+        Base.metadata.create_all(engine)
+        logger.info("Tablas creadas exitosamente")
         
-        # Configuración de la base de datos MySQL
-        DB_USER = os.getenv('DB_USER', 'root')
-        DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')  # Asegúrate de que esta es tu contraseña
-        DB_HOST = os.getenv('DB_HOST', 'localhost')
-        DB_PORT = os.getenv('DB_PORT', '3306')
-        DB_NAME = os.getenv('DB_NAME', 'gym_manager')
-        
-        DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-        print(f"Conectando a la base de datos: {DATABASE_URL}")
-        
-        engine = create_engine(
-            DATABASE_URL,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=1800,
-            echo=True  # Esto mostrará todas las consultas SQL
-        )
-        
+        # Probar la conexión
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM usuarios"))
+            count = result.scalar()
+            logger.info(f"Conexión exitosa. Total de usuarios: {count}")
+    except Exception as e:
+        logger.error(f"Error al conectar a la base de datos: {e}")
+        logger.error(traceback.format_exc())
+        return
+    
+    # Crear sesión de base de datos
+    Session = sessionmaker(bind=engine)
+    db_session = Session()
+    
+    # Establecer la sesión de la base de datos
+    set_db_session(db_session)
+    
+    # Función para limpiar recursos de la base de datos
+    def cleanup_db(engine, db_session):
+        logger.info("Iniciando limpieza de recursos de base de datos...")
         try:
-            # Probar la conexión
-            with engine.connect() as conn:
-                result = conn.execute(text("SELECT COUNT(*) FROM usuarios"))
-                count = result.scalar()
-                print(f"Conexión exitosa. Total de usuarios en la base de datos: {count}")
-                
-                # Mostrar un usuario de ejemplo
-                result = conn.execute(text("SELECT * FROM usuarios LIMIT 1"))
-                user = result.fetchone()
-                if user:
-                    # Convertir el resultado a un diccionario usando el método correcto
-                    user_dict = {key: value for key, value in zip(result.keys(), user)}
-                    print(f"Usuario de ejemplo encontrado:")
-                    print(f"  ID: {user_dict.get('id_usuario')}")
-                    print(f"  Nombre: {user_dict.get('nombre')}")
-                    print(f"  Rol: {user_dict.get('rol')}")
-                    print(f"  Estado: {user_dict.get('estado')}")
+            if db_session:
+                db_session.close()
+                logger.info("Sesión de base de datos cerrada")
+            if engine:
+                engine.dispose()
+                logger.info("Pool de conexiones liberado")
+            logger.info("Limpieza de recursos de base de datos completada")
         except Exception as e:
-            print(f"Error al conectar a la base de datos: {e}")
-            import traceback
-            print(traceback.format_exc())
-            return
-        
-        # Crear el controlador de autenticación
-        SessionLocal = sessionmaker(bind=engine)
-        db_session = SessionLocal()
-        
-        # Establecer la sesión de la base de datos
-        set_db_session(db_session)
-
-        # Iniciar la vista de login
-        auth_controller = AuthController(db_session)
-        login_view = LoginView(page, auth_controller)
-
-    ft.app(target=init)
+            logger.error(f"Error durante la limpieza de la base de datos: {e}")
+            logger.error(traceback.format_exc())
+    
+    # Manejar el cierre de la ventana
+    def on_window_close(e):
+        logger.info("Ventana cerrada por el usuario")
+        cleanup_db(engine, db_session)
+        page.window_destroy()
+    
+    page.on_window_close = on_window_close
+    
+    # Inicializar la vista de login
+    auth_controller = AuthController(db_session)
+    LoginView(page, auth_controller)
 
 if __name__ == "__main__":
-    main()
-
+    ft.app(target=main)
