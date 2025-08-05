@@ -1,4 +1,5 @@
 import flet as ft
+import logging
 from gym_manager.views.module_views import ModuleView
 from gym_manager.models.payment import Pago
 from gym_manager.controllers.payment_controller import PaymentController
@@ -23,6 +24,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
