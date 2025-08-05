@@ -214,7 +214,7 @@ class MembersView(ModuleView):
                                             ref=self.new_member_membership,
                                             border_radius=10,
                                             text_size=16,
-                                            expand=True
+                                            width=200
                                         ),
                                     ],
                                     expand=True,
