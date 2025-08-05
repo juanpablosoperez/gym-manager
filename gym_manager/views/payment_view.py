@@ -1728,48 +1728,22 @@ class PaymentsView(ModuleView):
 
     def show_success_dialog(self, file_path: str):
         """
-        Exporta los pagos actuales a un archivo Excel
+        Muestra un diálogo de éxito cuando se exporta un archivo
         """
-        try:
-            self.export_type = "excel"  # Establecer tipo de exportación
+        def open_folder(e):
+            """Abre la carpeta donde se guardó el archivo"""
+            import subprocess
+            import platform
             
-            # Obtener los pagos filtrados actuales
-            filters = {}
+            folder_path = os.path.dirname(file_path)
             
-            if self.search_field.value:
-                filters['member_name'] = self.search_field.value
-            
-            if self.date_from.value:
-                filters['date_from'] = self.date_from.value
-            
-            if self.date_to.value:
-                filters['date_to'] = self.date_to.value
-            
-            if self.payment_method.value and self.payment_method.value != "Todos":
-                filters['payment_method'] = self.payment_method.value
-            
-            # Aplicar filtro de estado
-            if self.status_filter.value == "Pagado":
-                filters['estado'] = 1
-            elif self.status_filter.value == "Cancelado":
-                filters['estado'] = 0
-
-            payments = self.payment_controller.get_payments(filters)
-            # Filtrar por estado aquí también para asegurarnos
-            if 'estado' in filters:
-                payments = [p for p in payments if p.estado == filters['estado']]
-            
-            if not payments:
-                self.show_message("No hay pagos para exportar", ft.colors.ORANGE)
-                return
-
-            # Actualizar el contenido del diálogo con el número de pagos
-            self.export_dialog.content.value = f"¿Deseas exportar {len(payments)} pagos a Excel?\nEl archivo se guardará en tu carpeta de Descargas."
-            
-            # Mostrar el diálogo
-            self.export_dialog.open = True
-            self.page.update()
-
+            if platform.system() == "Windows":
+                subprocess.run(["explorer", folder_path])
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", folder_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", folder_path])
+        
         success_dialog = ft.AlertDialog(
             title=ft.Row([
                 ft.Icon(ft.icons.CHECK_CIRCLE, color=ft.colors.GREEN, size=30),
