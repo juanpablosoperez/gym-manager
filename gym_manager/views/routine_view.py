@@ -3,12 +3,16 @@ from gym_manager.views.module_views import ModuleView
 from gym_manager.utils.database import get_db_session
 from gym_manager.models.routine import Rutina
 from gym_manager.controllers.routine_controller import RoutineController
+from gym_manager.utils.pagination import PaginationController, PaginationWidget
 import os
 from pathlib import Path
 
 class RoutinesView(ModuleView):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Gestión de Rutinas")
+        self.page = page
+        self.title = "Gestión de Rutinas"
+        self.content = None
+        
         # Inicializar referencias
         self.new_routine_name = ft.Ref[ft.TextField]()
         self.new_routine_type = ft.Ref[ft.Dropdown]()
@@ -25,6 +29,14 @@ class RoutinesView(ModuleView):
         )
         self.page.overlay.append(self.routine_file_picker)
         
+        # Inicializar paginación ANTES de setup_view
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
+        # Ahora llamar setup_view después de inicializar todo
         self.setup_confirm_dialog()
         self.setup_view()
 
@@ -184,6 +196,8 @@ class RoutinesView(ModuleView):
                         expand=True,
                         height=600,  # Altura más grande para mejor visualización
                     ),
+                    # Widget de paginación
+                    self.pagination_widget.get_widget(),
                 ],
                 spacing=0,
                 expand=True,
@@ -238,7 +252,33 @@ class RoutinesView(ModuleView):
         Retorna el contenido de la vista
         """
         self.page.update()
+        
+        # Llamar load_data después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_data_async())
+        
         return self.content
+    
+    async def _load_data_async(self):
+        """Carga los datos de forma asíncrona después de que la vista esté lista"""
+        try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Rutinas] Iniciando load_data asíncrono")
+            rutinas = self.routine_controller.get_routines()
+            print(f"[DEBUG - Rutinas] Obtenidas {len(rutinas)} rutinas")
+            
+            self.pagination_controller.set_items(rutinas)
+            self.pagination_widget.update_items(rutinas)
+            print("[DEBUG - Rutinas] Paginación actualizada")
+            
+            self.update_routines_table()
+            print("[DEBUG - Rutinas] Tabla actualizada")
+            
+        except Exception as ex:
+            print(f"[DEBUG - Rutinas] Error en load_data asíncrono: {str(ex)}")
+            self.show_message(f"Error al cargar las rutinas: {str(ex)}", ft.colors.RED)
 
     def setup_confirm_dialog(self):
         self.confirm_dialog = ft.AlertDialog(
@@ -282,8 +322,12 @@ class RoutinesView(ModuleView):
                 print("[DEBUG - Rutinas] No se encontraron rutinas")
                 self.show_message("No hay rutinas registradas", ft.colors.ORANGE)
             
+            # Actualizar paginación
+            self.pagination_controller.set_items(rutinas)
+            self.pagination_widget.update_items(rutinas)
+            
             print("[DEBUG - Rutinas] Llamando a update_routines_table")
-            self.update_routines_table(rutinas)
+            self.update_routines_table()
             print("[DEBUG - Rutinas] Llamando a page.update()")
             self.page.update()
             print("[DEBUG - Rutinas] load_data finalizado")
@@ -292,10 +336,18 @@ class RoutinesView(ModuleView):
             print(f"[DEBUG - Rutinas] Excepción en load_data: {str(ex)}")
             self.show_message(f"Error al cargar las rutinas: {str(ex)}", ft.colors.RED)
 
-    def update_routines_table(self, rutinas):
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_routines_table()
+
+    def update_routines_table(self, rutinas=None):
         """
         Actualiza la tabla con las rutinas
         """
+        # Obtener rutinas de la página actual
+        if rutinas is None:
+            rutinas = self.pagination_controller.get_current_page_items()
+        
         print(f"[DEBUG - Rutinas] Actualizando tabla con {len(rutinas)} rutinas")
         self.routines_table.rows.clear()
         
@@ -724,7 +776,11 @@ class RoutinesView(ModuleView):
             print(f"[DEBUG] Aplicando filtros: {filters}")  # Debug log
             rutinas = self.routine_controller.get_routines(filters)
             print(f"[DEBUG] Rutinas encontradas: {len(rutinas)}")  # Debug log
-            self.update_routines_table(rutinas)
+            
+            # Actualizar paginación con los datos filtrados
+            self.pagination_controller.set_items(rutinas)
+            self.pagination_widget.update_items(rutinas)
+            self.update_routines_table()
         except Exception as ex:
             print(f"[DEBUG] Error al aplicar filtros: {str(ex)}")  # Debug log
             self.show_message(f"Error al aplicar filtros: {str(ex)}", ft.colors.RED)

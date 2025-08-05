@@ -4,6 +4,7 @@ from gym_manager.controllers.member_controller import MemberController
 from gym_manager.controllers.routine_controller import RoutineController
 from gym_manager.utils.database import get_db_session
 from gym_manager.services.excel_utils import export_members_to_excel, export_members_to_pdf
+from gym_manager.utils.pagination import PaginationController, PaginationWidget
 import os
 import subprocess
 import tempfile
@@ -13,7 +14,10 @@ from pathlib import Path
 
 class MembersView(ModuleView):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Gestión de Miembros")
+        self.page = page
+        self.title = "Gestión de Miembros"
+        self.content = None
+        
         self.member_controller = MemberController(get_db_session())
         self.routine_controller = RoutineController()
         self.db_session = get_db_session()
@@ -51,8 +55,16 @@ class MembersView(ModuleView):
         # Variable para mensaje de error en el modal
         self.member_modal_error = ft.Text("", color=ft.colors.RED, size=16, visible=False)
         
+        # Inicializar paginación ANTES de setup_member_view
+        self.pagination_controller = PaginationController(items_per_page=10)
+        self.pagination_widget = PaginationWidget(
+            self.pagination_controller, 
+            on_page_change=self._on_page_change
+        )
+        
+        # Ahora llamar setup_member_view después de inicializar todo
         self.setup_member_view()
-        self.load_data()
+        # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_member_view(self):
         # Título amigable
@@ -378,6 +390,8 @@ class MembersView(ModuleView):
                         expand=True,
                         height=600,  # Altura más grande para mejor visualización
                     ),
+                    # Widget de paginación
+                    self.pagination_widget.get_widget(),
                 ],
                 spacing=0,
                 expand=True,
@@ -387,17 +401,32 @@ class MembersView(ModuleView):
             expand=True,
         )
         self.page.update()
+        
+        # Llamar load_data después de que la vista esté completamente inicializada
+        self.page.loop.create_task(self._load_data_async())
+        
         return content
-
-    def load_data(self):
-        """
-        Carga los datos de miembros
-        """
+    
+    async def _load_data_async(self):
+        """Carga los datos de forma asíncrona después de que la vista esté lista"""
         try:
+            # Pequeño delay para asegurar que la vista esté completamente renderizada
+            import asyncio
+            await asyncio.sleep(0.1)
+            
+            print("[DEBUG - Miembros] Iniciando load_data asíncrono")
             members = self.member_controller.get_members()
-            self.update_members_table(members)
+            print(f"[DEBUG - Miembros] Obtenidos {len(members)} miembros")
+            
+            self.pagination_controller.set_items(members)
+            self.pagination_widget.update_items(members)
+            print("[DEBUG - Miembros] Paginación actualizada")
+            
+            self.update_members_table()
+            print("[DEBUG - Miembros] Tabla actualizada")
+            
         except Exception as e:
-            print(f"Error al cargar datos: {str(e)}")
+            print(f"[DEBUG - Miembros] Error en load_data asíncrono: {str(e)}")
             self.show_message(f"Error al cargar los datos: {str(e)}", ft.colors.RED)
             # Intentar reconectar
             try:
@@ -405,11 +434,46 @@ class MembersView(ModuleView):
             except:
                 pass
 
-    def update_members_table(self, miembros):
+    def load_data(self):
+        """
+        Carga los datos de miembros
+        """
+        try:
+            print("[DEBUG - Miembros] Iniciando load_data")
+            members = self.member_controller.get_members()
+            print(f"[DEBUG - Miembros] Obtenidos {len(members)} miembros")
+            
+            self.pagination_controller.set_items(members)
+            self.pagination_widget.update_items(members)
+            print("[DEBUG - Miembros] Paginación actualizada")
+            
+            self.update_members_table()
+            print("[DEBUG - Miembros] Tabla actualizada")
+            
+        except Exception as e:
+            print(f"[DEBUG - Miembros] Error en load_data: {str(e)}")
+            self.show_message(f"Error al cargar los datos: {str(e)}", ft.colors.RED)
+            # Intentar reconectar
+            try:
+                self.db_session.rollback()
+            except:
+                pass
+
+    def _on_page_change(self):
+        """Callback cuando cambia la página"""
+        self.update_members_table()
+
+    def update_members_table(self, miembros=None):
         """
         Actualiza la tabla con los miembros
         """
+        print(f"[DEBUG - Miembros] Actualizando tabla con {len(miembros) if miembros else 'None'} miembros")
         self.members_table.rows.clear()
+        
+        # Obtener miembros de la página actual
+        if miembros is None:
+            miembros = self.pagination_controller.get_current_page_items()
+            print(f"[DEBUG - Miembros] Miembros de página actual: {len(miembros)}")
         
         # Actualizar contador de registros
         count = len(miembros)
@@ -810,7 +874,10 @@ class MembersView(ModuleView):
             filters['membership_type'] = self.membership_type.value
         
         members = self.member_controller.get_members(filters)
-        self.update_members_table(members)
+        # Actualizar paginación con los datos filtrados
+        self.pagination_controller.set_items(members)
+        self.pagination_widget.update_items(members)
+        self.update_members_table()
 
     def clear_filters(self, e):
         """
