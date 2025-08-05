@@ -369,12 +369,10 @@ class RoutinesView(ModuleView):
                             ft.Container(
                                 content=ft.Text(
                                     str(miembros_asignados),
-                                    color=ft.colors.WHITE
+                                    text_align=ft.TextAlign.CENTER
                                 ),
-                                bgcolor=ft.colors.BLUE if miembros_asignados > 0 else ft.colors.GREY,
-                                border_radius=8,
-                                padding=ft.padding.symmetric(horizontal=12, vertical=6),
                                 alignment=ft.alignment.center,
+                                expand=True
                             )
                         ),
                         ft.DataCell(
