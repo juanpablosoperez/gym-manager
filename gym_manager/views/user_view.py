@@ -153,6 +153,23 @@ class UsersView(ModuleView):
             focused_border_color=ft.colors.BLUE,
             border_color=ft.colors.GREY_400
         )
+        
+        # Campo para confirmar contraseña actual (solo en edición)
+        self.contrasena_actual = ft.TextField(
+            label="Contraseña actual (para confirmar cambios)",
+            prefix_icon=ft.icons.LOCK,
+            password=True,
+            can_reveal_password=True,
+            border_radius=8,
+            width=500,
+            height=40,
+            max_length=50,
+            visible=False,  # Solo visible en modo edición
+            on_change=lambda e: self.validar_campo_con_tocado("contrasena_actual"),
+            on_blur=lambda e: self.marcar_tocado("contrasena_actual"),
+            focused_border_color=ft.colors.BLUE,
+            border_color=ft.colors.GREY_400
+        )
 
         # Modal de nuevo/editar usuario
         self.user_modal = ft.AlertDialog(
@@ -227,6 +244,7 @@ class UsersView(ModuleView):
                                 spacing=8,
                             ),
                             padding=ft.padding.only(bottom=25),  # Espaciado fijo entre campos
+                            key="contrasena_container"
                         ),
                         # Contenedor para mensaje de error general
                         ft.Container(
@@ -502,7 +520,7 @@ class UsersView(ModuleView):
 
     def cancelar_formulario(self, e):
         self.usuario_editando = None
-        self.resetear_campos()
+        self.limpiar_campos_para_cancelar()
         self.limpiar_error_formulario()
         self.user_modal.open = False
         self.page.update()
@@ -512,17 +530,52 @@ class UsersView(ModuleView):
         self.apellido.value = ""
         self.rol.value = None
         self.contrasena.value = ""
-        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
+        self.contrasena_actual.value = ""
+        # Configurar placeholder para nuevo usuario
+        self.contrasena.hint_text = "Ingrese la contraseña"
+        # Mostrar campo de contraseña para nuevos usuarios
+        self.contrasena.visible = True
+        # Ocultar campo de contraseña actual para nuevos usuarios
+        self.contrasena_actual.visible = False
+        # Mostrar contenedor de contraseña para nuevos usuarios
+        self.mostrar_contenedor_contrasena(True)
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False, "contrasena_actual": False}
         self.intento_guardar = False
         
         # Limpiar contenedores de error solo si existen
-        for campo in ['nombre', 'apellido', 'contrasena']:
+        for campo in ['nombre', 'apellido', 'contrasena', 'contrasena_actual']:
+            if hasattr(self, f"error_container_{campo}"):
+                self.actualizar_error_campo(campo, None)
+
+    def limpiar_campos_para_cancelar(self):
+        """Limpia los campos sin cambiar la visibilidad del contenedor de contraseña"""
+        self.nombre.value = ""
+        self.apellido.value = ""
+        self.rol.value = None
+        self.contrasena.value = ""
+        self.contrasena_actual.value = ""
+        # Configurar placeholder para nuevo usuario
+        self.contrasena.hint_text = "Ingrese la contraseña"
+        # Mostrar campo de contraseña para nuevos usuarios
+        self.contrasena.visible = True
+        # Ocultar campo de contraseña actual para nuevos usuarios
+        self.contrasena_actual.visible = False
+        # NO cambiar la visibilidad del contenedor de contraseña aquí
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False, "contrasena_actual": False}
+        self.intento_guardar = False
+        
+        # Limpiar contenedores de error solo si existen
+        for campo in ['nombre', 'apellido', 'contrasena', 'contrasena_actual']:
             if hasattr(self, f"error_container_{campo}"):
                 self.actualizar_error_campo(campo, None)
 
     def guardar_usuario(self, e):
         self.intento_guardar = True
-        self.tocado = {"nombre": True, "apellido": True, "contrasena": True}
+        # Solo validar campos visibles
+        if self.usuario_editando:
+            self.tocado = {"nombre": True, "apellido": True}
+        else:
+            self.tocado = {"nombre": True, "apellido": True, "contrasena": True}
         self.validar_campos()
         # Validar campos obligatorios
         campos_faltantes = []
@@ -532,6 +585,7 @@ class UsersView(ModuleView):
             campos_faltantes.append("Apellido")
         if not self.rol.value:
             campos_faltantes.append("Rol")
+        # Solo validar contraseña para nuevos usuarios
         if not self.usuario_editando and not self.contrasena.value:
             campos_faltantes.append("Contraseña")
 
@@ -548,13 +602,14 @@ class UsersView(ModuleView):
                         self.show_message("No se puede cambiar el rol del último administrador activo", ft.colors.RED)
                         return
 
-                # Actualizar usuario existente
+
+
+                # Actualizar usuario existente (sin cambiar contraseña)
                 success, message = self.user_controller.update_user(
                     self.usuario_editando.id_usuario,
                     nombre=self.nombre.value.strip(),
                     apellido=self.apellido.value.strip(),
-                    rol=self.rol.value,
-                    contraseña=self.contrasena.value if self.contrasena.value else None
+                    rol=self.rol.value
                 )
                 if not success:
                     raise Exception(message)
@@ -589,13 +644,17 @@ class UsersView(ModuleView):
         self.nombre.value = usuario.nombre
         self.apellido.value = usuario.apellido
         self.rol.value = usuario.rol
-        self.contrasena.value = ""
+        # Ocultar campos de contraseña en edición (no se pueden mostrar)
+        self.contrasena.visible = False
+        self.contrasena_actual.visible = False
+        # Ocultar contenedor de contraseña en edición
+        self.mostrar_contenedor_contrasena(False)
         # Resetear las banderas de validación para que no se muestren errores al abrir
-        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False, "contrasena_actual": False}
         self.intento_guardar = False
         
         # Limpiar contenedores de error solo si existen
-        for campo in ['nombre', 'apellido', 'contrasena']:
+        for campo in ['nombre', 'apellido', 'contrasena', 'contrasena_actual']:
             if hasattr(self, f"error_container_{campo}"):
                 self.actualizar_error_campo(campo, None)
 
@@ -700,7 +759,18 @@ class UsersView(ModuleView):
                         error_container.update()
                 except:
                     pass  # Ignorar errores si el contenedor no está en la página
-                break
+
+    def mostrar_contenedor_contrasena(self, visible: bool):
+        """Muestra u oculta el contenedor de contraseña en el modal"""
+        try:
+            # Buscar el contenedor de contraseña en el modal
+            for control in self.user_modal.content.content.controls:
+                if hasattr(control, 'key') and control.key == "contrasena_container":
+                    control.visible = visible
+                    break
+        except Exception as e:
+            # Si hay error, simplemente ignorar
+            pass
 
     def confirm_toggle_estado(self, e):
         """

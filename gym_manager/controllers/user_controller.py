@@ -61,7 +61,9 @@ class UserController:
             for key, value in kwargs.items():
                 if hasattr(user, key):
                     if key == 'contraseña':
-                        user.set_password(value)
+                        # Solo actualizar la contraseña si se proporciona una nueva
+                        if value is not None and value.strip() != "":
+                            user.set_password(value)
                     else:
                         setattr(user, key, value)
             
