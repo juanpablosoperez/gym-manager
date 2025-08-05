@@ -1,16 +1,12 @@
 from logging.config import fileConfig
-import os
-from pathlib import Path
-from dotenv import load_dotenv
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-
-# Cargar variables de entorno del archivo .env.dev
-env_path = Path(__file__).resolve().parent.parent / '.env.dev'
-load_dotenv(env_path)
+from dotenv import load_dotenv
+import os
+import sys
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -23,19 +19,23 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-from gym_manager.models import Base
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from gym_manager.models.base import Base
 target_metadata = Base.metadata
-
-# Obtener la URL de la base de datos del archivo .env.dev
-config.set_main_option('sqlalchemy.url', os.getenv('DATABASE_URL'))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+# Cargar variables de entorno
+load_dotenv('.env.dev')
+
+# Obtener la URL de la base de datos del archivo .env
+database_url = os.getenv('DATABASE_URL')
+
+# Configurar la URL de la base de datos
+config.set_main_option('sqlalchemy.url', database_url)
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -80,6 +80,9 @@ def run_migrations_online() -> None:
         )
 
         with context.begin_transaction():
+            # Marcar la migración inicial como aplicada
+            context.execute("INSERT INTO alembic_version (version_num) VALUES ('119172ac129f') ON DUPLICATE KEY UPDATE version_num = '119172ac129f'")
+            # Ejecutar la nueva migración
             context.run_migrations()
 
 

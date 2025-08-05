@@ -1,12 +1,15 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Determinar entorno
-ENV = os.getenv("ENV", "development")
-env_file = ".env.prod" if ENV == "production" else ".env.dev"
+# Obtener la ruta base del proyecto
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Cargar variables de entorno
-load_dotenv(env_file)
+# Cargar variables de entorno del archivo .env.dev
+env_path = BASE_DIR / '.env.dev'
+load_dotenv(env_path)
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-SECRET_KEY = os.getenv("SECRET_KEY")
+# Configuración de la base de datos
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    raise Exception("No se encontró la variable de entorno DATABASE_URL") 
