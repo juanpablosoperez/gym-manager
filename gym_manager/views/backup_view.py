@@ -234,12 +234,12 @@ class BackupView(BaseView):
         # Crear tabla de backups
         self.backup_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Nombre", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Fecha", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Tamaño", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Estado", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Creado por", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Acciones", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Nombre", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Fecha", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Tamaño", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Estado", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Creado por", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Acciones", size=18, weight=ft.FontWeight.BOLD)),
             ],
             rows=[],
             border=ft.border.all(1, ft.colors.GREY_300),
@@ -276,6 +276,8 @@ class BackupView(BaseView):
                     ft.Container(
                         content=self.backup_table,
                         padding=ft.padding.symmetric(horizontal=20),
+                        height=600,
+                        alignment=ft.alignment.top_left,
                         expand=True,
                     ),
                     # Widget de paginación
