@@ -82,15 +82,15 @@ class UsersView(ModuleView):
             on_change=self.aplicar_filtros
         )
 
-        self.limpiar_filtros_btn = ft.TextButton(
+        self.limpiar_filtros_btn = ft.OutlinedButton(
             text="Limpiar filtros",
             icon=ft.icons.CLEAR,
             on_click=self.limpiar_filtros,
             style=ft.ButtonStyle(
-                color=ft.colors.BLACK87,
+                color=ft.colors.GREY_700,
                 shape=ft.RoundedRectangleBorder(radius=8),
-                padding=ft.padding.symmetric(horizontal=20, vertical=10),
-                text_style=ft.TextStyle(size=14),
+                padding=ft.padding.symmetric(horizontal=18, vertical=12),
+                text_style=ft.TextStyle(size=16),
             ),
         )
 

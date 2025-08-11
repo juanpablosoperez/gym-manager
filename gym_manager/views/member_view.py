@@ -120,13 +120,7 @@ class MembersView(ModuleView):
             on_change=self.apply_filters
         )
 
-        # Contador de registros
-        self.records_counter = ft.Text(
-            "0 miembros",
-            size=14,
-            color=ft.colors.GREY_600,
-            weight=ft.FontWeight.W_500,
-        )
+        # (sin contador de miembros)
 
         self.status_filter = ft.Dropdown(
             label="Estado",
@@ -375,12 +369,12 @@ class MembersView(ModuleView):
                         content=ft.Row(
                             controls=[
                                 self.search_field,
-                                self.records_counter,
                                 self.status_filter,
                                 self.membership_type,
                                 self.clear_btn,
                             ],
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            alignment=ft.MainAxisAlignment.START,
+                            spacing=10,
                         ),
                         padding=ft.padding.only(bottom=20),
                     ),
@@ -475,9 +469,7 @@ class MembersView(ModuleView):
             miembros = self.pagination_controller.get_current_page_items()
             print(f"[DEBUG - Miembros] Miembros de página actual: {len(miembros)}")
         
-        # Actualizar contador de registros
-        count = len(miembros)
-        self.records_counter.value = f"{count} {'miembro' if count == 1 else 'miembros'}"
+        # (contador removido en esta vista)
         
         for member in miembros:
             # Crear la celda de acciones
