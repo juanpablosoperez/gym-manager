@@ -360,16 +360,18 @@ class PaymentMethodView(ModuleView):
                                 ft.Container(
                                     content=self.methods_table,
                                     expand=True,
-                                    alignment=ft.alignment.center,
+                                    alignment=ft.alignment.top_left,
                                     padding=ft.padding.symmetric(horizontal=20),
+                                    height=600,
                                 )
                             ],
-                            alignment=ft.MainAxisAlignment.CENTER,
+                            alignment=ft.MainAxisAlignment.START,
+                            vertical_alignment=ft.CrossAxisAlignment.START,
                             expand=True,
                         ),
-                        alignment=ft.alignment.center,
+                        alignment=ft.alignment.top_left,
                         width=1200,
-                        padding=ft.padding.only(top=20),
+                        padding=ft.padding.only(top=10),
                     ),
                     # Widget de paginación
                     ft.Container(
@@ -484,7 +486,7 @@ class PaymentMethodView(ModuleView):
                 print(f"[DEBUG - Métodos de Pago] Métodos de página actual: {len(methods)}")
             
             if not methods:
-                # Mostrar mensaje cuando no hay métodos
+                # Mostrar mensaje cuando no hay métodos (estado vacío consistente)
                 self.methods_table.rows.append(
                     ft.DataRow(
                         cells=[

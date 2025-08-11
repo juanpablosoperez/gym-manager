@@ -388,7 +388,7 @@ class MembersView(ModuleView):
                     ft.Container(
                         content=self.members_table,
                         expand=True,
-                        height=600,  # Altura más grande para mejor visualización
+                        height=600,
                     ),
                     # Widget de paginación
                     self.pagination_widget.get_widget(),
@@ -555,6 +555,44 @@ class MembersView(ModuleView):
                 )
             )
         self.page.update()
+
+        # Mantener altura fija aunque no haya filas visibles
+        if len(self.members_table.rows) == 0:
+            self.members_table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Icon(name=ft.icons.PEOPLE_OUTLINE, size=48, color=ft.colors.GREY_400),
+                                        ft.Text(
+                                            "No se encontraron miembros",
+                                            size=20,
+                                            weight=ft.FontWeight.BOLD,
+                                            color=ft.colors.GREY_700
+                                        ),
+                                        ft.Text(
+                                            "Agrega tu primer miembro usando el botón 'Nuevo Miembro'",
+                                            size=16,
+                                            color=ft.colors.GREY_600
+                                        ),
+                                    ],
+                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=10,
+                                ),
+                                padding=40,
+                                alignment=ft.alignment.center,
+                            )
+                        ),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                    ]
+                )
+            )
 
     def show_new_member_modal(self, e):
         self.is_editing = False
