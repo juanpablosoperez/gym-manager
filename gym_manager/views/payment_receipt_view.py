@@ -29,9 +29,9 @@ class PaymentReceiptView(ModuleView):
         # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_view(self):
-        # Título principal
+        # Título principal (alineado a MembersView)
         self.title = ft.Text(
-            "Visualiza los Comprobantes de Pago!",
+            "¡Administra y consulta tus comprobantes!",
             size=28,
             weight=ft.FontWeight.BOLD,
             color=ft.colors.BLACK,
@@ -86,7 +86,7 @@ class PaymentReceiptView(ModuleView):
             tooltip="Seleccionar fecha hasta",
         )
 
-        # Botón limpiar filtros
+        # (sin contador en esta vista)
         self.clear_btn = ft.OutlinedButton(
             text="Limpiar filtros",
             icon=ft.icons.CLEAR,
@@ -167,9 +167,33 @@ class PaymentReceiptView(ModuleView):
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
+                    # Encabezado (título a la izquierda, acciones a la derecha si las hubiera)
                     ft.Container(
-                        content=self.title,
+                        content=ft.Row(
+                            controls=[
+                                self.title,
+                                ft.Row(controls=[], alignment=ft.MainAxisAlignment.END),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
                         padding=ft.padding.only(bottom=20, top=0, left=10, right=10),
+                        alignment=ft.alignment.top_left,
+                        width=1200,
+                    ),
+                    # Filtros compactos
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.date_from_field,
+                                self.date_to_field,
+                                self.clear_btn,
+                                ft.Container(expand=True),
+                            ],
+                            alignment=ft.MainAxisAlignment.START,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=8,
+                        ),
+                        padding=ft.padding.only(bottom=10, left=10, right=10),
                         alignment=ft.alignment.top_left,
                         width=1200,
                     ),
@@ -177,40 +201,20 @@ class PaymentReceiptView(ModuleView):
                         content=ft.Row(
                             controls=[
                                 ft.Container(
-                                    content=ft.Row(
-                                        controls=[
-                                            self.filters_container,
-                                        ],
-                                        alignment=ft.MainAxisAlignment.START,
-                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                        spacing=18,
-                                        expand=True,
-                                    ),
-                                    padding=ft.padding.only(bottom=10, left=10, right=10),
-                                    alignment=ft.alignment.top_left,
-                                    expand=True,
-                                ),
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=20,
-                        ),
-                    ),
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                ft.Container(
                                     content=self.receipts_table,
                                     expand=True,
-                                    alignment=ft.alignment.center,
+                                    alignment=ft.alignment.top_left,
                                     padding=ft.padding.symmetric(horizontal=20),
+                                    height=600,
                                 )
                             ],
-                            alignment=ft.MainAxisAlignment.CENTER,
+                            alignment=ft.MainAxisAlignment.START,
+                            vertical_alignment=ft.CrossAxisAlignment.START,
                             expand=True,
                         ),
-                        alignment=ft.alignment.center,
+                        alignment=ft.alignment.top_left,
                         width=1200,
-                        padding=ft.padding.only(top=20),
+                        padding=ft.padding.only(top=10),
                     ),
                     # Widget de paginación
                     ft.Container(
@@ -316,6 +320,47 @@ class PaymentReceiptView(ModuleView):
             receipts = self.pagination_controller.get_current_page_items()
             print(f"[DEBUG - Comprobantes] Comprobantes de página actual: {len(receipts)}")
         
+        # (contador removido en esta vista)
+        
+        if not receipts:
+            # Estado vacío consistente
+            self.receipts_table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Icon(name=ft.icons.RECEIPT_LONG, size=48, color=ft.colors.GREY_400),
+                                        ft.Text(
+                                            "No se encontraron comprobantes",
+                                            size=20,
+                                            weight=ft.FontWeight.BOLD,
+                                            color=ft.colors.GREY_700
+                                        ),
+                                        ft.Text(
+                                            "Genera o registra comprobantes desde la sección de Pagos",
+                                            size=16,
+                                            color=ft.colors.GREY_600
+                                        ),
+                                    ],
+                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=10,
+                                ),
+                                padding=40,
+                                alignment=ft.alignment.center,
+                            )
+                        ),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                    ]
+                )
+            )
+            self.page.update()
+            return
+
         for receipt in receipts:
             self.receipts_table.rows.append(
                 ft.DataRow(

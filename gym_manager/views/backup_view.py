@@ -209,16 +209,16 @@ class BackupView(BaseView):
         # No configurar la ventana aquí para evitar sobrescribir la maximización
         # La configuración de ventana se maneja en navigation.py
 
-        # Título principal
+        # Título principal (alineado a MembersView)
         self.welcome_title = ft.Text(
-            "Gestión de Backups",
+            "¡Administra y consulta tus backups!",
             size=28,
             weight=ft.FontWeight.BOLD,
             color=ft.colors.BLACK,
             text_align=ft.TextAlign.LEFT,
         )
 
-        # Crear botón para nuevo backup
+        # Crear botón para nuevo backup (alta)
         self.new_backup_button = ft.ElevatedButton(
             "Nuevo Backup",
             icon=ft.icons.BACKUP,
@@ -231,15 +231,23 @@ class BackupView(BaseView):
             ),
         )
 
+        # Contador de registros (como MembersView)
+        self.records_counter = ft.Text(
+            "0 backups",
+            size=14,
+            color=ft.colors.GREY_600,
+            weight=ft.FontWeight.W_500,
+        )
+
         # Crear tabla de backups
         self.backup_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Nombre", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Fecha", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Tamaño", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Estado", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Creado por", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Acciones", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Nombre", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Fecha", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Tamaño", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Estado", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Creado por", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Acciones", size=18, weight=ft.FontWeight.BOLD)),
             ],
             rows=[],
             border=ft.border.all(1, ft.colors.GREY_300),
@@ -259,23 +267,23 @@ class BackupView(BaseView):
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
+                    # Encabezado (título a la izquierda, alta a la derecha)
                     ft.Container(
                         content=ft.Row(
                             controls=[
                                 self.welcome_title,
-                                ft.Container(
-                                    content=self.new_backup_button,
-                                    alignment=ft.alignment.center_right,
-                                ),
+                                ft.Row([self.new_backup_button], alignment=ft.MainAxisAlignment.END),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         ),
-                        padding=ft.padding.only(bottom=30, top=20, left=20, right=20),
+                        padding=ft.padding.only(bottom=20, top=20, left=20, right=20),
                         alignment=ft.alignment.top_left,
                     ),
                     ft.Container(
                         content=self.backup_table,
                         padding=ft.padding.symmetric(horizontal=20),
+                        height=600,
+                        alignment=ft.alignment.top_left,
                         expand=True,
                     ),
                     # Widget de paginación
@@ -310,6 +318,10 @@ class BackupView(BaseView):
                 backups = self.pagination_controller.get_current_page_items()
                 print(f"[DEBUG - Backups] Backups de página actual: {len(backups)}")
             
+            # Actualizar contador de registros
+            count = len(backups)
+            self.records_counter.value = f"{count} {'backup' if count == 1 else 'backups'}"
+
             self.backup_table.rows = [
                 ft.DataRow(
                     cells=[
