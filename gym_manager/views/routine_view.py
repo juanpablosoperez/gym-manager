@@ -100,13 +100,7 @@ class RoutinesView(ModuleView):
             on_change=self.apply_filters
         )
 
-        # Contador de registros
-        self.records_counter = ft.Text(
-            "0 rutinas",
-            size=14,
-            color=ft.colors.GREY_600,
-            weight=ft.FontWeight.W_500,
-        )
+        # (sin contador en esta vista)
 
         self.difficulty_filter = ft.Dropdown(
             label="Dificultad",
@@ -177,24 +171,24 @@ class RoutinesView(ModuleView):
                         ),
                         padding=ft.padding.only(bottom=20),
                     ),
-                    # Filtros fijos
+                    # Filtros compactos
                     ft.Container(
                         content=ft.Row(
                             controls=[
                                 self.search_field,
-                                self.records_counter,
                                 self.difficulty_filter,
                                 self.clear_btn,
                             ],
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            alignment=ft.MainAxisAlignment.START,
+                            spacing=10,
                         ),
                         padding=ft.padding.only(bottom=20),
                     ),
-                    # Tabla con scroll
+                    # Tabla con scroll (altura fija)
                     ft.Container(
                         content=self.routines_table,
                         expand=True,
-                        height=600,  # Altura más grande para mejor visualización
+                        height=600,
                     ),
                     # Widget de paginación
                     self.pagination_widget.get_widget(),
@@ -351,20 +345,41 @@ class RoutinesView(ModuleView):
         print(f"[DEBUG - Rutinas] Actualizando tabla con {len(rutinas)} rutinas")
         self.routines_table.rows.clear()
         
-        # Actualizar contador de registros
-        count = len(rutinas)
-        self.records_counter.value = f"{count} {'rutina' if count == 1 else 'rutinas'}"
+        # (contador removido en esta vista)
         
         if not rutinas:
             print("[DEBUG - Rutinas] No hay rutinas para mostrar")
             self.routines_table.rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("No hay rutinas registradas", italic=True)),
-                        ft.DataCell(ft.Text("")),
-                        ft.DataCell(ft.Text("")),
-                        ft.DataCell(ft.Text("")),
-                        ft.DataCell(ft.Text("")),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Icon(name=ft.icons.FITNESS_CENTER, size=48, color=ft.colors.GREY_400),
+                                        ft.Text(
+                                            "No se encontraron rutinas",
+                                            size=20,
+                                            weight=ft.FontWeight.BOLD,
+                                            color=ft.colors.GREY_700
+                                        ),
+                                        ft.Text(
+                                            "Crea tu primera rutina usando el botón 'Nueva Rutina'",
+                                            size=16,
+                                            color=ft.colors.GREY_600
+                                        ),
+                                    ],
+                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=10,
+                                ),
+                                padding=40,
+                                alignment=ft.alignment.center,
+                            )
+                        ),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
                     ]
                 )
             )

@@ -199,6 +199,15 @@ class PaymentsView(ModuleView):
 
         self.clear_btn.on_click = self.clear_filters
 
+        # Título (estilo MembersView)
+        self.welcome_title = ft.Text(
+            "¡Administra y consulta tus pagos!",
+            size=28,
+            weight=ft.FontWeight.BOLD,
+            color=ft.colors.BLACK,
+            text_align=ft.TextAlign.LEFT,
+        )
+
         # Tabla de pagos
         self.payments_table = ft.DataTable(
             columns=[
@@ -571,7 +580,8 @@ class PaymentsView(ModuleView):
                 spread_radius=1,
                 blur_radius=10,
                 color=ft.colors.GREY_300,
-            )
+            ),
+            width=420
         )
 
         # Modal para editar la cuota mensual
@@ -752,59 +762,50 @@ class PaymentsView(ModuleView):
                         alignment=ft.alignment.top_left,
                         width=900,
                     ),
+                    # Encabezado (título a la izquierda, alta y export a la derecha)
                     ft.Container(
                         content=ft.Row(
                             controls=[
-                                ft.Container(
-                                    content=ft.Row(
-                                        controls=[
-                                            self.search_field,
-                                            self.date_from_field,
-                                            self.date_to_field,
-                                            self.payment_method,
-                                            self.status_filter,
-                                            self.clear_btn,
-                                            self.new_payment_btn,
-                                        ],
-                                        alignment=ft.MainAxisAlignment.START,
-                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                        spacing=18,
-                                        expand=True,
-                                    ),
-                                    padding=ft.padding.only(bottom=10, left=10),
-                                    alignment=ft.alignment.top_left,
-                                    expand=True,
-                                ),
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=20,
-                        ),
-                        padding=ft.padding.only(bottom=10, left=10),
-                        alignment=ft.alignment.top_left,
-                        width=1300,
-                    ),
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                self.monthly_fee_card,  # Mover la tarjeta aquí
-                                ft.Container(
-                                    content=ft.Row(
-                                        controls=[
-                                            self.export_excel_btn,
-                                            self.export_pdf_btn,
-                                        ],
-                                        alignment=ft.MainAxisAlignment.END,
-                                        spacing=8,
-                                    ),
-                                    padding=ft.padding.only(bottom=10, left=10, right=30),
-                                    alignment=ft.alignment.top_right,
+                                self.welcome_title,
+                                ft.Row(
+                                    controls=[
+                                        self.new_payment_btn,
+                                        self.export_excel_btn,
+                                        self.export_pdf_btn,
+                                    ],
+                                    alignment=ft.MainAxisAlignment.END,
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                            spacing=8,
                         ),
+                        padding=ft.padding.only(bottom=20, left=10, right=10),
+                        alignment=ft.alignment.top_left,
+                        width=1300,
+                    ),
+                    # Filtros compactos
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.search_field,
+                                self.date_from_field,
+                                self.date_to_field,
+                                self.payment_method,
+                                self.status_filter,
+                                self.clear_btn,
+                            ],
+                            alignment=ft.MainAxisAlignment.START,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=10,
+                        ),
+                        padding=ft.padding.only(bottom=20, left=10, right=10),
+                        alignment=ft.alignment.top_left,
+                        width=1300,
+                    ),
+                    # Tarjeta informativa adicional (debajo de filtros)
+                    ft.Container(
+                        content=self.monthly_fee_card,
                         padding=ft.padding.only(bottom=10, left=10, right=30),
-                        alignment=ft.alignment.top_right,
+                        alignment=ft.alignment.top_left,
                         width=1300,
                     ),
                     ft.Container(
@@ -815,12 +816,14 @@ class PaymentsView(ModuleView):
                                     expand=True,
                                     alignment=ft.alignment.center,
                                     padding=ft.padding.symmetric(horizontal=40),
+                                    height=600,
                                 )
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
+                            vertical_alignment=ft.CrossAxisAlignment.START,
                             expand=True,
                         ),
-                        alignment=ft.alignment.center,
+                        alignment=ft.alignment.top_left,
                         width=1300,
                         padding=ft.padding.only(top=30),
                     ),
@@ -1009,6 +1012,8 @@ class PaymentsView(ModuleView):
         if payments is None:
             payments = self.pagination_controller.get_current_page_items()
             print(f"[DEBUG - Pagos] Pagos de página actual: {len(payments)}")
+        
+        # (contador removido en esta vista)
         
         if not payments:
             # Mostrar mensaje cuando no hay pagos

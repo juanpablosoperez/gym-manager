@@ -28,9 +28,9 @@ class PaymentMethodView(ModuleView):
         # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_payment_method_view(self):
-        # Título principal
+        # Título principal (alineado a MembersView)
         self.welcome_title = ft.Text(
-            "Administrar Métodos de Pago",
+            "¡Administra y consulta tus métodos de pago!",
             size=28,
             weight=ft.FontWeight.BOLD,
             color=ft.colors.BLACK,
@@ -318,13 +318,45 @@ class PaymentMethodView(ModuleView):
         self.selected_method = None
         self.selected_method_to_delete = None
 
+        # (sin contador en esta vista)
+
         # Layout principal
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
+                    # Encabezado (título a la izquierda, alta a la derecha)
                     ft.Container(
-                        content=self.welcome_title,
+                        content=ft.Row(
+                            controls=[
+                                self.welcome_title,
+                                ft.Row(
+                                    controls=[
+                                        self.new_method_btn,
+                                    ],
+                                    alignment=ft.MainAxisAlignment.END,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
                         padding=ft.padding.only(bottom=20, top=0, left=10, right=10),
+                        alignment=ft.alignment.top_left,
+                        width=1200,
+                    ),
+                    # Filtros (más compactos)
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                self.search_field,
+                                self.status_filter,
+                                self.clear_btn,
+                                ft.Container(expand=True),
+                                ft.Row([self.most_used_card], alignment=ft.MainAxisAlignment.END),
+                            ],
+                            alignment=ft.MainAxisAlignment.START,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=8,
+                        ),
+                        padding=ft.padding.only(bottom=10, left=10, right=10),
                         alignment=ft.alignment.top_left,
                         width=1200,
                     ),
@@ -332,44 +364,20 @@ class PaymentMethodView(ModuleView):
                         content=ft.Row(
                             controls=[
                                 ft.Container(
-                                    content=ft.Row(
-                                        controls=[
-                                            self.search_field,
-                                            self.status_filter,
-                                            self.clear_btn,
-                                            self.new_method_btn,
-                                            self.most_used_card,
-                                        ],
-                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                        spacing=18,
-                                        expand=True,
-                                    ),
-                                    padding=ft.padding.only(bottom=10, left=10, right=10),
-                                    alignment=ft.alignment.top_left,
-                                    expand=True,
-                                ),
-                            ],
-                            alignment=ft.MainAxisAlignment.START,
-                            spacing=20,
-                        ),
-                    ),
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                ft.Container(
                                     content=self.methods_table,
                                     expand=True,
-                                    alignment=ft.alignment.center,
+                                    alignment=ft.alignment.top_left,
                                     padding=ft.padding.symmetric(horizontal=20),
+                                    height=600,
                                 )
                             ],
-                            alignment=ft.MainAxisAlignment.CENTER,
+                            alignment=ft.MainAxisAlignment.START,
+                            vertical_alignment=ft.CrossAxisAlignment.START,
                             expand=True,
                         ),
-                        alignment=ft.alignment.center,
+                        alignment=ft.alignment.top_left,
                         width=1200,
-                        padding=ft.padding.only(top=20),
+                        padding=ft.padding.only(top=10),
                     ),
                     # Widget de paginación
                     ft.Container(
@@ -483,8 +491,10 @@ class PaymentMethodView(ModuleView):
                 methods = self.pagination_controller.get_current_page_items()
                 print(f"[DEBUG - Métodos de Pago] Métodos de página actual: {len(methods)}")
             
+            # (contador removido en esta vista)
+            
             if not methods:
-                # Mostrar mensaje cuando no hay métodos
+                # Mostrar mensaje cuando no hay métodos (estado vacío consistente)
                 self.methods_table.rows.append(
                     ft.DataRow(
                         cells=[

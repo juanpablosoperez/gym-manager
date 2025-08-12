@@ -82,15 +82,15 @@ class UsersView(ModuleView):
             on_change=self.aplicar_filtros
         )
 
-        self.limpiar_filtros_btn = ft.TextButton(
+        self.limpiar_filtros_btn = ft.OutlinedButton(
             text="Limpiar filtros",
             icon=ft.icons.CLEAR,
             on_click=self.limpiar_filtros,
             style=ft.ButtonStyle(
-                color=ft.colors.BLACK87,
+                color=ft.colors.GREY_700,
                 shape=ft.RoundedRectangleBorder(radius=8),
-                padding=ft.padding.symmetric(horizontal=20, vertical=10),
-                text_style=ft.TextStyle(size=14),
+                padding=ft.padding.symmetric(horizontal=18, vertical=12),
+                text_style=ft.TextStyle(size=16),
             ),
         )
 
@@ -321,18 +321,18 @@ class UsersView(ModuleView):
         # Tabla de usuarios
         self.users_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Nombre", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Apellido", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Rol", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Estado", size=16, weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Acciones", size=16, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Nombre", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Apellido", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Rol", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Estado", size=18, weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Acciones", size=18, weight=ft.FontWeight.BOLD)),
             ],
             rows=[],
             border=ft.border.all(1, ft.colors.GREY_300),
             border_radius=12,
             vertical_lines=ft.border.all(1, ft.colors.GREY_300),
             horizontal_lines=ft.border.all(1, ft.colors.GREY_300),
-            column_spacing=100,
+            column_spacing=60,
             heading_row_color=ft.colors.GREY_100,
             heading_row_height=60,
             data_row_color=ft.colors.WHITE,
@@ -375,13 +375,14 @@ class UsersView(ModuleView):
                     ft.Container(
                         content=ft.Container(
                             content=self.users_table,
-                            alignment=ft.alignment.center,
+                            alignment=ft.alignment.top_left,
                             padding=ft.padding.symmetric(horizontal=20),
+                            height=600,
                         ),
                         expand=True,
                         padding=ft.padding.symmetric(horizontal=20),
-                        margin=ft.margin.only(top=20),
-                        alignment=ft.alignment.center,
+                        margin=ft.margin.only(top=10),
+                        alignment=ft.alignment.top_left,
                     ),
                     # Widget de paginación
                     self.pagination_widget.get_widget(),
@@ -488,9 +489,12 @@ class UsersView(ModuleView):
                                 ),
                                 padding=40,
                                 alignment=ft.alignment.center,
-                            ),
-                            col_span=5
+                            )
                         ),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
+                        ft.DataCell(ft.Container()),
                     ]
                 )
             )
