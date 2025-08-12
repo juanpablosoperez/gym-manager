@@ -1,7 +1,8 @@
 import flet as ft
+from gym_manager.utils.roles import get_allowed_modules_by_role
 
-def create_sidebar(page: ft.Page, on_item_selected=None):
-    menu_items = [
+def create_sidebar(page: ft.Page, user_role: str, on_item_selected=None):
+    full_menu_items = [
         {"icon": ft.icons.DASHBOARD_OUTLINED, "text": "Dashboard", "selected_icon": ft.icons.DASHBOARD},
         {"icon": ft.icons.PEOPLE_OUTLINE, "text": "Miembros", "selected_icon": ft.icons.PEOPLE},
         {"icon": ft.icons.FITNESS_CENTER_OUTLINED, "text": "Rutinas", "selected_icon": ft.icons.FITNESS_CENTER},
@@ -12,6 +13,9 @@ def create_sidebar(page: ft.Page, on_item_selected=None):
         {"icon": ft.icons.ADMIN_PANEL_SETTINGS_OUTLINED, "text": "Usuarios", "selected_icon": ft.icons.ADMIN_PANEL_SETTINGS},
         {"icon": ft.icons.BACKUP_OUTLINED, "text": "Backup", "selected_icon": ft.icons.BACKUP},
     ]
+
+    allowed_texts = set(get_allowed_modules_by_role(user_role))
+    menu_items = [item for item in full_menu_items if item["text"] in allowed_texts]
 
     is_expanded = True
     selected_index = 0
