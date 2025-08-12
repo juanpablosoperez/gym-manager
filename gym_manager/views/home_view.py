@@ -3,6 +3,7 @@ from gym_manager.components.header import create_header
 from gym_manager.components.sidebar import create_sidebar
 from gym_manager.utils.navigation import navigate_to_login
 from gym_manager.utils.database import get_db_session
+from gym_manager.utils.roles import is_module_allowed, get_allowed_modules_by_role
 from gym_manager.views.module_views import (
     MembersView, PaymentsView, ReportsView,
     PaymentMethodsView, UsersView, BackupsView, RoutinesView
@@ -50,10 +51,11 @@ class HomeView:
             section_title=self.section_title
         )
 
-        # Crear sidebar
+        # Crear sidebar con filtrado por rol
         self.sidebar = create_sidebar(
             page=self.page,
-            on_item_selected=self.handle_route_change
+            user_role=self.user_rol,
+            on_item_selected=self.handle_route_change,
         )
 
         # Contenedor principal para el contenido
@@ -308,8 +310,35 @@ class HomeView:
         self.main_content.content = None
         previous_title = self.section_title # Guardar título anterior por si acaso
 
-        # Título de sección según el índice
-        if index == 0:  # Dashboard
+        # Mapeo entre índice filtrado y texto de módulo visible actual según el rol
+        visible_modules = get_allowed_modules_by_role(self.user_rol)
+        # Garantizar el orden coincidente con el sidebar filtrado
+        ordered_all = [
+            "Dashboard",
+            "Miembros",
+            "Rutinas",
+            "Pagos",
+            "Comprobantes",
+            "Estadísticas",
+            "Métodos de Pago",
+            "Usuarios",
+            "Backup",
+        ]
+        ordered_visible = [m for m in ordered_all if m in visible_modules]
+        if index < 0 or index >= len(ordered_visible):
+            # Índice fuera de rango (por seguridad)
+            self.show_message("Acceso inválido", ft.colors.RED_400)
+            return
+
+        selected_module = ordered_visible[index]
+
+        # Protección adicional por rol: si por algún motivo no está permitido, cancelar
+        if not is_module_allowed(self.user_rol, selected_module):
+            self.show_message("No tienes permisos para acceder a este módulo", ft.colors.RED_400)
+            return
+
+        # Título de sección según el módulo
+        if selected_module == "Dashboard":
             self.section_title = "Dashboard"
             self.main_content.content = ft.Column(
                 controls=[
@@ -330,35 +359,35 @@ class HomeView:
                 scroll=ft.ScrollMode.ADAPTIVE,  # Agregar scroll adaptativo aquí también
                 spacing=0,  # Controlar espaciado con márgenes de los hijos
             )
-        elif index == 1:  # Gestión de Miembros
+        elif selected_module == "Miembros":
             self.section_title = "Gestión de Miembros"
             view = MembersView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 2:  # Gestión de Rutinas
+        elif selected_module == "Rutinas":
             self.section_title = "Gestión de Rutinas"
             view = RoutinesView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 3:  # Gestión de Pagos
+        elif selected_module == "Pagos":
             self.section_title = "Gestión de Pagos"
             view = PaymentsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 4:  # Comprobantes de Pago
+        elif selected_module == "Comprobantes":
             self.section_title = "Comprobantes de Pago"
             view = PaymentReceiptView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 5:  # Informes y Estadísticas
+        elif selected_module == "Estadísticas":
             self.section_title = "Informes y Estadísticas"
             view = ReportsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 6:  # Métodos de Pago
+        elif selected_module == "Métodos de Pago":
             self.section_title = "Métodos de Pago"
             view = PaymentMethodsView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 7:  # Gestión de Usuarios
+        elif selected_module == "Usuarios":
             self.section_title = "Gestión de Usuarios"
             view = UsersView(self.page)
             self.main_content.content = view.get_content()
-        elif index == 8:  # Gestión de Backups
+        elif selected_module == "Backup":
             self.section_title = "Gestión de Backups"
             view = BackupsView(self.page, self.user_name)
             self.main_content.content = view.get_content()
