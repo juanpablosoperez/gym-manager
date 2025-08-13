@@ -122,7 +122,7 @@ class LoginView:
                     ft.Row(
                         controls=[
                             ft.Text(
-                                "Potencia tu gimnasio ",
+                                "Potenciá tu gimnasio ",
                                 size=14,
                                 color=ft.colors.GREY_700,
                                 italic=True,

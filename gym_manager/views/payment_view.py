@@ -157,19 +157,7 @@ class PaymentsView(ModuleView):
             tooltip="Seleccionar fecha hasta",
         )
 
-        self.payment_method = ft.Dropdown(
-            label="Método de pago",
-            width=180,
-            options=[
-                ft.dropdown.Option("Todos"),
-                ft.dropdown.Option("Efectivo"),
-                ft.dropdown.Option("Transferencia bancaria"),
-                ft.dropdown.Option("Tarjeta de crédito")
-            ],
-            border_radius=10,
-            text_size=16,
-            on_change=self.apply_filters
-        )
+        # Filtro de método de pago eliminado de la pantalla de pagos
 
         # Filtro de estado
         self.status_filter = ft.Dropdown(
@@ -789,7 +777,7 @@ class PaymentsView(ModuleView):
                                 self.search_field,
                                 self.date_from_field,
                                 self.date_to_field,
-                                self.payment_method,
+                                # Filtro de método de pago eliminado
                                 self.status_filter,
                                 self.clear_btn,
                             ],
@@ -989,11 +977,7 @@ class PaymentsView(ModuleView):
                 self.edit_payment_method_field.options = [
                     ft.dropdown.Option(method.descripcion) for method in active_payment_methods
                 ]
-                self.payment_method.options = [
-                    ft.dropdown.Option("Todos")
-                ] + [
-                    ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-                ]
+                # No se llena filtro (fue eliminado de la pantalla)
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
@@ -1129,8 +1113,7 @@ class PaymentsView(ModuleView):
         if self.date_to.value:
             filters['date_to'] = self.date_to.value
         
-        if self.payment_method.value and self.payment_method.value != "Todos":
-            filters['payment_method'] = self.payment_method.value
+        # Filtro por método de pago eliminado
         
         # Filtro de estado
         if self.status_filter.value == "Pagado":
@@ -1167,7 +1150,7 @@ class PaymentsView(ModuleView):
         self.date_to.value = None
         self.date_from_field.content.controls[0].value = ""
         self.date_to_field.content.controls[0].value = ""
-        self.payment_method.value = "Todos"
+        # Filtro por método de pago eliminado
         self.status_filter.value = "Pagado"
         self.page.update()
         # Recargar datos sin filtros usando el método asíncrono
