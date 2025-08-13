@@ -177,3 +177,10 @@ Gym Manager.spec
 gym_manager/pack/GymManagerSetup.exe
 gym_manager/pack/files/Gym Manager.exe
 gym_manager/pack/files/pack.7z
+
+dist/
+build/
+Gym Manager.spec
+gym_manager/pack/GymManagerSetup.exe
+gym_manager/pack/files/Gym Manager.exe
+gym_manager/pack/files/pack.7z
