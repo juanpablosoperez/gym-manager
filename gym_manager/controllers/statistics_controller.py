@@ -4,11 +4,6 @@ from gym_manager.controllers.member_controller import MemberController
 from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.database import get_db_session
 from pathlib import Path
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 import os
 # Importa aquí tus modelos o servicios necesarios. Ejemplo:
 # from gym_manager.models.member_model import Member
@@ -30,7 +25,7 @@ class StatisticsController:
     def _initialize_event_handlers(self):
         """Conecta los manejadores de eventos a los controles de la vista."""
         if self.view is None:
-            print("Error: La vista no está asignada al controlador al inicializar eventos.")
+            print("Error: La vista no está asignada al inicializar eventos.")
             return
             
         self.view.generate_report_button.on_click = self.handle_generate_report
@@ -160,6 +155,12 @@ class StatisticsController:
     def _export_payments_to_pdf(self, payments):
         """Exporta los pagos a PDF (lógica copiada y adaptada de payment_view.py)."""
         try:
+            # Importar reportlab solo cuando se necesita
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
             downloads_path = str(Path.home() / "Downloads")
             filename = f"informe_pagos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             filepath = os.path.join(downloads_path, filename)
@@ -260,6 +261,12 @@ class StatisticsController:
 
     def _export_members_to_pdf(self, miembros, membership_status="Todos"):
         try:
+            # Importar reportlab solo cuando se necesita
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
             downloads_path = str(Path.home() / "Downloads")
             status_suffix = f"_{membership_status.lower()}" if membership_status != "Todos" else ""
             filename = f"informe_miembros{status_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"

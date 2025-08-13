@@ -6,6 +6,11 @@ import traceback
 
 # Third-party imports
 import flet as ft
+if not hasattr(ft, "colors") and hasattr(ft, "Colors"):
+    # Compatibilidad: algunas versiones exponen Colors (CamelCase) en lugar de colors
+    ft.colors = ft.Colors
+if not hasattr(ft, "icons") and hasattr(ft, "Icons"):
+    ft.icons = ft.Icons
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -29,6 +34,7 @@ def main(page: ft.Page):
     
     # Configurar la página
     page.title = "Gym Manager"
+    page.window_icon = "assets/app.ico"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
     page.spacing = 0

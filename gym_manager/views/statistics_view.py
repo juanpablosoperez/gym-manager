@@ -1,8 +1,36 @@
 import flet as ft
 from gym_manager.views.module_views import ModuleView
 from datetime import datetime
-import plotly.graph_objs as go
-from flet.plotly_chart import PlotlyChart
+try:
+    import plotly.graph_objs as go
+    from flet.plotly_chart import PlotlyChart
+    HAS_PLOTLY = True
+except Exception:
+    go = None
+    PlotlyChart = None
+    HAS_PLOTLY = False
+import logging
+import os
+from pathlib import Path
+import sys
+import base64
+
+# Logger a archivo en carpeta escribible del usuario
+def _get_stats_logger():
+    try:
+        data_root = Path(os.getenv('LOCALAPPDATA', str(Path.home()))) / 'GymManager' / 'logs'
+        data_root.mkdir(parents=True, exist_ok=True)
+        logger = logging.getLogger('gym_manager.views.statistics_view')
+        if not logger.handlers:
+            logger.setLevel(logging.INFO)
+            fh = logging.FileHandler(str(data_root / 'statistics.log'))
+            fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            logger.addHandler(fh)
+        return logger
+    except Exception:
+        return logging.getLogger(__name__)
+
+_LOGGER = _get_stats_logger()
 
 class StatisticsView(ModuleView):
     def __init__(self, page: ft.Page, controller):
@@ -160,87 +188,111 @@ class StatisticsView(ModuleView):
         self.page.update()
 
     def build(self):
-        self.report_type_dropdown.on_change = self._validate_report_generation
-        self.start_date_picker.on_change = lambda e: self._update_date_text(self.start_date_text, self.start_date_picker.value)
-        self.end_date_picker.on_change = lambda e: self._update_date_text(self.end_date_text, self.end_date_picker.value)
+        try:
+            _LOGGER.info('Entrando a StatisticsView.build (HAS_PLOTLY=%s)', HAS_PLOTLY)
+            self.report_type_dropdown.on_change = self._validate_report_generation
+            self.start_date_picker.on_change = lambda e: self._update_date_text(self.start_date_text, self.start_date_picker.value)
+            self.end_date_picker.on_change = lambda e: self._update_date_text(self.end_date_text, self.end_date_picker.value)
 
-        # --- Encabezado ---
-        header_section = ft.Container(
-            ft.Column([
-                ft.Text("Informes y Estadísticas", size=32, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
-                ft.Text("Visualizá la actividad del gimnasio y generá reportes exportables", size=16, color=ft.colors.GREY_700)
-            ], spacing=5),
-            padding=ft.padding.only(top=10, bottom=20, left=10, right=10)
-        )
-
-        # --- Sección de Generación de Informes (Card) ---
-        report_filters_card = ft.Container(
-            content=ft.Column([
-                ft.Text("Generación de Informes", size=20, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
-                ft.ResponsiveRow([
-                    ft.Column([self.report_type_dropdown], col={"xs": 12, "sm": 6, "md": 3}),
-                    ft.Column([self.membership_status_dropdown], col={"xs": 12, "sm": 6, "md": 3}),
-                    ft.Column([
-                        self.start_date_button, self.start_date_text
-                        ], col={"xs": 12, "sm": 6, "md": 2}, horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
-                    ft.Column([
-                        self.end_date_button, self.end_date_text
-                        ], col={"xs": 12, "sm": 6, "md": 2}, horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
-                    # Nueva columna para el botón Generar Informe
-                    ft.Column(
-                        [self.generate_report_button],
-                        col={"xs": 12, "sm": 12, "md": 2},
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        horizontal_alignment=ft.CrossAxisAlignment.STRETCH
-                    )
-                ], spacing=15, run_spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
-            ], spacing=15),
-            padding=20, margin=ft.margin.only(bottom=25, left=5, right=5),
-            border_radius=12, bgcolor=ft.colors.WHITE,
-            border=ft.border.all(1, ft.colors.GREY_300),
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=10, color=ft.colors.BLACK12, offset=ft.Offset(1,1))
-        )
-
-        # --- Sección Panel de Estadísticas ---
-        metrics_cards_section = ft.ResponsiveRow([
-                ft.Column([self.monthly_payments_card], col={"xs": 12, "sm": 6, "md": 3}),
-                ft.Column([self.active_members_today_card], col={"xs": 12, "sm": 6, "md": 3}),
-                ft.Column([self.expired_memberships_card], col={"xs": 12, "sm": 6, "md": 3}),
-                ft.Column([self.total_annual_income_card], col={"xs": 12, "sm": 6, "md": 3}),
-            ], spacing=10, run_spacing=10
-        )
-
-        # --- Gráficos ---
-        # Ingresos por Mes (datos reales)
-        data_ingresos = self.controller.get_monthly_income_data()
-        fig_ingresos = go.Figure(
-            data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")],
-            layout=go.Layout(
-                title=dict(
-                    text="Ingresos por Mes",
-                    font=dict(size=24, family="Arial", color="black")
-                ),
-                xaxis=dict(
-                    title=dict(
-                        text="Mes",
-                        font=dict(size=18, family="Arial")
-                    ),
-                    tickfont=dict(size=18)
-                ),
-                yaxis=dict(
-                    title=dict(
-                        text="Ingresos ($)",
-                        font=dict(size=18, family="Arial")
-                    ),
-                    tickfont=dict(size=18)
-                ),
-                width=800,
-                height=600,
-                margin=dict(l=50, r=50, t=50, b=50)
+            # --- Encabezado ---
+            header_section = ft.Container(
+                ft.Column([
+                    ft.Text("Informes y Estadísticas", size=32, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
+                    ft.Text("Visualizá la actividad del gimnasio y generá reportes exportables", size=16, color=ft.colors.GREY_700)
+                ], spacing=5),
+                padding=ft.padding.only(top=10, bottom=20, left=10, right=10)
             )
-        )
-        chart_ingresos = ft.Container(
-            PlotlyChart(fig_ingresos, expand=True), 
+
+            # --- Sección de Generación de Informes (Card) ---
+            report_filters_card = ft.Container(
+                content=ft.Column([
+                    ft.Text("Generación de Informes", size=20, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
+                    ft.ResponsiveRow([
+                        ft.Column([self.report_type_dropdown], col={"xs": 12, "sm": 6, "md": 3}),
+                        ft.Column([self.membership_status_dropdown], col={"xs": 12, "sm": 6, "md": 3}),
+                        ft.Column([
+                            self.start_date_button, self.start_date_text
+                            ], col={"xs": 12, "sm": 6, "md": 2}, horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
+                        ft.Column([
+                            self.end_date_button, self.end_date_text
+                            ], col={"xs": 12, "sm": 6, "md": 2}, horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),
+                        # Nueva columna para el botón Generar Informe
+                        ft.Column(
+                            [self.generate_report_button],
+                            col={"xs": 12, "sm": 12, "md": 2},
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            horizontal_alignment=ft.CrossAxisAlignment.STRETCH
+                        )
+                    ], spacing=15, run_spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+                ], spacing=15),
+                padding=20, margin=ft.margin.only(bottom=25, left=5, right=5),
+                border_radius=12, bgcolor=ft.colors.WHITE,
+                border=ft.border.all(1, ft.colors.GREY_300),
+                shadow=ft.BoxShadow(spread_radius=1, blur_radius=10, color=ft.colors.BLACK12, offset=ft.Offset(1,1))
+            )
+
+            # --- Sección Panel de Estadísticas ---
+            metrics_cards_section = ft.ResponsiveRow([
+                    ft.Column([self.monthly_payments_card], col={"xs": 12, "sm": 6, "md": 3}),
+                    ft.Column([self.active_members_today_card], col={"xs": 12, "sm": 6, "md": 3}),
+                    ft.Column([self.expired_memberships_card], col={"xs": 12, "sm": 6, "md": 3}),
+                    ft.Column([self.total_annual_income_card], col={"xs": 12, "sm": 6, "md": 3}),
+                ], spacing=10, run_spacing=10
+            )
+
+            # --- Gráficos ---
+            if not HAS_PLOTLY:
+                _LOGGER.warning('Plotly/PlotlyChart no disponible. Mostrando placeholder sin gráficos.')
+                return ft.Container(
+                    content=ft.Column([
+                        header_section,
+                        report_filters_card,
+                        ft.Container(ft.Text('Plotly no está disponible en este paquete. Instala plotly y reempaqueta.'), padding=20),
+                    ], scroll=ft.ScrollMode.ADAPTIVE),
+                    expand=True,
+                )
+
+            # Ingresos por Mes (datos reales)
+            data_ingresos = self.controller.get_monthly_income_data()
+            fig_ingresos = go.Figure(
+                data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")],
+                layout=go.Layout(
+                    title=dict(
+                        text="Ingresos por Mes",
+                        font=dict(size=24, family="Arial", color="black")
+                    ),
+                    xaxis=dict(
+                        title=dict(
+                            text="Mes",
+                            font=dict(size=18, family="Arial")
+                        ),
+                        tickfont=dict(size=18)
+                    ),
+                    yaxis=dict(
+                        title=dict(
+                            text="Ingresos ($)",
+                            font=dict(size=18, family="Arial")
+                        ),
+                        tickfont=dict(size=18)
+                    ),
+                    width=800,
+                    height=600,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
+            )
+            # Intentar PlotlyChart; si falla, usar imagen PNG (requiere kaleido)
+            try:
+                ingresos_widget = PlotlyChart(fig_ingresos, expand=True)
+            except Exception as e:
+                _LOGGER.warning('Fallo PlotlyChart ingresos, usando PNG: %s', e)
+                try:
+                    png_bytes = fig_ingresos.to_image(format="png")
+                    ingresos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
+                except Exception as e2:
+                    ingresos_widget = ft.Text(f"No se pudo renderizar gráfico (ingresos): {e2}", color=ft.colors.RED)
+
+            chart_ingresos = ft.Container(
+            ingresos_widget, 
             bgcolor=ft.colors.WHITE, 
             border_radius=12, 
             padding=20, 
@@ -248,32 +300,42 @@ class StatisticsView(ModuleView):
             margin=ft.margin.symmetric(vertical=10)
         )
 
-        # Distribución de Métodos de Pago (datos reales)
-        data_metodos = self.controller.get_payment_methods_distribution()
-        metodos = list(data_metodos.keys())
-        valores = list(data_metodos.values())
-        fig_metodos = go.Figure(
-            data=[go.Pie(
-                labels=metodos, 
-                values=valores, 
-                hole=0.3,
-                textfont=dict(size=18)
-            )],
-            layout=go.Layout(
-                title=dict(
-                    text="Distribución de Métodos de Pago",
-                    font=dict(size=24, family="Arial", color="black")
-                ),
-                legend=dict(
-                    font=dict(size=18)
-                ),
-                width=800,
-                height=600,
-                margin=dict(l=50, r=50, t=50, b=50)
+            # Distribución de Métodos de Pago (datos reales)
+            data_metodos = self.controller.get_payment_methods_distribution()
+            metodos = list(data_metodos.keys())
+            valores = list(data_metodos.values())
+            fig_metodos = go.Figure(
+                data=[go.Pie(
+                    labels=metodos, 
+                    values=valores, 
+                    hole=0.3,
+                    textfont=dict(size=18)
+                )],
+                layout=go.Layout(
+                    title=dict(
+                        text="Distribución de Métodos de Pago",
+                        font=dict(size=24, family="Arial", color="black")
+                    ),
+                    legend=dict(
+                        font=dict(size=18)
+                    ),
+                    width=800,
+                    height=600,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
             )
-        )
-        chart_metodos = ft.Container(
-            PlotlyChart(fig_metodos, expand=True), 
+            try:
+                metodos_widget = PlotlyChart(fig_metodos, expand=True)
+            except Exception as e:
+                _LOGGER.warning('Fallo PlotlyChart metodos, usando PNG: %s', e)
+                try:
+                    png_bytes = fig_metodos.to_image(format="png")
+                    metodos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
+                except Exception as e2:
+                    metodos_widget = ft.Text(f"No se pudo renderizar gráfico (métodos): {e2}", color=ft.colors.RED)
+
+            chart_metodos = ft.Container(
+            metodos_widget, 
             bgcolor=ft.colors.WHITE, 
             border_radius=12, 
             padding=20, 
@@ -281,44 +343,54 @@ class StatisticsView(ModuleView):
             margin=ft.margin.symmetric(vertical=10)
         )
 
-        # Nuevos Miembros por Mes (datos reales)
-        data_nuevos = self.controller.get_new_members_per_month()
-        meses = data_nuevos["meses"]
-        nuevos = data_nuevos["nuevos"]
-        fig_nuevos = go.Figure(
-            data=[go.Scatter(
-                x=meses, 
-                y=nuevos, 
-                mode="lines+markers", 
-                line=dict(color="#4CAF50"),
-                textfont=dict(size=18)
-            )],
-            layout=go.Layout(
-                title=dict(
-                    text="Nuevos Miembros por Mes",
-                    font=dict(size=24, family="Arial", color="black")
-                ),
-                xaxis=dict(
+            # Nuevos Miembros por Mes (datos reales)
+            data_nuevos = self.controller.get_new_members_per_month()
+            meses = data_nuevos["meses"]
+            nuevos = data_nuevos["nuevos"]
+            fig_nuevos = go.Figure(
+                data=[go.Scatter(
+                    x=meses, 
+                    y=nuevos, 
+                    mode="lines+markers", 
+                    line=dict(color="#4CAF50"),
+                    textfont=dict(size=18)
+                )],
+                layout=go.Layout(
                     title=dict(
-                        text="Mes",
-                        font=dict(size=18, family="Arial")
+                        text="Nuevos Miembros por Mes",
+                        font=dict(size=24, family="Arial", color="black")
                     ),
-                    tickfont=dict(size=18)
-                ),
-                yaxis=dict(
-                    title=dict(
-                        text="Cantidad",
-                        font=dict(size=18, family="Arial")
+                    xaxis=dict(
+                        title=dict(
+                            text="Mes",
+                            font=dict(size=18, family="Arial")
+                        ),
+                        tickfont=dict(size=18)
                     ),
-                    tickfont=dict(size=18)
-                ),
-                width=800,
-                height=600,
-                margin=dict(l=50, r=50, t=50, b=50)
+                    yaxis=dict(
+                        title=dict(
+                            text="Cantidad",
+                            font=dict(size=18, family="Arial")
+                        ),
+                        tickfont=dict(size=18)
+                    ),
+                    width=800,
+                    height=600,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
             )
-        )
-        chart_nuevos = ft.Container(
-            PlotlyChart(fig_nuevos, expand=True), 
+            try:
+                nuevos_widget = PlotlyChart(fig_nuevos, expand=True)
+            except Exception as e:
+                _LOGGER.warning('Fallo PlotlyChart nuevos, usando PNG: %s', e)
+                try:
+                    png_bytes = fig_nuevos.to_image(format="png")
+                    nuevos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
+                except Exception as e2:
+                    nuevos_widget = ft.Text(f"No se pudo renderizar gráfico (nuevos): {e2}", color=ft.colors.RED)
+
+            chart_nuevos = ft.Container(
+            nuevos_widget, 
             bgcolor=ft.colors.WHITE, 
             border_radius=12, 
             padding=20, 
@@ -326,43 +398,53 @@ class StatisticsView(ModuleView):
             margin=ft.margin.symmetric(vertical=10)
         )
 
-        # Membresías Activas por Tipo (datos reales)
-        data_tipos = self.controller.get_active_memberships_by_type()
-        tipos = list(data_tipos.keys())
-        activos = list(data_tipos.values())
-        fig_tipos = go.Figure(
-            data=[go.Bar(
-                x=tipos, 
-                y=activos, 
-                marker_color="#FF9800",
-                textfont=dict(size=18)
-            )],
-            layout=go.Layout(
-                title=dict(
-                    text="Membresías Activas por Tipo",
-                    font=dict(size=24, family="Arial", color="black")
-                ),
-                xaxis=dict(
+            # Membresías Activas por Tipo (datos reales)
+            data_tipos = self.controller.get_active_memberships_by_type()
+            tipos = list(data_tipos.keys())
+            activos = list(data_tipos.values())
+            fig_tipos = go.Figure(
+                data=[go.Bar(
+                    x=tipos, 
+                    y=activos, 
+                    marker_color="#FF9800",
+                    textfont=dict(size=18)
+                )],
+                layout=go.Layout(
                     title=dict(
-                        text="Tipo",
-                        font=dict(size=18, family="Arial")
+                        text="Membresías Activas por Tipo",
+                        font=dict(size=24, family="Arial", color="black")
                     ),
-                    tickfont=dict(size=18)
-                ),
-                yaxis=dict(
-                    title=dict(
-                        text="Cantidad",
-                        font=dict(size=18, family="Arial")
+                    xaxis=dict(
+                        title=dict(
+                            text="Tipo",
+                            font=dict(size=18, family="Arial")
+                        ),
+                        tickfont=dict(size=18)
                     ),
-                    tickfont=dict(size=18)
-                ),
-                width=800,
-                height=600,
-                margin=dict(l=50, r=50, t=50, b=50)
+                    yaxis=dict(
+                        title=dict(
+                            text="Cantidad",
+                            font=dict(size=18, family="Arial")
+                        ),
+                        tickfont=dict(size=18)
+                    ),
+                    width=800,
+                    height=600,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
             )
-        )
-        chart_tipos = ft.Container(
-            PlotlyChart(fig_tipos, expand=True), 
+            try:
+                tipos_widget = PlotlyChart(fig_tipos, expand=True)
+            except Exception as e:
+                _LOGGER.warning('Fallo PlotlyChart tipos, usando PNG: %s', e)
+                try:
+                    png_bytes = fig_tipos.to_image(format="png")
+                    tipos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
+                except Exception as e2:
+                    tipos_widget = ft.Text(f"No se pudo renderizar gráfico (tipos): {e2}", color=ft.colors.RED)
+
+            chart_tipos = ft.Container(
+            tipos_widget, 
             bgcolor=ft.colors.WHITE, 
             border_radius=12, 
             padding=20, 
@@ -370,42 +452,52 @@ class StatisticsView(ModuleView):
             margin=ft.margin.symmetric(vertical=10)
         )
 
-        charts_section = ft.Column([
-                ft.ResponsiveRow([
-                    ft.Column([chart_ingresos], col={"xs": 12, "md": 6}),
-                    ft.Column([chart_metodos], col={"xs": 12, "md": 6}),
-                ], spacing=10, run_spacing=10),
-                ft.ResponsiveRow([
-                    ft.Column([chart_nuevos], col={"xs": 12, "md": 6}),
-                    ft.Column([chart_tipos], col={"xs": 12, "md": 6}),
-                ], spacing=10, run_spacing=10),
-            ], spacing=10
-        )
+            charts_section = ft.Column([
+                    ft.ResponsiveRow([
+                        ft.Column([chart_ingresos], col={"xs": 12, "md": 6}),
+                        ft.Column([chart_metodos], col={"xs": 12, "md": 6}),
+                    ], spacing=10, run_spacing=10),
+                    ft.ResponsiveRow([
+                        ft.Column([chart_nuevos], col={"xs": 12, "md": 6}),
+                        ft.Column([chart_tipos], col={"xs": 12, "md": 6}),
+                    ], spacing=10, run_spacing=10),
+                ], spacing=10
+            )
 
-        statistics_panel = ft.Container(
-            content=ft.Column([
-                ft.Text("Métricas Clave", size=22, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
-                metrics_cards_section, # Solo una sección de tarjetas ahora
-                ft.Divider(height=30, thickness=1, color=ft.colors.GREY_300),
-                ft.Text("Análisis Gráfico", size=22, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
-                charts_section
-            ], spacing=20),
-            padding=ft.padding.all(15),
-        )
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    header_section,
-                    report_filters_card,
-                    statistics_panel
-                ],
-                scroll=ft.ScrollMode.ADAPTIVE,
-                spacing=0, # Controlar espaciado con márgenes de los hijos
-            ),
-            expand=True,
-            bgcolor=ft.colors.WHITE, # Fondo blanco
-            padding=ft.padding.symmetric(horizontal=15, vertical=10)
-        )
+            statistics_panel = ft.Container(
+                content=ft.Column([
+                    ft.Text("Métricas Clave", size=22, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
+                    metrics_cards_section, # Solo una sección de tarjetas ahora
+                    ft.Divider(height=30, thickness=1, color=ft.colors.GREY_300),
+                    ft.Text("Análisis Gráfico", size=22, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK87),
+                    charts_section
+                ], spacing=20),
+                padding=ft.padding.all(15),
+            )
+            _LOGGER.info('StatisticsView.build OK, devolviendo layout completo')
+            return ft.Container(
+                content=ft.Column(
+                    controls=[
+                        header_section,
+                        report_filters_card,
+                        statistics_panel
+                    ],
+                    scroll=ft.ScrollMode.ADAPTIVE,
+                    spacing=0, # Controlar espaciado con márgenes de los hijos
+                ),
+                expand=True,
+                bgcolor=ft.colors.WHITE, # Fondo blanco
+                padding=ft.padding.symmetric(horizontal=15, vertical=10)
+            )
+        except Exception as ex:
+            _LOGGER.error('Error en StatisticsView.build: %s', str(ex))
+            return ft.Container(
+                content=ft.Column([
+                    ft.Text('Error al cargar Estadísticas', color=ft.colors.RED, size=20),
+                    ft.Text(str(ex), color=ft.colors.RED_400),
+                ], spacing=10),
+                padding=20,
+            )
 
     def _update_date_text(self, text_control, date_value):
         if date_value:
