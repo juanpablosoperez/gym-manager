@@ -169,3 +169,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+\ndist/\nbuild/\nGym Manager.spec\ngym_manager/pack/GymManagerSetup.exe\ngym_manager/pack/files/Gym Manager.exe\ngym_manager/pack/files/pack.7z
