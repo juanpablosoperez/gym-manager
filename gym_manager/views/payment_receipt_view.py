@@ -260,6 +260,7 @@ class PaymentReceiptView(ModuleView):
             
             # Actualizar paginación
             self.pagination_controller.set_items(receipts)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(receipts)
             print("[DEBUG - Comprobantes] Paginación actualizada")
             
@@ -304,7 +305,10 @@ class PaymentReceiptView(ModuleView):
                 filters['fecha_hasta'] = self.date_to_value
 
             receipts = self.payment_receipt_controller.get_receipts(filters)
-            self.update_receipts_table(receipts)
+            self.pagination_controller.set_items(receipts)
+            self.pagination_controller.current_page = 1
+            self.pagination_widget.update_items(receipts)
+            self.update_receipts_table()
         except Exception as e:
             self.show_message(f"Error al cargar los comprobantes: {str(e)}", ft.colors.RED)
 

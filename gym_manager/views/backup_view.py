@@ -181,11 +181,12 @@ class BackupView(BaseView):
             
             # Actualizar paginación
             self.pagination_controller.set_items(backups)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(backups)
             print("[DEBUG - Backups] Paginación actualizada")
             
             # Actualizar tabla
-            self.update_backups_table(backups)
+            self.update_backups_table()
             print("[DEBUG - Backups] Tabla actualizada")
             
         except Exception as e:
@@ -305,7 +306,10 @@ class BackupView(BaseView):
         """Carga la lista de backups"""
         try:
             backups = self.backup_service.get_backups()
-            self.update_backups_table(backups)
+            self.pagination_controller.set_items(backups)
+            self.pagination_controller.current_page = 1
+            self.pagination_widget.update_items(backups)
+            self.update_backups_table()
         except Exception as e:
             self._handle_error("Error cargando backups", e)
     
@@ -357,8 +361,13 @@ class BackupView(BaseView):
                 for backup in backups
             ]
             
-            # Actualizar la página
+            # Actualizar la página y forzar scroll al tope
             self.page.update()
+            try:
+                if hasattr(self.page, "scroll_to"):
+                    self.page.scroll_to(0)
+            except Exception:
+                pass
             logger.info("Tabla de backups actualizada exitosamente")
             
         except Exception as e:

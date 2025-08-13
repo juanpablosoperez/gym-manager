@@ -413,6 +413,7 @@ class MembersView(ModuleView):
             print(f"[DEBUG - Miembros] Obtenidos {len(members)} miembros")
             
             self.pagination_controller.set_items(members)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(members)
             print("[DEBUG - Miembros] Paginación actualizada")
             
@@ -438,6 +439,7 @@ class MembersView(ModuleView):
             print(f"[DEBUG - Miembros] Obtenidos {len(members)} miembros")
             
             self.pagination_controller.set_items(members)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(members)
             print("[DEBUG - Miembros] Paginación actualizada")
             
@@ -547,6 +549,11 @@ class MembersView(ModuleView):
                 )
             )
         self.page.update()
+        try:
+            if hasattr(self.page, "scroll_to"):
+                self.page.scroll_to(0)
+        except Exception:
+            pass
 
         # Mantener altura fija aunque no haya filas visibles
         if len(self.members_table.rows) == 0:
@@ -906,6 +913,7 @@ class MembersView(ModuleView):
         members = self.member_controller.get_members(filters)
         # Actualizar paginación con los datos filtrados
         self.pagination_controller.set_items(members)
+        self.pagination_controller.current_page = 1
         self.pagination_widget.update_items(members)
         self.update_members_table()
 

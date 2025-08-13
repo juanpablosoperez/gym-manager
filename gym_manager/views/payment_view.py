@@ -798,23 +798,18 @@ class PaymentsView(ModuleView):
                         width=1300,
                     ),
                     ft.Container(
-                        content=ft.Row(
+                        content=ft.Column(
                             controls=[
-                                ft.Container(
-                                    content=self.payments_table,
-                                    expand=True,
-                                    alignment=ft.alignment.center,
-                                    padding=ft.padding.symmetric(horizontal=40),
-                                    height=600,
-                                )
+                                self.payments_table
                             ],
-                            alignment=ft.MainAxisAlignment.CENTER,
-                            vertical_alignment=ft.CrossAxisAlignment.START,
+                            spacing=0,
+                            scroll=ft.ScrollMode.ALWAYS,
                             expand=True,
                         ),
                         alignment=ft.alignment.top_left,
                         width=1300,
-                        padding=ft.padding.only(top=30),
+                        padding=ft.padding.only(top=30, left=40, right=40),
+                        height=600,
                     ),
                     # Widget de paginación
                     ft.Container(
@@ -923,6 +918,12 @@ class PaymentsView(ModuleView):
             self.page.overlay.append(self.new_payment_modal)
         self.new_payment_modal.open = True
         self.page.update()
+        # Forzar scroll al tope tras cambiar de página o actualizar filas
+        try:
+            if hasattr(self.page, "scroll_to"):
+                self.page.scroll_to(0)
+        except Exception:
+            pass
 
     def _map_payments(self, payments):
         """Mapea objetos Pago a estructuras simples para evitar DetachedInstanceError tras cerrar sesión."""

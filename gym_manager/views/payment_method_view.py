@@ -454,6 +454,7 @@ class PaymentMethodView(ModuleView):
             
             # Actualizar paginación
             self.pagination_controller.set_items(methods)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(methods)
             print("[DEBUG - Métodos de Pago] Paginación actualizada")
             
@@ -475,7 +476,10 @@ class PaymentMethodView(ModuleView):
         Carga los datos iniciales de la vista
         """
         methods = self.payment_method_controller.get_payment_methods()
-        self.update_methods_table(methods)
+        self.pagination_controller.set_items(methods)
+        self.pagination_controller.current_page = 1
+        self.pagination_widget.update_items(methods)
+        self.update_methods_table()
         self.update_stats_cards(methods)
 
     def update_methods_table(self, methods=None):
@@ -757,6 +761,7 @@ class PaymentMethodView(ModuleView):
             
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(methods)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(methods)
             self.update_methods_table()
             self.update_stats_cards(methods)

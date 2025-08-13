@@ -417,6 +417,7 @@ class UsersView(ModuleView):
             print(f"[DEBUG - Usuarios] Obtenidos {len(usuarios)} usuarios")
             
             self.pagination_controller.set_items(usuarios)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(usuarios)
             print("[DEBUG - Usuarios] Paginación actualizada")
             
@@ -437,6 +438,7 @@ class UsersView(ModuleView):
             print(f"[DEBUG - Usuarios] Obtenidos {len(usuarios)} usuarios")
             
             self.pagination_controller.set_items(usuarios)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(usuarios)
             print("[DEBUG - Usuarios] Paginación actualizada")
             
@@ -572,6 +574,11 @@ class UsersView(ModuleView):
                     )
                 )
         self.page.update()
+        try:
+            if hasattr(self.page, "scroll_to"):
+                self.page.scroll_to(0)
+        except Exception:
+            pass
 
     def mostrar_formulario(self, e):
         self.usuario_editando = None
@@ -887,6 +894,7 @@ class UsersView(ModuleView):
 
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(usuarios_filtrados)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(usuarios_filtrados)
             self.update_users_table()
         except Exception as ex:

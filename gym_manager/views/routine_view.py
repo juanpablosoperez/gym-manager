@@ -264,6 +264,7 @@ class RoutinesView(ModuleView):
             print(f"[DEBUG - Rutinas] Obtenidas {len(rutinas)} rutinas")
             
             self.pagination_controller.set_items(rutinas)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(rutinas)
             print("[DEBUG - Rutinas] Paginación actualizada")
             
@@ -318,6 +319,7 @@ class RoutinesView(ModuleView):
             
             # Actualizar paginación
             self.pagination_controller.set_items(rutinas)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(rutinas)
             
             print("[DEBUG - Rutinas] Llamando a update_routines_table")
@@ -794,6 +796,7 @@ class RoutinesView(ModuleView):
             
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(rutinas)
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(rutinas)
             self.update_routines_table()
         except Exception as ex:
