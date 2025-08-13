@@ -22,6 +22,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from types import SimpleNamespace
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
@@ -855,13 +856,16 @@ class PaymentsView(ModuleView):
                 payments = [p for p in temp_controller.get_payments() if p.estado == 1]
                 print(f"[DEBUG - Pagos] Obtenidos {len(payments)} pagos")
                 
+                # Mapear a objetos livianos antes de cerrar la sesión
+                mapped_payments = self._map_payments(payments)
                 # Actualizar paginación
-                self.pagination_controller.set_items(payments)
-                self.pagination_widget.update_items(payments)
+                self.pagination_controller.set_items(mapped_payments)
+                self.pagination_controller.current_page = 1
+                self.pagination_widget.update_items(mapped_payments)
                 print("[DEBUG - Pagos] Paginación actualizada")
                 
-                # Actualizar tabla
-                self.update_payments_table(payments)
+                # Actualizar tabla (usar página actual)
+                self.update_payments_table()
                 print("[DEBUG - Pagos] Tabla actualizada")
             
             # Cargar la cuota mensual actual
@@ -920,6 +924,35 @@ class PaymentsView(ModuleView):
         self.new_payment_modal.open = True
         self.page.update()
 
+    def _map_payments(self, payments):
+        """Mapea objetos Pago a estructuras simples para evitar DetachedInstanceError tras cerrar sesión."""
+        mapped = []
+        for p in payments or []:
+            try:
+                miembro_nombre = f"{p.miembro.nombre} {p.miembro.apellido}" if getattr(p, 'miembro', None) else ""
+                metodo_desc = p.metodo_pago.descripcion if getattr(p, 'metodo_pago', None) else ""
+                mapped.append(SimpleNamespace(
+                    id_pago=p.id_pago,
+                    fecha_pago=p.fecha_pago,
+                    monto=p.monto,
+                    referencia=p.referencia,
+                    estado=int(p.estado) if isinstance(p.estado, bool) else p.estado,
+                    miembro_nombre=miembro_nombre,
+                    metodo_pago_descripcion=metodo_desc,
+                ))
+            except Exception:
+                # Fallback mínimo
+                mapped.append(SimpleNamespace(
+                    id_pago=getattr(p, 'id_pago', 0),
+                    fecha_pago=getattr(p, 'fecha_pago', None),
+                    monto=getattr(p, 'monto', 0),
+                    referencia=getattr(p, 'referencia', ''),
+                    estado=int(getattr(p, 'estado', 1)),
+                    miembro_nombre="",
+                    metodo_pago_descripcion="",
+                ))
+        return mapped
+
     def close_modal(self, e):
         """
         Cierra el modal de nuevo pago y limpia los campos
@@ -949,7 +982,11 @@ class PaymentsView(ModuleView):
                 # Recrear el controlador con la nueva sesión
                 temp_controller = PaymentController(session)
                 payments = [p for p in temp_controller.get_payments() if p.estado == 1]
-                self.update_payments_table(payments)
+                mapped_payments = self._map_payments(payments)
+                self.pagination_controller.set_items(mapped_payments)
+                self.pagination_controller.current_page = 1
+                self.pagination_widget.update_items(mapped_payments)
+                self.update_payments_table()
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
@@ -1041,18 +1078,7 @@ class PaymentsView(ModuleView):
             for payment in payments:
                 estado_texto = "Pagado" if payment.estado == 1 else "Cancelado"
                 color_estado = ft.colors.GREEN if payment.estado == 1 else ft.colors.RED
-                
-                # Crear un objeto ligero con solo los datos necesarios para evitar problemas de sesión
-                payment_data = type('PaymentData', (), {
-                    'id_pago': payment.id_pago,
-                    'fecha_pago': payment.fecha_pago,
-                    'monto': payment.monto,
-                    'referencia': payment.referencia,
-                    'estado': payment.estado,
-                    'miembro_nombre': f"{payment.miembro.nombre} {payment.miembro.apellido}",
-                    'metodo_pago_descripcion': payment.metodo_pago.descripcion
-                })
-                
+                payment_data = payment
                 self.payments_table.rows.append(
                     ft.DataRow(
                         cells=[
@@ -1130,10 +1156,12 @@ class PaymentsView(ModuleView):
                 # Si el filtro es por estado, filtrar aquí también por si acaso
                 if 'estado' in filters:
                     payments = [p for p in payments if p.estado == filters['estado']]
-                
+
+                mapped_payments = self._map_payments(payments)
                 # Actualizar paginación con los datos filtrados
-                self.pagination_controller.set_items(payments)
-                self.pagination_widget.update_items(payments)
+                self.pagination_controller.set_items(mapped_payments)
+                self.pagination_controller.current_page = 1
+                self.pagination_widget.update_items(mapped_payments)
                 self.update_payments_table()
         except Exception as e:
             import logging
