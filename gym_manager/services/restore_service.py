@@ -14,6 +14,7 @@ import flet as ft
 import sqlparse
 import re
 import base64
+import sys
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -33,29 +34,41 @@ class RestoreService:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         
-        # Crear directorio de logs si no existe
-        log_dir = Path('logs')
-        log_dir.mkdir(exist_ok=True)
+        # Directorio de datos/logs escribible del usuario
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent
+        else:
+            base_dir = Path(__file__).resolve().parent.parent.parent
+        data_root = Path(os.getenv('LOCALAPPDATA', str(Path.home()))) / 'GymManager'
+        data_root.mkdir(parents=True, exist_ok=True)
+        log_dir = data_root / 'logs'
+        log_dir.mkdir(parents=True, exist_ok=True)
         
         # Crear manejador de archivo
-        handler = logging.FileHandler('logs/restore.log')
+        handler = logging.FileHandler(str(log_dir / 'restore.log'))
         handler.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         
-        # Cargar variables de entorno del archivo .env.dev
-        project_root = Path(__file__).parent.parent.parent
-        env_path = project_root / '.env.dev'
-        if not env_path.exists():
-            raise FileNotFoundError(f"No se encontró el archivo de configuración: {env_path}")
-            
-        load_dotenv(env_path, override=True)  # Forzar la sobrescritura de variables
+        # Cargar variables de entorno desde posibles ubicaciones
+        project_root = base_dir
+        for candidate in [
+            project_root / '.env',
+            project_root / '.env.dev',
+            Path('.env'),
+            Path('.env.dev'),
+        ]:
+            try:
+                if candidate.exists():
+                    load_dotenv(candidate, override=False)
+            except Exception:
+                pass
         
         # Configuración de la base de datos
         self.DATABASE_URL = os.getenv('DATABASE_URL')
         if not self.DATABASE_URL:
-            raise ValueError("No se encontró la variable de entorno DATABASE_URL")
+            raise ValueError("No se encontró la variable de entorno DATABASE_URL. Cree un .env.dev junto al ejecutable o defina la variable de entorno.")
             
         self.logger.info(f"[Restore] Usando base de datos: {self.DATABASE_URL}")
         
@@ -116,7 +129,10 @@ class RestoreService:
             # Preparar el backup
             backup_path = Path(backup.file_path)
             if not backup_path.is_absolute():
-                backup_path = Path(__file__).parent.parent.parent / backup_path
+                # Intentar resolver en carpeta de datos de usuario primero
+                data_root = Path(os.getenv('LOCALAPPDATA', str(Path.home()))) / 'GymManager' / 'backups'
+                candidate = data_root / backup_path.name
+                backup_path = candidate if candidate.exists() else (Path(__file__).parent.parent.parent / backup_path)
             
             if not backup_path.exists():
                 return False, f"Archivo de backup no encontrado: {backup_path}"
@@ -173,7 +189,9 @@ class RestoreService:
                 
             backup_path = Path(backup.file_path)
             if not backup_path.is_absolute():
-                backup_path = Path(__file__).parent.parent.parent / backup_path
+                data_root = Path(os.getenv('LOCALAPPDATA', str(Path.home()))) / 'GymManager' / 'backups'
+                candidate = data_root / backup_path.name
+                backup_path = candidate if candidate.exists() else (Path(__file__).parent.parent.parent / backup_path)
             
             if not backup_path.exists():
                 return False, f"Archivo de backup no encontrado: {backup_path}"

@@ -1,5 +1,7 @@
 import flet as ft
+Colors = getattr(ft, "colors", getattr(ft, "Colors", None))
 from gym_manager.controllers.auth_controller import AuthController
+from gym_manager.utils.navigation import navigate_to_login
 
 class LoginView:
     def __init__(self, page: ft.Page, auth_controller: AuthController):
