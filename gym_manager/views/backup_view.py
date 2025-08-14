@@ -261,7 +261,6 @@ class BackupView(BaseView):
             data_row_color=ft.colors.WHITE,
             data_row_min_height=56,
             expand=True,
-            width=1200,
         )
 
         # Layout principal

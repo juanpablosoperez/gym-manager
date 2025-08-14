@@ -218,6 +218,7 @@ class PaymentsView(ModuleView):
             heading_row_height=60,
             data_row_color=ft.colors.WHITE,
             data_row_min_height=56,
+            expand=True,
         )
 
         # Modal de nuevo pago
@@ -749,7 +750,7 @@ class PaymentsView(ModuleView):
                         content=self.title,
                         padding=ft.padding.only(bottom=30, top=0, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=900,
+                        
                     ),
                     # Encabezado (título a la izquierda, alta y export a la derecha)
                     ft.Container(
@@ -769,7 +770,7 @@ class PaymentsView(ModuleView):
                         ),
                         padding=ft.padding.only(bottom=20, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=1300,
+                        
                     ),
                     # Filtros compactos
                     ft.Container(
@@ -788,14 +789,14 @@ class PaymentsView(ModuleView):
                         ),
                         padding=ft.padding.only(bottom=20, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=1300,
+                        
                     ),
                     # Tarjeta informativa adicional (debajo de filtros)
                     ft.Container(
                         content=self.monthly_fee_card,
                         padding=ft.padding.only(bottom=10, left=10, right=30),
                         alignment=ft.alignment.top_left,
-                        width=1300,
+                        
                     ),
                     ft.Container(
                         content=ft.Column(
@@ -807,7 +808,7 @@ class PaymentsView(ModuleView):
                             expand=True,
                         ),
                         alignment=ft.alignment.top_left,
-                        width=1300,
+                        
                         padding=ft.padding.only(top=30, left=40, right=40),
                         height=600,
                     ),

@@ -182,6 +182,7 @@ class MembersView(ModuleView):
             heading_row_height=60,
             data_row_color=ft.colors.WHITE,
             data_row_min_height=56,
+            expand=True,
         )
 
         # Modal de nuevo/editar miembro

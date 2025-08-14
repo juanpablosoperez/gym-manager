@@ -338,7 +338,6 @@ class UsersView(ModuleView):
             data_row_color=ft.colors.WHITE,
             data_row_min_height=56,
             expand=True,
-            width=1200,
         )
 
         # Layout principal
@@ -358,7 +357,7 @@ class UsersView(ModuleView):
                         ),
                         padding=ft.padding.only(bottom=30, top=0, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=1300,
+                        
                     ),
                     ft.Container(
                         content=ft.Row(

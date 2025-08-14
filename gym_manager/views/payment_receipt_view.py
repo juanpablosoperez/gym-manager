@@ -161,6 +161,7 @@ class PaymentReceiptView(ModuleView):
             heading_row_height=60,
             data_row_color=ft.colors.WHITE,
             data_row_min_height=56,
+            expand=True,
         )
 
         # Layout principal
@@ -178,7 +179,7 @@ class PaymentReceiptView(ModuleView):
                         ),
                         padding=ft.padding.only(bottom=20, top=0, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=1200,
+                        
                     ),
                     # Filtros compactos
                     ft.Container(
@@ -195,7 +196,7 @@ class PaymentReceiptView(ModuleView):
                         ),
                         padding=ft.padding.only(bottom=10, left=10, right=10),
                         alignment=ft.alignment.top_left,
-                        width=1200,
+                        
                     ),
                     ft.Container(
                         content=ft.Row(
@@ -213,7 +214,7 @@ class PaymentReceiptView(ModuleView):
                             expand=True,
                         ),
                         alignment=ft.alignment.top_left,
-                        width=1200,
+                        
                         padding=ft.padding.only(top=10),
                     ),
                     # Widget de paginación
