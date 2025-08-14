@@ -128,6 +128,22 @@ class StatisticsView(ModuleView):
         self.new_members_line_chart = self._create_chart_placeholder("Nuevos Miembros por Mes")
         self.active_memberships_by_type_chart = self._create_chart_placeholder("Membresías Activas")
 
+        # Indicador de carga (overlay modal)
+        self.loading_dialog = ft.AlertDialog(
+            modal=True,
+            content=ft.Row(
+                controls=[
+                    ft.ProgressRing(),
+                    ft.Text("  Cargando estadísticas...", size=16),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            actions=[],
+        )
+        # Asegurar que el overlay contenga el diálogo
+        if self.loading_dialog not in self.page.overlay:
+            self.page.overlay.append(self.loading_dialog)
+
     def _create_summary_card(self, icon_name, value=None, description=None, color=ft.colors.PRIMARY, value_text=None, text_value=None, description_value_format="{}"):
         icon_widget = ft.Icon(name=icon_name, size=40, color=color)
         
@@ -170,8 +186,23 @@ class StatisticsView(ModuleView):
             bgcolor=ft.colors.WHITE,
             shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)),
             margin=ft.margin.symmetric(vertical=10),
-            height=350 
+            height=500 
         )
+
+    # API pública para mostrar/ocultar el loader desde el controlador o el contenedor
+    def show_loading(self):
+        try:
+            self.loading_dialog.open = True
+            self.page.update()
+        except Exception:
+            pass
+
+    def hide_loading(self):
+        try:
+            self.loading_dialog.open = False
+            self.page.update()
+        except Exception:
+            pass
 
     def _open_date_picker(self, picker):
         picker.open = True
@@ -240,226 +271,21 @@ class StatisticsView(ModuleView):
                 ], spacing=10, run_spacing=10
             )
 
-            # --- Gráficos ---
+            # --- Gráficos (usar placeholders al construir; el controlador los cargará) ---
             if not HAS_PLOTLY:
                 _LOGGER.warning('Plotly/PlotlyChart no disponible. Mostrando placeholder sin gráficos.')
-                return ft.Container(
-                    content=ft.Column([
-                        header_section,
-                        report_filters_card,
-                        ft.Container(ft.Text('Plotly no está disponible en este paquete. Instala plotly y reempaqueta.'), padding=20),
-                    ], scroll=ft.ScrollMode.ADAPTIVE),
-                    expand=True,
-                )
-
-            # Ingresos por Mes (datos reales)
-            data_ingresos = self.controller.get_monthly_income_data()
-            fig_ingresos = go.Figure(
-                data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")],
-                layout=go.Layout(
-                    title=dict(
-                        text="Ingresos por Mes",
-                        font=dict(size=24, family="Arial", color="black")
-                    ),
-                    xaxis=dict(
-                        title=dict(
-                            text="Mes",
-                            font=dict(size=18, family="Arial")
-                        ),
-                        tickfont=dict(size=18)
-                    ),
-                    yaxis=dict(
-                        title=dict(
-                            text="Ingresos ($)",
-                            font=dict(size=18, family="Arial")
-                        ),
-                        tickfont=dict(size=18)
-                    ),
-                    width=800,
-                    height=600,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
-            )
-            # Intentar PlotlyChart; si falla, usar imagen PNG (requiere kaleido)
-            try:
-                ingresos_widget = PlotlyChart(fig_ingresos, expand=True)
-            except Exception as e:
-                _LOGGER.warning('Fallo PlotlyChart ingresos, usando PNG: %s', e)
-                try:
-                    png_bytes = fig_ingresos.to_image(format="png")
-                    ingresos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
-                except Exception as e2:
-                    ingresos_widget = ft.Text(f"No se pudo renderizar gráfico (ingresos): {e2}", color=ft.colors.RED)
-
-            chart_ingresos = ft.Container(
-            ingresos_widget, 
-            bgcolor=ft.colors.WHITE, 
-            border_radius=12, 
-            padding=20, 
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
-            margin=ft.margin.symmetric(vertical=10)
-        )
-
-            # Distribución de Métodos de Pago (datos reales)
-            data_metodos = self.controller.get_payment_methods_distribution()
-            metodos = list(data_metodos.keys())
-            valores = list(data_metodos.values())
-            fig_metodos = go.Figure(
-                data=[go.Pie(
-                    labels=metodos, 
-                    values=valores, 
-                    hole=0.3,
-                    textfont=dict(size=18)
-                )],
-                layout=go.Layout(
-                    title=dict(
-                        text="Distribución de Métodos de Pago",
-                        font=dict(size=24, family="Arial", color="black")
-                    ),
-                    legend=dict(
-                        font=dict(size=18)
-                    ),
-                    width=800,
-                    height=600,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
-            )
-            try:
-                metodos_widget = PlotlyChart(fig_metodos, expand=True)
-            except Exception as e:
-                _LOGGER.warning('Fallo PlotlyChart metodos, usando PNG: %s', e)
-                try:
-                    png_bytes = fig_metodos.to_image(format="png")
-                    metodos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
-                except Exception as e2:
-                    metodos_widget = ft.Text(f"No se pudo renderizar gráfico (métodos): {e2}", color=ft.colors.RED)
-
-            chart_metodos = ft.Container(
-            metodos_widget, 
-            bgcolor=ft.colors.WHITE, 
-            border_radius=12, 
-            padding=20, 
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
-            margin=ft.margin.symmetric(vertical=10)
-        )
-
-            # Nuevos Miembros por Mes (datos reales)
-            data_nuevos = self.controller.get_new_members_per_month()
-            meses = data_nuevos["meses"]
-            nuevos = data_nuevos["nuevos"]
-            fig_nuevos = go.Figure(
-                data=[go.Scatter(
-                    x=meses, 
-                    y=nuevos, 
-                    mode="lines+markers", 
-                    line=dict(color="#4CAF50"),
-                    textfont=dict(size=18)
-                )],
-                layout=go.Layout(
-                    title=dict(
-                        text="Nuevos Miembros por Mes",
-                        font=dict(size=24, family="Arial", color="black")
-                    ),
-                    xaxis=dict(
-                        title=dict(
-                            text="Mes",
-                            font=dict(size=18, family="Arial")
-                        ),
-                        tickfont=dict(size=18)
-                    ),
-                    yaxis=dict(
-                        title=dict(
-                            text="Cantidad",
-                            font=dict(size=18, family="Arial")
-                        ),
-                        tickfont=dict(size=18)
-                    ),
-                    width=800,
-                    height=600,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
-            )
-            try:
-                nuevos_widget = PlotlyChart(fig_nuevos, expand=True)
-            except Exception as e:
-                _LOGGER.warning('Fallo PlotlyChart nuevos, usando PNG: %s', e)
-                try:
-                    png_bytes = fig_nuevos.to_image(format="png")
-                    nuevos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
-                except Exception as e2:
-                    nuevos_widget = ft.Text(f"No se pudo renderizar gráfico (nuevos): {e2}", color=ft.colors.RED)
-
-            chart_nuevos = ft.Container(
-            nuevos_widget, 
-            bgcolor=ft.colors.WHITE, 
-            border_radius=12, 
-            padding=20, 
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
-            margin=ft.margin.symmetric(vertical=10)
-        )
-
-            # Membresías Activas por Tipo (datos reales)
-            data_tipos = self.controller.get_active_memberships_by_type()
-            tipos = list(data_tipos.keys())
-            activos = list(data_tipos.values())
-            fig_tipos = go.Figure(
-                data=[go.Bar(
-                    x=tipos, 
-                    y=activos, 
-                    marker_color="#FF9800",
-                    textfont=dict(size=18)
-                )],
-                layout=go.Layout(
-                    title=dict(
-                        text="Membresías Activas por Tipo",
-                        font=dict(size=24, family="Arial", color="black")
-                    ),
-                    xaxis=dict(
-                        title=dict(
-                            text="Tipo",
-                            font=dict(size=18, family="Arial")
-                        ),
-                        tickfont=dict(size=18)
-                    ),
-                    yaxis=dict(
-                        title=dict(
-                            text="Cantidad",
-                            font=dict(size=18, family="Arial")
-                        ),
-                        tickfont=dict(size=18)
-                    ),
-                    width=800,
-                    height=600,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
-            )
-            try:
-                tipos_widget = PlotlyChart(fig_tipos, expand=True)
-            except Exception as e:
-                _LOGGER.warning('Fallo PlotlyChart tipos, usando PNG: %s', e)
-                try:
-                    png_bytes = fig_tipos.to_image(format="png")
-                    tipos_widget = ft.Image(src_base64=base64.b64encode(png_bytes).decode(), expand=True)
-                except Exception as e2:
-                    tipos_widget = ft.Text(f"No se pudo renderizar gráfico (tipos): {e2}", color=ft.colors.RED)
-
-            chart_tipos = ft.Container(
-            tipos_widget, 
-            bgcolor=ft.colors.WHITE, 
-            border_radius=12, 
-            padding=20, 
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)), 
-            margin=ft.margin.symmetric(vertical=10)
-        )
-
             charts_section = ft.Column([
                     ft.ResponsiveRow([
-                        ft.Column([chart_ingresos], col={"xs": 12, "md": 6}),
-                        ft.Column([chart_metodos], col={"xs": 12, "md": 6}),
+                        ft.Column([self.income_bar_chart], col={"xs": 12, "md": 12}),
                     ], spacing=10, run_spacing=10),
                     ft.ResponsiveRow([
-                        ft.Column([chart_nuevos], col={"xs": 12, "md": 6}),
-                        ft.Column([chart_tipos], col={"xs": 12, "md": 6}),
+                        ft.Column([self.payment_method_pie_chart], col={"xs": 12, "md": 12}),
+                    ], spacing=10, run_spacing=10),
+                    ft.ResponsiveRow([
+                        ft.Column([self.new_members_line_chart], col={"xs": 12, "md": 12}),
+                    ], spacing=10, run_spacing=10),
+                    ft.ResponsiveRow([
+                        ft.Column([self.active_memberships_by_type_chart], col={"xs": 12, "md": 12}),
                     ], spacing=10, run_spacing=10),
                 ], spacing=10
             )
@@ -474,7 +300,7 @@ class StatisticsView(ModuleView):
                 ], spacing=20),
                 padding=ft.padding.all(15),
             )
-            _LOGGER.info('StatisticsView.build OK, devolviendo layout completo')
+            _LOGGER.info('StatisticsView.build OK, devolviendo layout con placeholders')
             return ft.Container(
                 content=ft.Column(
                     controls=[

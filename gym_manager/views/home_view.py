@@ -86,6 +86,21 @@ class HomeView:
             margin=ft.margin.all(20),
         )
 
+        # Loader global para navegación entre módulos
+        self.loading_dialog = ft.AlertDialog(
+            modal=True,
+            content=ft.Row(
+                controls=[
+                    ft.ProgressRing(),
+                    ft.Text("  Cargando...", size=16),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            actions=[],
+        )
+        if self.loading_dialog not in self.page.overlay:
+            self.page.overlay.append(self.loading_dialog)
+
         # Construir la interfaz
         self.page.add(
             ft.Column(
@@ -105,6 +120,20 @@ class HomeView:
             )
         )
         self.page.update()
+
+    def show_loading(self):
+        try:
+            self.loading_dialog.open = True
+            self.page.update()
+        except Exception:
+            pass
+
+    def hide_loading(self):
+        try:
+            self.loading_dialog.open = False
+            self.page.update()
+        except Exception:
+            pass
 
     def create_stats_row(self):
         # Obtener datos reales de pagos de hoy
@@ -306,6 +335,8 @@ class HomeView:
         )
 
     def handle_route_change(self, index: int):
+        # Mostrar loader global durante la navegación
+        self.show_loading()
         # Limpiar el contenido actual
         self.main_content.content = None
         previous_title = self.section_title # Guardar título anterior por si acaso
@@ -401,26 +432,30 @@ class HomeView:
             section_title=self.section_title
         )
         
-        # Reconstruir la interfaz
-        self.page.controls.clear()
-        self.page.add(
-            ft.Column(
-                controls=[
-                    self.header,
-                    ft.Row(
-                        controls=[
-                            self.sidebar,
-                            ft.VerticalDivider(width=1),
-                            self.main_content,
-                        ],
-                        expand=True,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
+        try:
+            # Reconstruir la interfaz
+            self.page.controls.clear()
+            self.page.add(
+                ft.Column(
+                    controls=[
+                        self.header,
+                        ft.Row(
+                            controls=[
+                                self.sidebar,
+                                ft.VerticalDivider(width=1),
+                                self.main_content,
+                            ],
+                            expand=True,
+                        ),
+                    ],
+                    spacing=0,
+                    expand=True,
+                )
             )
-        )
-        self.page.update()
+            self.page.update()
+        finally:
+            # Ocultar loader tras completar la navegación
+            self.hide_loading()
 
     def show_message(self, message: str, color: str):
         self.snack.bgcolor = color

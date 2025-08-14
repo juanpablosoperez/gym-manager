@@ -44,9 +44,23 @@ class StatisticsController:
         if self.view is None:
             print("Error: La vista no está asignada al cargar estadísticas.")
             return
-        await self.load_summary_cards_data()
-        await self.load_charts_data()
-        self.page.update() # Cambiar self.view.update() a self.page.update()
+        # Asegurar que se muestre el loader antes de iniciar
+        try:
+            self.view.show_loading()
+        except Exception:
+            pass
+        try:
+            await self.load_summary_cards_data()
+            await self.load_charts_data()
+        except Exception as e:
+            print(f"Error al inicializar estadísticas: {str(e)}")
+        finally:
+            # Ocultar loader al finalizar o ante error
+            try:
+                self.view.hide_loading()
+            except Exception:
+                pass
+            self.page.update() # Cambiar self.view.update() a self.page.update()
 
     async def load_summary_cards_data(self):
         """Carga los datos para las tarjetas de resumen."""
@@ -77,8 +91,49 @@ class StatisticsController:
             self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
 
     async def load_charts_data(self):
-        """Carga y configura los datos para los gráficos."""
-        print("Chart data loading (placeholder)...")
+        """Carga y configura los datos para los gráficos, reemplazando placeholders una vez listos."""
+        try:
+            # Income per month
+            data_ingresos = self.get_monthly_income_data()
+            if hasattr(self.view, 'income_bar_chart') and data_ingresos:
+                import plotly.graph_objs as go
+                from flet.plotly_chart import PlotlyChart
+                fig = go.Figure(data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")])
+                chart = PlotlyChart(fig, expand=True)
+                self.view.income_bar_chart.content.controls[1] = chart
+
+            # Payment method pie
+            data_metodos = self.get_payment_methods_distribution()
+            if hasattr(self.view, 'payment_method_pie_chart') and data_metodos:
+                import plotly.graph_objs as go
+                from flet.plotly_chart import PlotlyChart
+                labels = list(data_metodos.keys())
+                values = list(data_metodos.values())
+                fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.3)])
+                chart = PlotlyChart(fig, expand=True)
+                self.view.payment_method_pie_chart.content.controls[1] = chart
+
+            # New members per month
+            data_nuevos = self.get_new_members_per_month()
+            if hasattr(self.view, 'new_members_line_chart') and data_nuevos:
+                import plotly.graph_objs as go
+                from flet.plotly_chart import PlotlyChart
+                fig = go.Figure(data=[go.Scatter(x=data_nuevos["meses"], y=data_nuevos["nuevos"], mode="lines+markers", line=dict(color="#4CAF50"))])
+                chart = PlotlyChart(fig, expand=True)
+                self.view.new_members_line_chart.content.controls[1] = chart
+
+            # Active memberships by type
+            data_tipos = self.get_active_memberships_by_type()
+            if hasattr(self.view, 'active_memberships_by_type_chart') and data_tipos:
+                import plotly.graph_objs as go
+                from flet.plotly_chart import PlotlyChart
+                fig = go.Figure(data=[go.Bar(x=list(data_tipos.keys()), y=list(data_tipos.values()), marker_color="#FF9800")])
+                chart = PlotlyChart(fig, expand=True)
+                self.view.active_memberships_by_type_chart.content.controls[1] = chart
+
+            self.page.update()
+        except Exception as e:
+            print(f"Error al cargar datos de gráficos: {str(e)}")
 
     async def handle_generate_report(self, e):
         """Maneja el evento de clic en el botón 'Generar Informe'."""
@@ -136,7 +191,7 @@ class StatisticsController:
                 ),
                 ft.ElevatedButton(
                     "Exportar",
-                    on_click=on_confirm,
+                    on_click=lambda e: self._handle_report_export(on_confirm),
                     style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_900, color=ft.colors.WHITE)
                 ),
             ],
@@ -146,6 +201,24 @@ class StatisticsController:
         self.page.overlay.append(self.report_dialog)
         self.report_dialog.open = True
         self.page.update()
+
+    def _handle_report_export(self, on_confirm):
+        """Muestra loader durante la exportación y ejecuta la acción de confirmación."""
+        try:
+            # Mostrar loader
+            if hasattr(self.view, 'show_loading'):
+                self.view.show_loading()
+        except Exception:
+            pass
+        try:
+            on_confirm(None)
+        finally:
+            # Ocultar loader al terminar
+            try:
+                if hasattr(self.view, 'hide_loading'):
+                    self.view.hide_loading()
+            except Exception:
+                pass
 
     def _close_report_dialog(self):
         if hasattr(self, 'report_dialog'):

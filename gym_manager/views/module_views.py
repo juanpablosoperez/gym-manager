@@ -66,6 +66,11 @@ class ReportsView(ModuleView):
         
         # Primero creamos la vista
         self.statistics_view = StatisticsViewImpl(page, None)
+        # Mostrar loader inmediatamente
+        try:
+            self.statistics_view.show_loading()
+        except Exception:
+            pass
         # Luego creamos el controlador con la vista
         self.statistics_controller = StatisticsController(self.statistics_view, page)
         # Asignamos el controlador a la vista
