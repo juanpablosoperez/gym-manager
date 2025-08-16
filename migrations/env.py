@@ -4,7 +4,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 import os
 import sys
 
@@ -28,11 +28,9 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-# Cargar variables de entorno
-load_dotenv('.env.dev')
-
-# Obtener la URL de la base de datos del archivo .env
-database_url = os.getenv('DATABASE_URL')
+# Configurar la base de datos MySQL
+from gym_manager.config import DATABASE_URL
+database_url = DATABASE_URL
 
 # Configurar la URL de la base de datos
 config.set_main_option('sqlalchemy.url', database_url)

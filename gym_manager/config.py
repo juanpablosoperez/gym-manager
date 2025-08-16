@@ -1,15 +1,15 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Obtener la ruta base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Cargar variables de entorno del archivo .env.dev
-env_path = BASE_DIR / '.env.dev'
-load_dotenv(env_path)
+# Configuración de la base de datos MySQL local
+# Configuración por defecto para desarrollo local
+DB_HOST = "localhost"
+DB_PORT = "3306"
+DB_NAME = "gym_manager"
+DB_USER = "root"
+DB_PASSWORD = "root"  # Cambiar por tu contraseña de MySQL
 
-# Configuración de la base de datos
-DATABASE_URL = os.getenv('DATABASE_URL')
-if not DATABASE_URL:
-    raise Exception("No se encontró la variable de entorno DATABASE_URL") 
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}" 

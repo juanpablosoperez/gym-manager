@@ -4,15 +4,10 @@ from sqlalchemy.pool import QueuePool
 import os
 from contextlib import contextmanager
 from sqlalchemy.exc import DBAPIError, PendingRollbackError
-from dotenv import load_dotenv
+from pathlib import Path
 
-# Cargar variables de entorno
-load_dotenv('.env.dev')
-
-# Configuración de la base de datos
-DATABASE_URL = os.getenv('DATABASE_URL')
-if not DATABASE_URL:
-    raise Exception("No se encontró la variable de entorno DATABASE_URL")
+# Configuración de la base de datos MySQL
+from gym_manager.config import DATABASE_URL
 
 # Crear el engine con pool de conexiones y reconexión automática
 engine = create_engine(

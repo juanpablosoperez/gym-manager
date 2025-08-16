@@ -1,11 +1,8 @@
 from sqlalchemy import create_engine
-from dotenv import load_dotenv
-import os
 from sqlalchemy.exc import SQLAlchemyError
+from gym_manager.config import DATABASE_URL
 
-load_dotenv('.env.dev')
-
-db_url = os.getenv("DATABASE_URL")
+db_url = DATABASE_URL
 print("Intentando conectar a:", db_url)
 
 try:

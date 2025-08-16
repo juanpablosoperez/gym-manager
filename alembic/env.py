@@ -1,16 +1,15 @@
 from logging.config import fileConfig
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
-# Cargar variables de entorno del archivo .env.dev
-env_path = Path(__file__).resolve().parent.parent / '.env.dev'
-load_dotenv(env_path)
+# Configurar la base de datos MySQL
+from gym_manager.config import DATABASE_URL
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -28,8 +27,8 @@ if config.config_file_name is not None:
 from gym_manager.models import Base
 target_metadata = Base.metadata
 
-# Obtener la URL de la base de datos del archivo .env.dev
-config.set_main_option('sqlalchemy.url', os.getenv('DATABASE_URL'))
+# Configurar la URL de la base de datos
+config.set_main_option('sqlalchemy.url', DATABASE_URL)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

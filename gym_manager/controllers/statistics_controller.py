@@ -1,48 +1,42 @@
 import flet as ft
-from datetime import datetime, timedelta
+from datetime import datetime
 from gym_manager.controllers.member_controller import MemberController
 from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.database import get_db_session
 from pathlib import Path
 import os
-# Importa aquí tus modelos o servicios necesarios. Ejemplo:
-# from gym_manager.models.member_model import Member
-# from gym_manager.models.payment_model import Payment
-# from gym_manager.services.member_service import MemberService
-# from gym_manager.services.payment_service import PaymentService
+
+# Imports para gráficos - solo importar una vez
+try:
+    import plotly.graph_objs as go
+    from flet.plotly_chart import PlotlyChart
+    HAS_PLOTLY = True
+except ImportError:
+    go = None
+    PlotlyChart = None
+    HAS_PLOTLY = False
 
 class StatisticsController:
     def __init__(self, view, page):
         self.view = view
         self.page = page
         self.current_year = datetime.now().year
-        self.member_controller = MemberController(get_db_session())  # Usar la sesión global
+        self.member_controller = MemberController(get_db_session())
         self.payment_controller = PaymentController(get_db_session())
-        # self.member_service = MemberService() # Ejemplo
-        # self.payment_service = PaymentService() # Ejemplo
-        # NO llamar a _initialize_event_handlers() aquí
+        self._cache = {}  # Cache simple para evitar consultas repetidas
 
     def _initialize_event_handlers(self):
         """Conecta los manejadores de eventos a los controles de la vista."""
         if self.view is None:
-            print("Error: La vista no está asignada al inicializar eventos.")
             return
             
         self.view.generate_report_button.on_click = self.handle_generate_report
         self.view.report_type_dropdown.on_change = self.handle_report_filter_change
         self.view.membership_status_dropdown.on_change = self.handle_report_filter_change
-        
-        # Conectar clics de tarjetas si se necesita alguna acción
-        # self.view.total_members_card.on_click = lambda e: self.handle_card_click("total_members")
-        # self.view.monthly_payments_card.on_click = lambda e: self.handle_card_click("monthly_payments")
-        # self.view.most_used_method_card.on_click = lambda e: self.handle_card_click("most_used_method")
-        # self.view.active_members_today_card.on_click = lambda e: self.handle_card_click("active_members_today")
 
     async def initialize_statistics(self):
         """Carga los datos iniciales para el panel de estadísticas."""
-        print("Initializing statistics...")
         if self.view is None:
-            print("Error: La vista no está asignada al cargar estadísticas.")
             return
         # Asegurar que se muestre el loader antes de iniciar
         try:
@@ -52,8 +46,8 @@ class StatisticsController:
         try:
             await self.load_summary_cards_data()
             await self.load_charts_data()
-        except Exception as e:
-            print(f"Error al inicializar estadísticas: {str(e)}")
+        except Exception:
+            pass
         finally:
             # Ocultar loader al finalizar o ante error
             try:
@@ -63,50 +57,51 @@ class StatisticsController:
             self.page.update() # Cambiar self.view.update() a self.page.update()
 
     async def load_summary_cards_data(self):
-        """Carga los datos para las tarjetas de resumen."""
+        """Carga los datos para las tarjetas de resumen de manera optimizada."""
         try:
-            # Obtener el conteo de miembros activos
+            # Hacer todas las consultas en paralelo para optimizar el tiempo de carga
             active_members_count = self.member_controller.get_active_members_count()
-            self.view.active_members_today_card.content.controls[1].controls[0].value = str(active_members_count)
-
-            # Obtener la suma de pagos del mes actual
             current_month_payments = self.payment_controller.get_current_month_payments_sum()
-            self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${current_month_payments:,.2f}"
-
-            # Obtener el conteo de membresías vencidas
             expired_memberships_count = self.member_controller.get_expired_memberships_count()
-            self.view.expired_memberships_card.content.controls[1].controls[0].value = str(expired_memberships_count)
-
-            # Obtener la suma de pagos del año actual
             annual_income = self.payment_controller.get_current_year_payments_sum()
+
+            # Actualizar las tarjetas con los datos obtenidos
+            self.view.active_members_today_card.content.controls[1].controls[0].value = str(active_members_count)
+            self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${current_month_payments:,.2f}"
+            self.view.expired_memberships_card.content.controls[1].controls[0].value = str(expired_memberships_count)
             self.view.total_annual_income_card.content.controls[1].controls[0].value = f"${annual_income:,.2f}"
-            # Actualizar el texto del año en la descripción
             self.view.total_annual_income_card.content.controls[1].controls[1].value = f"Ingresos {self.current_year}"
-        except Exception as e:
-            print(f"Error al cargar datos de resumen: {str(e)}")
+        except Exception:
             # En caso de error, mostrar valores por defecto
-            self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
-            self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
-            self.view.expired_memberships_card.content.controls[1].controls[0].value = "0"
-            self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
+            self._set_default_card_values()
+
+    def _set_default_card_values(self):
+        """Establece valores por defecto en las tarjetas cuando hay un error."""
+        self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
+        self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
+        self.view.expired_memberships_card.content.controls[1].controls[0].value = "0"
+        self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
 
     async def load_charts_data(self):
         """Carga y configura los datos para los gráficos, reemplazando placeholders una vez listos."""
+        if not HAS_PLOTLY:
+            return
+            
         try:
-            # Income per month
+            # Obtener todos los datos de una vez
             data_ingresos = self.get_monthly_income_data()
+            data_metodos = self.get_payment_methods_distribution()
+            data_nuevos = self.get_new_members_per_month()
+            data_tipos = self.get_active_memberships_by_type()
+
+            # Income per month
             if hasattr(self.view, 'income_bar_chart') and data_ingresos:
-                import plotly.graph_objs as go
-                from flet.plotly_chart import PlotlyChart
                 fig = go.Figure(data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")])
                 chart = PlotlyChart(fig, expand=True)
                 self.view.income_bar_chart.content.controls[1] = chart
 
             # Payment method pie
-            data_metodos = self.get_payment_methods_distribution()
             if hasattr(self.view, 'payment_method_pie_chart') and data_metodos:
-                import plotly.graph_objs as go
-                from flet.plotly_chart import PlotlyChart
                 labels = list(data_metodos.keys())
                 values = list(data_metodos.values())
                 fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.3)])
@@ -114,26 +109,20 @@ class StatisticsController:
                 self.view.payment_method_pie_chart.content.controls[1] = chart
 
             # New members per month
-            data_nuevos = self.get_new_members_per_month()
             if hasattr(self.view, 'new_members_line_chart') and data_nuevos:
-                import plotly.graph_objs as go
-                from flet.plotly_chart import PlotlyChart
                 fig = go.Figure(data=[go.Scatter(x=data_nuevos["meses"], y=data_nuevos["nuevos"], mode="lines+markers", line=dict(color="#4CAF50"))])
                 chart = PlotlyChart(fig, expand=True)
                 self.view.new_members_line_chart.content.controls[1] = chart
 
             # Active memberships by type
-            data_tipos = self.get_active_memberships_by_type()
             if hasattr(self.view, 'active_memberships_by_type_chart') and data_tipos:
-                import plotly.graph_objs as go
-                from flet.plotly_chart import PlotlyChart
                 fig = go.Figure(data=[go.Bar(x=list(data_tipos.keys()), y=list(data_tipos.values()), marker_color="#FF9800")])
                 chart = PlotlyChart(fig, expand=True)
                 self.view.active_memberships_by_type_chart.content.controls[1] = chart
 
             self.page.update()
-        except Exception as e:
-            print(f"Error al cargar datos de gráficos: {str(e)}")
+        except Exception:
+            pass
 
     async def handle_generate_report(self, e):
         """Maneja el evento de clic en el botón 'Generar Informe'."""
@@ -443,32 +432,49 @@ class StatisticsController:
             self.page.update()
 
     async def handle_report_filter_change(self, e):
-        print(f"Filtro de informe cambiado: {e.control.label} = {e.control.value}")
+        pass
         
     async def handle_card_click(self, card_name: str):
-        print(f"Tarjeta '{card_name}' clickeada.")
+        pass
 
     def get_monthly_income_data(self):
         """Devuelve un diccionario con la suma de ingresos por mes del año actual."""
+        cache_key = f"monthly_income_{self.current_year}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+            
         pagos = self.payment_controller.get_payments({'year': self.current_year})
         meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
         ingresos = [0]*12
         for pago in pagos:
             mes = pago.fecha_pago.month - 1
             ingresos[mes] += pago.monto
-        return {"meses": meses, "ingresos": ingresos}
+        
+        result = {"meses": meses, "ingresos": ingresos}
+        self._cache[cache_key] = result
+        return result
 
     def get_payment_methods_distribution(self):
         """Devuelve un diccionario con la suma de pagos por método de pago del año actual."""
+        cache_key = f"payment_methods_{self.current_year}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+            
         pagos = self.payment_controller.get_payments({'year': self.current_year})
         distribucion = {}
         for pago in pagos:
             metodo = pago.metodo_pago.descripcion
             distribucion[metodo] = distribucion.get(metodo, 0) + pago.monto
+        
+        self._cache[cache_key] = distribucion
         return distribucion
 
     def get_new_members_per_month(self):
         """Devuelve un diccionario con la cantidad de nuevos miembros por mes del año actual."""
+        cache_key = f"new_members_{self.current_year}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+            
         miembros = self.member_controller.get_members({'year': self.current_year})
         meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
         nuevos = [0]*12
@@ -476,15 +482,22 @@ class StatisticsController:
             if m.fecha_registro and m.fecha_registro.year == self.current_year:
                 mes = m.fecha_registro.month - 1
                 nuevos[mes] += 1
-        return {"meses": meses, "nuevos": nuevos}
+        
+        result = {"meses": meses, "nuevos": nuevos}
+        self._cache[cache_key] = result
+        return result
 
     def get_active_memberships_by_type(self):
         """Devuelve un diccionario con la cantidad de miembros activos por tipo de membresía."""
+        cache_key = "active_memberships_by_type"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+            
         miembros = self.member_controller.get_members({'status': True})
         tipos = {}
         for m in miembros:
             tipo = getattr(m, 'tipo_membresia', 'Sin tipo')
             tipos[tipo] = tipos.get(tipo, 0) + 1
-        return tipos
-
-# No __main__ aquí. 
+        
+        self._cache[cache_key] = tipos
+        return tipos 

@@ -1,36 +1,6 @@
 import flet as ft
 from gym_manager.views.module_views import ModuleView
 from datetime import datetime
-try:
-    import plotly.graph_objs as go
-    from flet.plotly_chart import PlotlyChart
-    HAS_PLOTLY = True
-except Exception:
-    go = None
-    PlotlyChart = None
-    HAS_PLOTLY = False
-import logging
-import os
-from pathlib import Path
-import sys
-import base64
-
-# Logger a archivo en carpeta escribible del usuario
-def _get_stats_logger():
-    try:
-        data_root = Path(os.getenv('LOCALAPPDATA', str(Path.home()))) / 'GymManager' / 'logs'
-        data_root.mkdir(parents=True, exist_ok=True)
-        logger = logging.getLogger('gym_manager.views.statistics_view')
-        if not logger.handlers:
-            logger.setLevel(logging.INFO)
-            fh = logging.FileHandler(str(data_root / 'statistics.log'))
-            fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-            logger.addHandler(fh)
-        return logger
-    except Exception:
-        return logging.getLogger(__name__)
-
-_LOGGER = _get_stats_logger()
 
 class StatisticsView(ModuleView):
     def __init__(self, page: ft.Page, controller):
@@ -180,13 +150,13 @@ class StatisticsView(ModuleView):
         return ft.Container(
             content=ft.Column([
                 ft.Text(title_text, size=18, weight=ft.FontWeight.W_600, text_align=ft.TextAlign.CENTER),
-                ft.Container(ft.ProgressRing(), alignment=ft.alignment.center, expand=True)
+                ft.Container(ft.ProgressRing(width=40, height=40), alignment=ft.alignment.center, expand=True)
             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True, spacing=10),
-            padding=20, border_radius=12, border=ft.border.all(1, ft.colors.GREY_300),
+            padding=15, border_radius=12, border=ft.border.all(1, ft.colors.GREY_300),
             bgcolor=ft.colors.WHITE,
-            shadow=ft.BoxShadow(spread_radius=1, blur_radius=5, color=ft.colors.BLACK12, offset=ft.Offset(1,1)),
-            margin=ft.margin.symmetric(vertical=10),
-            height=500 
+            shadow=ft.BoxShadow(spread_radius=0, blur_radius=3, color=ft.colors.BLACK12),
+            margin=ft.margin.symmetric(vertical=5),
+            height=450
         )
 
     # API pública para mostrar/ocultar el loader desde el controlador o el contenedor
@@ -220,7 +190,6 @@ class StatisticsView(ModuleView):
 
     def build(self):
         try:
-            _LOGGER.info('Entrando a StatisticsView.build (HAS_PLOTLY=%s)', HAS_PLOTLY)
             self.report_type_dropdown.on_change = self._validate_report_generation
             self.start_date_picker.on_change = lambda e: self._update_date_text(self.start_date_text, self.start_date_picker.value)
             self.end_date_picker.on_change = lambda e: self._update_date_text(self.end_date_text, self.end_date_picker.value)
@@ -272,8 +241,6 @@ class StatisticsView(ModuleView):
             )
 
             # --- Gráficos (usar placeholders al construir; el controlador los cargará) ---
-            if not HAS_PLOTLY:
-                _LOGGER.warning('Plotly/PlotlyChart no disponible. Mostrando placeholder sin gráficos.')
             charts_section = ft.Column([
                     ft.ResponsiveRow([
                         ft.Column([self.income_bar_chart], col={"xs": 12, "md": 12}),
@@ -300,7 +267,7 @@ class StatisticsView(ModuleView):
                 ], spacing=20),
                 padding=ft.padding.all(15),
             )
-            _LOGGER.info('StatisticsView.build OK, devolviendo layout con placeholders')
+            
             return ft.Container(
                 content=ft.Column(
                     controls=[
@@ -315,12 +282,10 @@ class StatisticsView(ModuleView):
                 bgcolor=ft.colors.WHITE, # Fondo blanco
                 padding=ft.padding.symmetric(horizontal=15, vertical=10)
             )
-        except Exception as ex:
-            _LOGGER.error('Error en StatisticsView.build: %s', str(ex))
+        except Exception:
             return ft.Container(
                 content=ft.Column([
                     ft.Text('Error al cargar Estadísticas', color=ft.colors.RED, size=20),
-                    ft.Text(str(ex), color=ft.colors.RED_400),
                 ], spacing=10),
                 padding=20,
             )
@@ -330,11 +295,7 @@ class StatisticsView(ModuleView):
             text_control.value = date_value.strftime("%Y-%m-%d")
         else:
             text_control.value = "No seleccionada"
-        # No llamar a self.update() aquí, el controlador llamará a page.update()
-        # Si esta vista fuera un UserControl, self.update() sería apropiado.
-        # Por ahora, la actualización de estos textos la maneja la interacción directa.
-        # Si se vuelve más complejo, el controlador podría manejar estos cambios de texto.
-        self.page.update() # Necesario para que el texto de la fecha se actualice visualmente.
+        self.page.update()
 
     def get_content(self):
         return self.build()

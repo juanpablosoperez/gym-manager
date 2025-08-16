@@ -7,7 +7,7 @@ from sqlalchemy import text, create_engine
 from gym_manager.models.backup import Backup
 import traceback
 from typing import List, Optional, Tuple
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 import base64
 import sys
@@ -53,25 +53,9 @@ class BackupService:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         
-        # Cargar variables de entorno desde posibles ubicaciones
-        env_loaded = False
-        for candidate in [
-            project_root / '.env',
-            project_root / '.env.dev',
-            Path('.env'),
-            Path('.env.dev'),
-        ]:
-            try:
-                if candidate.exists():
-                    load_dotenv(candidate, override=False)
-                    env_loaded = True
-            except Exception:
-                pass
-        
-        # Configuración de la base de datos
-        self.DATABASE_URL = os.getenv('DATABASE_URL')
-        if not self.DATABASE_URL:
-            raise ValueError("No se encontró la variable de entorno DATABASE_URL. Cree un archivo .env.dev junto al ejecutable o defina la variable de entorno.")
+        # Usar configuración SQLite local
+        from gym_manager.config import DATABASE_URL
+        self.DATABASE_URL = DATABASE_URL
             
         self.logger.info(f"[Backup] Usando base de datos: {self.DATABASE_URL}")
         
@@ -87,19 +71,7 @@ class BackupService:
         # Limpiar backups antiguos
         self._clean_old_backups()
 
-    def _get_database_url(self) -> str:
-        """Construye la URL de la base de datos a partir de las variables de entorno."""
-        # No necesitamos cargar el .env.dev aquí porque ya se cargó en el constructor
-        DB_USER = os.getenv('DB_USER')
-        DB_PASSWORD = os.getenv('DB_PASSWORD')
-        DB_HOST = os.getenv('DB_HOST')
-        DB_PORT = os.getenv('DB_PORT')
-        DB_NAME = os.getenv('DB_NAME')
-        
-        if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
-            raise ValueError("Faltan variables de entorno necesarias para la conexión a la base de datos")
-        
-        return f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
 
     def _clean_old_backups(self, max_backups: int = 10):
         """

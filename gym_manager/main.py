@@ -13,13 +13,19 @@ if not hasattr(ft, "icons") and hasattr(ft, "Icons"):
     ft.icons = ft.Icons
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
 
 # Local imports
 from gym_manager.views.login_view import LoginView
 from gym_manager.utils.navigation import init_db, navigate_to_login, set_db_session
 from gym_manager.controllers.auth_controller import AuthController
 from gym_manager.models import Base
+from gym_manager.config import DATABASE_URL
+
+# Import mínimo para PyInstaller - solo MySQL driver
+try:
+    import pymysql
+except ImportError:
+    pass
 
 # Configurar logging
 logging.basicConfig(
@@ -29,27 +35,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main(page: ft.Page):
-    # Cargar variables de entorno
-    load_dotenv('.env.dev')
-    
-    # Configurar la página
-    page.title = "Gym Manager"
-    page.window_icon = "assets/app.ico"
-    page.theme_mode = ft.ThemeMode.LIGHT
-    page.padding = 0
-    page.spacing = 0
-    page.window_width = 1200
-    page.window_height = 800
-    page.window_resizable = True
-    page.window_maximizable = True
-    page.window_minimizable = True
-    # La ventana no se maximiza al inicio, solo después del login
-    page.window_maximized = False  # Asegurar que no esté maximizada al inicio
-    
-    # Configuración de la base de datos
-    DATABASE_URL = os.getenv('DATABASE_URL')
-    if not DATABASE_URL:
-        logger.error("No se encontró la variable de entorno DATABASE_URL")
+    try:
+        # Configurar la página
+        page.title = "Gym Manager"
+        page.window_icon = "assets/app.ico"
+        page.theme_mode = ft.ThemeMode.LIGHT
+        page.padding = 0
+        page.spacing = 0
+        page.window_width = 1200
+        page.window_height = 800
+        page.window_resizable = True
+        page.window_maximizable = True
+        page.window_minimizable = True
+        # La ventana no se maximiza al inicio, solo después del login
+        page.window_maximized = False  # Asegurar que no esté maximizada al inicio
+        
+        logger.info(f"Usando base de datos: {DATABASE_URL}")
+    except Exception as e:
+        logger.error(f"Error al configurar la página: {e}")
         return
     
     # Inicializar la base de datos
@@ -107,8 +110,26 @@ def main(page: ft.Page):
     page.on_window_close = on_window_close
     
     # Inicializar la vista de login
-    auth_controller = AuthController(db_session)
-    LoginView(page, auth_controller)
+    try:
+        auth_controller = AuthController(db_session)
+        login_view = LoginView(page, auth_controller)
+        logger.info("Vista de login inicializada correctamente")
+    except Exception as e:
+        logger.error(f"Error al inicializar la vista de login: {e}")
+        logger.error(traceback.format_exc())
+        # Mostrar una pantalla de error básica
+        page.add(
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("Error al inicializar la aplicación", size=20, color=ft.colors.RED),
+                    ft.Text(f"Detalle: {str(e)}", size=12),
+                    ft.ElevatedButton("Cerrar", on_click=lambda _: page.window_destroy())
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                alignment=ft.alignment.center,
+                expand=True
+            )
+        )
+        page.update()
 
 if __name__ == "__main__":
     ft.app(target=main)
