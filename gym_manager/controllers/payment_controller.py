@@ -4,15 +4,13 @@ from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
 from gym_manager.models.payment_receipt import ComprobantePago
 from gym_manager.utils.database import session_scope
-from sqlalchemy.exc import DBAPIError, PendingRollbackError, SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, PendingRollbackError
 from sqlalchemy import func, extract
 from sqlalchemy.orm import joinedload
-import logging
 
 class PaymentController:
     def __init__(self, db_session=None):
         self.db_session = db_session
-        self.logger = logging.getLogger(__name__)
 
     def get_payments(self, filters=None):
         """
@@ -47,10 +45,16 @@ class PaymentController:
                             query = query.order_by(order_column.desc())
                         else:
                             query = query.order_by(order_column.asc())
+                else:
+                    # Ordenamiento por defecto: fecha de pago descendente (más reciente primero)
+                    query = query.order_by(Pago.fecha_pago.desc())
                 
                 # Límite de resultados
                 if filters.get('limit'):
                     query = query.limit(filters['limit'])
+            else:
+                # Si no hay filtros, aplicar ordenamiento por defecto
+                query = query.order_by(Pago.fecha_pago.desc())
             
             return query.all()
         except (DBAPIError, PendingRollbackError):
@@ -58,7 +62,6 @@ class PaymentController:
             self.db_session.rollback()
             return self.get_payments(filters)
         except Exception as e:
-            self.logger.error(f"Error al obtener pagos: {str(e)}")
             self.db_session.rollback()
             raise
 
@@ -66,11 +69,9 @@ class PaymentController:
         """
         Crea un nuevo pago
         """
-        self.logger.info("Iniciando creación de pago...")
         try:
             # Crear una nueva sesión para esta operación
             with session_scope() as session:
-                self.logger.info("Creando nuevo objeto Pago...")
                 new_payment = Pago(
                     fecha_pago=payment_data['fecha_pago'],
                     monto=payment_data['monto'],
@@ -79,13 +80,10 @@ class PaymentController:
                     id_miembro=payment_data['id_miembro'],
                     id_metodo_pago=payment_data['id_metodo_pago']
                 )
-                self.logger.info(f"Datos del pago: {payment_data}")
                 session.add(new_payment)
                 session.flush()  # Esto asegura que se genere el ID
-                self.logger.info("Pago creado exitosamente")
                 return True, {"message": "Pago registrado exitosamente", "id_pago": new_payment.id_pago}
         except Exception as e:
-            self.logger.error(f"Error al crear pago: {str(e)}")
             return False, f"Error al crear el pago: {str(e)}"
 
     def update_payment(self, payment_id, payment_data):
@@ -103,7 +101,6 @@ class PaymentController:
                 
                 return True, "Pago actualizado exitosamente"
         except Exception as e:
-            self.logger.error(f"Error al actualizar pago: {str(e)}")
             return False, f"Error al actualizar el pago: {str(e)}"
 
     def delete_payment(self, payment_id):
@@ -119,7 +116,6 @@ class PaymentController:
                 session.delete(payment)
                 return True, "Pago eliminado exitosamente"
         except Exception as e:
-            self.logger.error(f"Error al eliminar pago: {str(e)}")
             return False, f"Error al eliminar el pago: {str(e)}"
 
     def get_payment_summary(self):
@@ -150,8 +146,7 @@ class PaymentController:
                 'pending_payments': 0,
                 'monthly_total': 0
             }
-        except Exception as e:
-            self.logger.error(f"Error al obtener resumen de pagos: {str(e)}")
+        except Exception:
             return {
                 'total_payments': 0,
                 'pending_payments': 0,
@@ -173,8 +168,7 @@ class PaymentController:
             ).scalar() or 0
             
             return total
-        except Exception as e:
-            self.logger.error(f"Error al obtener suma de pagos mensuales: {str(e)}")
+        except Exception:
             return 0
 
     def get_current_year_payments_sum(self):
@@ -190,8 +184,7 @@ class PaymentController:
             ).scalar() or 0
             
             return total
-        except Exception as e:
-            self.logger.error(f"Error al obtener suma de pagos anuales: {str(e)}")
+        except Exception:
             return 0
 
     def save_payment_receipt(self, payment_id: int, pdf_content: bytes):
@@ -218,5 +211,4 @@ class PaymentController:
                 
                 return True, "Comprobante guardado exitosamente"
         except Exception as e:
-            self.logger.error(f"Error al guardar comprobante: {str(e)}")
             return False, f"Error al guardar el comprobante: {str(e)}"

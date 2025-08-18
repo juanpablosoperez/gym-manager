@@ -1,33 +1,24 @@
 import flet as ft
-import logging
 from gym_manager.views.module_views import ModuleView
 from gym_manager.models.payment import Pago
 from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.database import get_db_session
 from gym_manager.controllers.monthly_fee_controller import MonthlyFeeController
-from datetime import datetime, timedelta
-from gym_manager.utils.navigation import navigate_to_login
+from datetime import datetime
 from gym_manager.models.member import Miembro
 from gym_manager.models.payment_method import MetodoPago
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 import os
-from pathlib import Path
 from gym_manager.models.monthly_fee import CuotaMensual
 from gym_manager.utils.database import session_scope
 from sqlalchemy.orm import joinedload
 import subprocess
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 from types import SimpleNamespace
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
-# Configurar logger
-logger = logging.getLogger(__name__)
 
 class PaymentsView(ModuleView):
     def __init__(self, page: ft.Page):
@@ -52,9 +43,7 @@ class PaymentsView(ModuleView):
         
         # Ahora llamar setup_payment_view después de inicializar todo
         self.setup_payment_view()
-        self.export_type = None  # Agregar variable para el tipo de exportación
         self.check_overdue_payments()  # Verificar pagos vencidos al iniciar
-        # NO llamar load_data aquí, se llamará cuando la vista se muestre
 
     def setup_payment_view(self):
         # Título amigable arriba de los filtros, en negro y bien arriba
@@ -843,14 +832,11 @@ class PaymentsView(ModuleView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Pagos] Iniciando load_data asíncrono")
-            
             # Cargar pagos usando session_scope para evitar problemas de sesión
             with session_scope() as session:
                 # Recrear el controlador con la nueva sesión
                 temp_controller = PaymentController(session)
                 payments = [p for p in temp_controller.get_payments() if p.estado == 1]
-                print(f"[DEBUG - Pagos] Obtenidos {len(payments)} pagos")
                 
                 # Mapear a objetos livianos antes de cerrar la sesión
                 mapped_payments = self._map_payments(payments)
@@ -858,19 +844,16 @@ class PaymentsView(ModuleView):
                 self.pagination_controller.set_items(mapped_payments)
                 self.pagination_controller.current_page = 1
                 self.pagination_widget.update_items(mapped_payments)
-                print("[DEBUG - Pagos] Paginación actualizada")
                 
                 # Actualizar tabla (usar página actual)
                 self.update_payments_table()
-                print("[DEBUG - Pagos] Tabla actualizada")
             
             # Cargar la cuota mensual actual
             try:
                 with session_scope() as session:
                     current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
                     self.current_monthly_fee = current_fee.monto if current_fee else None
-            except Exception as e:
-                print(f"[DEBUG - Pagos] Error al cargar cuota mensual: {str(e)}")
+            except Exception:
                 self.current_monthly_fee = None
 
             # Cargar métodos de pago activos usando session_scope
@@ -880,11 +863,10 @@ class PaymentsView(ModuleView):
                     self.new_payment_method_field.options = [
                         ft.dropdown.Option(method.descripcion) for method in active_payment_methods
                     ]
-            except Exception as e:
-                print(f"[DEBUG - Pagos] Error al cargar métodos de pago: {str(e)}")
+            except Exception:
+                pass
                 
-        except Exception as e:
-            print(f"[DEBUG - Pagos] Error en load_data asíncrono: {str(e)}")
+        except Exception:
             self.update_payments_table([])
     
     def _on_page_change(self):
@@ -989,10 +971,7 @@ class PaymentsView(ModuleView):
                 self.pagination_controller.current_page = 1
                 self.pagination_widget.update_items(mapped_payments)
                 self.update_payments_table()
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al cargar datos: {str(e)}")
+        except Exception:
             self.update_payments_table([])
 
         # Cargar la cuota mensual actual
@@ -1000,10 +979,7 @@ class PaymentsView(ModuleView):
             with session_scope() as session:
                 current_fee = session.query(CuotaMensual).filter_by(activo=1).first()
                 self.current_monthly_fee = current_fee.monto if current_fee else None
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al cargar cuota mensual: {str(e)}")
+        except Exception:
             self.current_monthly_fee = None
 
         # Cargar métodos de pago activos usando session_scope
@@ -1016,11 +992,8 @@ class PaymentsView(ModuleView):
                 self.edit_payment_method_field.options = [
                     ft.dropdown.Option(method.descripcion) for method in active_payment_methods
                 ]
-                # No se llena filtro (fue eliminado de la pantalla)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al cargar métodos de pago: {str(e)}")
+        except Exception:
+            pass
         
         self.page.update()
 
@@ -1028,15 +1001,11 @@ class PaymentsView(ModuleView):
         """
         Actualiza la tabla de pagos con datos reales
         """
-        print(f"[DEBUG - Pagos] Actualizando tabla con {len(payments) if payments else 'None'} pagos")
         self.payments_table.rows.clear()
         
         # Obtener pagos de la página actual
         if payments is None:
             payments = self.pagination_controller.get_current_page_items()
-            print(f"[DEBUG - Pagos] Pagos de página actual: {len(payments)}")
-        
-        # (contador removido en esta vista)
         
         if not payments:
             # Mostrar mensaje cuando no hay pagos
@@ -1165,10 +1134,7 @@ class PaymentsView(ModuleView):
                 self.pagination_controller.current_page = 1
                 self.pagination_widget.update_items(mapped_payments)
                 self.update_payments_table()
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al aplicar filtros: {str(e)}")
+        except Exception:
             self.update_payments_table([])
 
     def clear_filters(self, e):
@@ -1217,9 +1183,6 @@ class PaymentsView(ModuleView):
                 self.edit_payment_modal.open = True
                 self.page.update()
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al cargar datos del pago: {str(e)}")
             self.show_message(f"Error al cargar los datos del pago: {str(e)}", ft.colors.RED)
 
     def close_edit_modal(self, e):
@@ -1335,10 +1298,6 @@ class PaymentsView(ModuleView):
             return
 
         try:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info("Iniciando generación de comprobante...")
-            
             # Crear el documento PDF
             downloads_path = os.path.expanduser("~/Downloads")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1426,7 +1385,6 @@ class PaymentsView(ModuleView):
                     pdf_content
                 )
                 if not success:
-                    logger.error(f"Error al guardar comprobante: {message}")
                     self.receipt_validation_text.value = f"Error al guardar el comprobante: {message}"
                     self.receipt_validation_text.color = ft.colors.RED
                 else:
@@ -1442,8 +1400,6 @@ class PaymentsView(ModuleView):
             self.close_receipt_modal(e)
 
         except Exception as e:
-            logger.error(f"Error al generar comprobante: {str(e)}")
-            
             # Mostrar mensaje de error
             self.receipt_validation_text.value = f"Error al generar el comprobante: {str(e)}"
             self.receipt_validation_text.color = ft.colors.RED
@@ -1480,10 +1436,7 @@ class PaymentsView(ModuleView):
                         'documento': member.documento
                     })
                     members_data.append(member_data)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al buscar miembros: {str(e)}")
+        except Exception:
             members_data = []
 
         self.member_search_results.controls.clear()
@@ -1568,13 +1521,11 @@ class PaymentsView(ModuleView):
                     pass
                 self.db_session.close()
             
-            logger.info("Obteniendo ID del método de pago...")
             metodo_pago_id = self.get_payment_method_id(self.new_payment_method_field.value)
             if not metodo_pago_id:
                 self.show_message("Error al obtener el método de pago", ft.colors.RED)
                 return
 
-            logger.info("Preparando datos del pago...")
             payment_data = {
                 'fecha_pago': self.new_payment_date_value,
                 'monto': monto,
@@ -1583,11 +1534,9 @@ class PaymentsView(ModuleView):
                 'referencia': self.new_payment_observations_field.value
             }
             
-            logger.info("Llamando al controlador para crear el pago...")
             success, response = self.payment_controller.create_payment(payment_data)
             
             if success:
-                logger.info("Pago creado exitosamente")
                 payment_id = response['id_pago']  # Obtener el ID del pago creado
                 
                 # Generar el comprobante para el pago recién creado
@@ -1677,13 +1626,9 @@ class PaymentsView(ModuleView):
                         pdf_content
                     )
                     if not success:
-                        logger.error(f"Error al guardar comprobante: {message}")
                         self.show_message(f"Error al guardar el comprobante: {message}", ft.colors.RED)
-                    else:
-                        logger.info("Comprobante guardado exitosamente en la base de datos")
 
                 except Exception as ex:
-                    logger.error(f"Error al generar comprobante automático: {str(ex)}")
                     self.show_message(f"Error al generar el comprobante: {str(ex)}", ft.colors.RED)
                 
                 self.close_modal(e)
@@ -1692,10 +1637,8 @@ class PaymentsView(ModuleView):
                 self.success_modal.open = True
                 self.page.update()
             else:
-                logger.error(f"Error al crear el pago: {response}")
                 self.show_message(response, ft.colors.RED)
         except Exception as e:
-            logger.error(f"Error inesperado al guardar el pago: {str(e)}")
             self.show_message(f"Error al guardar el pago: {str(e)}", ft.colors.RED)
 
     def get_payment_method_id(self, method_name):
@@ -1706,8 +1649,7 @@ class PaymentsView(ModuleView):
             with session_scope() as session:
                 method = session.query(MetodoPago).filter_by(descripcion=method_name).first()
                 return method.id_metodo_pago if method else None
-        except Exception as e:
-            logger.error(f"Error al obtener método de pago: {str(e)}")
+        except Exception:
             return None
 
     def show_message(self, message: str, color: str):
@@ -2076,11 +2018,9 @@ class PaymentsView(ModuleView):
                 self.overdue_alert.open = True
                 self.page.update()
 
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error al verificar pagos vencidos: {str(e)}")
+        except Exception:
             # No mostrar el error al usuario para no interrumpir la experiencia
+            pass
 
     def close_overdue_alert(self, e):
         """
