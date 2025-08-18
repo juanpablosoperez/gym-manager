@@ -5,6 +5,7 @@ from gym_manager.controllers.payment_controller import PaymentController
 from gym_manager.utils.database import get_db_session
 from pathlib import Path
 import os
+import asyncio
 
 # Imports para gráficos - solo importar una vez
 try:
@@ -23,106 +24,299 @@ class StatisticsController:
         self.current_year = datetime.now().year
         self.member_controller = MemberController(get_db_session())
         self.payment_controller = PaymentController(get_db_session())
-        self._cache = {}  # Cache simple para evitar consultas repetidas
+        self._cache = {}  # Cache mejorado para evitar consultas repetidas
+        self._cache_timeout = 300  # 5 minutos de timeout para el cache
+        self._cache_timestamps = {}  # Timestamps para controlar la expiración del cache
 
     def _initialize_event_handlers(self):
         """Conecta los manejadores de eventos a los controles de la vista."""
         if self.view is None:
             return
-            
-        self.view.generate_report_button.on_click = self.handle_generate_report
-        self.view.report_type_dropdown.on_change = self.handle_report_filter_change
-        self.view.membership_status_dropdown.on_change = self.handle_report_filter_change
+        
+        # Asegurar que los componentes UI estén creados antes de asignar event handlers
+        self.view._create_ui_components_lazy()
+        
+        # Ahora asignar los event handlers
+        if hasattr(self.view, 'generate_report_button'):
+            self.view.generate_report_button.on_click = self.handle_generate_report
+        if hasattr(self.view, 'report_type_dropdown'):
+            self.view.report_type_dropdown.on_change = self.handle_report_filter_change
+        if hasattr(self.view, 'membership_status_dropdown'):
+            self.view.membership_status_dropdown.on_change = self.handle_report_filter_change
 
     async def initialize_statistics(self):
-        """Carga los datos iniciales para el panel de estadísticas."""
+        """Carga los datos iniciales para el panel de estadísticas con optimizaciones."""
         if self.view is None:
+            print("Error: Vista es None")
             return
-        # Asegurar que se muestre el loader antes de iniciar
+        
+        print("🚀 Iniciando carga de estadísticas...")
+        
         try:
             self.view.show_loading()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error mostrando loader: {e}")
+        
         try:
+            # Cargar datos de tarjetas primero (más rápido)
+            print("📊 Cargando datos de tarjetas...")
             await self.load_summary_cards_data()
-            await self.load_charts_data()
-        except Exception:
-            pass
+            print("✅ Datos de tarjetas cargados")
+            self.page.update()
+            
+            # Cargar gráficos en segundo plano de forma asíncrona
+            print("📈 Iniciando carga de gráficos en background...")
+            asyncio.create_task(self._load_charts_background())
+            
+        except Exception as e:
+            print(f"Error en initialize_statistics: {e}")
         finally:
-            # Ocultar loader al finalizar o ante error
+            # Ocultar loader para las tarjetas (los gráficos seguirán cargando en background)
             try:
                 self.view.hide_loading()
-            except Exception:
-                pass
-            self.page.update() # Cambiar self.view.update() a self.page.update()
+            except Exception as e:
+                print(f"Error ocultando loader: {e}")
+            self.page.update()
+    
+    async def _load_charts_background(self):
+        """Carga los gráficos en segundo plano sin bloquear la UI"""
+        try:
+            print("🎨 Cargando gráficos...")
+            await self.load_charts_data()
+            print("✅ Gráficos cargados")
+        except Exception as e:
+            print(f"Error cargando gráficos: {e}")
 
     async def load_summary_cards_data(self):
-        """Carga los datos para las tarjetas de resumen de manera optimizada."""
+        """Carga los datos para las tarjetas de resumen de manera optimizada con cache."""
         try:
-            # Hacer todas las consultas en paralelo para optimizar el tiempo de carga
-            active_members_count = self.member_controller.get_active_members_count()
-            current_month_payments = self.payment_controller.get_current_month_payments_sum()
-            expired_memberships_count = self.member_controller.get_expired_memberships_count()
-            annual_income = self.payment_controller.get_current_year_payments_sum()
-
-            # Actualizar las tarjetas con los datos obtenidos
-            self.view.active_members_today_card.content.controls[1].controls[0].value = str(active_members_count)
-            self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${current_month_payments:,.2f}"
-            self.view.expired_memberships_card.content.controls[1].controls[0].value = str(expired_memberships_count)
-            self.view.total_annual_income_card.content.controls[1].controls[0].value = f"${annual_income:,.2f}"
-            self.view.total_annual_income_card.content.controls[1].controls[1].value = f"Ingresos {self.current_year}"
-        except Exception:
+            # Verificar cache primero
+            cache_key = f"summary_cards_{self.current_year}"
+            if self._is_cache_valid(cache_key):
+                print("💾 Usando datos en cache")
+                cached_data = self._cache[cache_key]
+                self._update_cards_with_data(cached_data)
+                return
+            
+            print("🔄 Obteniendo datos frescos de la base de datos...")
+            
+            # Ejecutar consultas de forma secuencial para evitar problemas de concurrencia
+            # con la sesión de base de datos
+            try:
+                active_members_count = self.member_controller.get_active_members_count()
+                print(f"✓ Miembros activos: {active_members_count}")
+            except Exception as e:
+                print(f"✗ Error obteniendo miembros activos: {e}")
+                active_members_count = 0
+                
+            try:
+                current_month_payments = self.payment_controller.get_current_month_payments_sum()
+                print(f"✓ Pagos del mes: ${current_month_payments}")
+            except Exception as e:
+                print(f"✗ Error obteniendo pagos del mes: {e}")
+                current_month_payments = 0
+                
+            try:
+                expired_memberships_count = self.member_controller.get_expired_memberships_count()
+                print(f"✓ Membresías vencidas: {expired_memberships_count}")
+            except Exception as e:
+                print(f"✗ Error obteniendo membresías vencidas: {e}")
+                expired_memberships_count = 0
+                
+            try:
+                annual_income = self.payment_controller.get_current_year_payments_sum()
+                print(f"✓ Ingresos anuales: ${annual_income}")
+            except Exception as e:
+                print(f"✗ Error obteniendo ingresos anuales: {e}")
+                annual_income = 0
+            
+            # Guardar en cache
+            data = {
+                'active_members': active_members_count,
+                'monthly_payments': current_month_payments,
+                'expired_memberships': expired_memberships_count,
+                'annual_income': annual_income
+            }
+            self._cache[cache_key] = data
+            self._cache_timestamps[cache_key] = datetime.now().timestamp()
+            
+            # Actualizar UI
+            self._update_cards_with_data(data)
+            print("📊 Tarjetas actualizadas correctamente")
+            
+        except Exception as e:
+            print(f"Error general en load_summary_cards_data: {e}")
             # En caso de error, mostrar valores por defecto
             self._set_default_card_values()
+    
+    def _update_cards_with_data(self, data):
+        """Actualiza las tarjetas con los datos proporcionados"""
+        try:
+            # Asegurar que los componentes UI estén creados
+            if not self.view._ui_components_created:
+                self.view._create_ui_components_lazy()
+            
+            # Verificar que las tarjetas existan antes de actualizarlas
+            if hasattr(self.view, 'active_members_today_card'):
+                self.view.active_members_today_card.content.controls[1].controls[0].value = str(data['active_members'])
+            if hasattr(self.view, 'monthly_payments_card'):
+                self.view.monthly_payments_card.content.controls[1].controls[0].value = f"${data['monthly_payments']:,.2f}"
+            if hasattr(self.view, 'expired_memberships_card'):
+                self.view.expired_memberships_card.content.controls[1].controls[0].value = str(data['expired_memberships'])
+            if hasattr(self.view, 'total_annual_income_card'):
+                self.view.total_annual_income_card.content.controls[1].controls[0].value = f"${data['annual_income']:,.2f}"
+                if len(self.view.total_annual_income_card.content.controls[1].controls) > 1:
+                    self.view.total_annual_income_card.content.controls[1].controls[1].value = f"Ingresos {self.current_year}"
+            
+            # Forzar actualización de la UI
+            self.page.update()
+            
+        except Exception as e:
+            print(f"Error actualizando tarjetas: {e}")  # Debug
+            self._set_default_card_values()
+    
+    def _is_cache_valid(self, cache_key):
+        """Verifica si el cache es válido basado en el timestamp"""
+        if cache_key not in self._cache or cache_key not in self._cache_timestamps:
+            return False
+        
+        current_time = datetime.now().timestamp()
+        cache_time = self._cache_timestamps[cache_key]
+        return (current_time - cache_time) < self._cache_timeout
 
     def _set_default_card_values(self):
         """Establece valores por defecto en las tarjetas cuando hay un error."""
-        self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
-        self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
-        self.view.expired_memberships_card.content.controls[1].controls[0].value = "0"
-        self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
+        try:
+            # Asegurar que los componentes UI estén creados
+            if not self.view._ui_components_created:
+                self.view._create_ui_components_lazy()
+            
+            # Verificar que las tarjetas existan antes de actualizarlas
+            if hasattr(self.view, 'active_members_today_card'):
+                self.view.active_members_today_card.content.controls[1].controls[0].value = "0"
+            if hasattr(self.view, 'monthly_payments_card'):
+                self.view.monthly_payments_card.content.controls[1].controls[0].value = "$0.00"
+            if hasattr(self.view, 'expired_memberships_card'):
+                self.view.expired_memberships_card.content.controls[1].controls[0].value = "0"
+            if hasattr(self.view, 'total_annual_income_card'):
+                self.view.total_annual_income_card.content.controls[1].controls[0].value = "$0.00"
+            
+            # Forzar actualización de la UI
+            self.page.update()
+            
+        except Exception as e:
+            print(f"Error estableciendo valores por defecto: {e}")  # Debug
 
     async def load_charts_data(self):
-        """Carga y configura los datos para los gráficos, reemplazando placeholders una vez listos."""
+        """Carga y configura los datos para los gráficos de manera optimizada con lazy loading."""
         if not HAS_PLOTLY:
+            print("⚠️ Plotly no disponible, saltando gráficos")
             return
             
         try:
-            # Obtener todos los datos de una vez
-            data_ingresos = self.get_monthly_income_data()
-            data_metodos = self.get_payment_methods_distribution()
-            data_nuevos = self.get_new_members_per_month()
-            data_tipos = self.get_active_memberships_by_type()
-
-            # Income per month
-            if hasattr(self.view, 'income_bar_chart') and data_ingresos:
-                fig = go.Figure(data=[go.Bar(x=data_ingresos["meses"], y=data_ingresos["ingresos"], marker_color="#1F4E78")])
+            # Obtener datos de gráficos de forma secuencial para evitar problemas de concurrencia
+            print("📈 Obteniendo datos para gráficos...")
+            
+            data_ingresos = self._get_cached_monthly_income_data()
+            print("✓ Datos de ingresos obtenidos")
+            
+            data_metodos = self._get_cached_payment_methods_distribution()
+            print("✓ Datos de métodos de pago obtenidos")
+            
+            data_nuevos = self._get_cached_new_members_per_month()
+            print("✓ Datos de nuevos miembros obtenidos")
+            
+            data_tipos = self._get_cached_active_memberships_by_type()
+            print("✓ Datos de tipos de membresía obtenidos")
+            
+            # Crear gráficos uno por uno para mejor UX
+            await self._create_chart_async("income", data_ingresos, 0)
+            await self._create_chart_async("payment_methods", data_metodos, 0.5)
+            await self._create_chart_async("new_members", data_nuevos, 1)
+            await self._create_chart_async("memberships_by_type", data_tipos, 1.5)
+            
+        except Exception as e:
+            print(f"Error en load_charts_data: {e}")
+    
+    async def _create_chart_async(self, chart_type, data, delay_seconds):
+        """Crea un gráfico específico de forma asíncrona con un pequeño delay para mejorar UX"""
+        try:
+            # Pequeño delay para escalonar la creación de gráficos
+            if delay_seconds > 0:
+                await asyncio.sleep(delay_seconds * 0.5)
+            
+            if isinstance(data, Exception) or not data:
+                return
+                
+            chart = None
+            
+            if chart_type == "income" and hasattr(self.view, 'income_bar_chart'):
+                fig = go.Figure(data=[go.Bar(
+                    x=data["meses"], 
+                    y=data["ingresos"], 
+                    marker_color="#1F4E78",
+                    name="Ingresos"
+                )])
+                fig.update_layout(
+                    title="Ingresos Mensuales",
+                    xaxis_title="Mes",
+                    yaxis_title="Monto ($)",
+                    height=400
+                )
                 chart = PlotlyChart(fig, expand=True)
                 self.view.income_bar_chart.content.controls[1] = chart
-
-            # Payment method pie
-            if hasattr(self.view, 'payment_method_pie_chart') and data_metodos:
-                labels = list(data_metodos.keys())
-                values = list(data_metodos.values())
-                fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.3)])
+                
+            elif chart_type == "payment_methods" and hasattr(self.view, 'payment_method_pie_chart'):
+                labels = list(data.keys())
+                values = list(data.values())
+                fig = go.Figure(data=[go.Pie(
+                    labels=labels, 
+                    values=values, 
+                    hole=0.3
+                )])
+                fig.update_layout(title="Métodos de Pago", height=400)
                 chart = PlotlyChart(fig, expand=True)
                 self.view.payment_method_pie_chart.content.controls[1] = chart
-
-            # New members per month
-            if hasattr(self.view, 'new_members_line_chart') and data_nuevos:
-                fig = go.Figure(data=[go.Scatter(x=data_nuevos["meses"], y=data_nuevos["nuevos"], mode="lines+markers", line=dict(color="#4CAF50"))])
+                
+            elif chart_type == "new_members" and hasattr(self.view, 'new_members_line_chart'):
+                fig = go.Figure(data=[go.Scatter(
+                    x=data["meses"], 
+                    y=data["nuevos"], 
+                    mode="lines+markers", 
+                    line=dict(color="#4CAF50"),
+                    name="Nuevos Miembros"
+                )])
+                fig.update_layout(
+                    title="Nuevos Miembros por Mes",
+                    xaxis_title="Mes",
+                    yaxis_title="Cantidad",
+                    height=400
+                )
                 chart = PlotlyChart(fig, expand=True)
                 self.view.new_members_line_chart.content.controls[1] = chart
-
-            # Active memberships by type
-            if hasattr(self.view, 'active_memberships_by_type_chart') and data_tipos:
-                fig = go.Figure(data=[go.Bar(x=list(data_tipos.keys()), y=list(data_tipos.values()), marker_color="#FF9800")])
+                
+            elif chart_type == "memberships_by_type" and hasattr(self.view, 'active_memberships_by_type_chart'):
+                fig = go.Figure(data=[go.Bar(
+                    x=list(data.keys()), 
+                    y=list(data.values()), 
+                    marker_color="#FF9800",
+                    name="Membresías Activas"
+                )])
+                fig.update_layout(
+                    title="Membresías Activas por Tipo",
+                    xaxis_title="Tipo de Membresía",
+                    yaxis_title="Cantidad",
+                    height=400
+                )
                 chart = PlotlyChart(fig, expand=True)
                 self.view.active_memberships_by_type_chart.content.controls[1] = chart
-
-            self.page.update()
-        except Exception:
-            pass
+            
+            # Actualizar UI después de crear cada gráfico
+            if chart:
+                self.page.update()
+                
+        except Exception as e:
+            print(f"Error creando gráfico {chart_type}: {e}")  # Debug
 
     async def handle_generate_report(self, e):
         """Maneja el evento de clic en el botón 'Generar Informe'."""
@@ -437,67 +631,101 @@ class StatisticsController:
     async def handle_card_click(self, card_name: str):
         pass
 
-    def get_monthly_income_data(self):
-        """Devuelve un diccionario con la suma de ingresos por mes del año actual."""
+    def _get_cached_monthly_income_data(self):
+        """Devuelve un diccionario con la suma de ingresos por mes del año actual con cache mejorado."""
         cache_key = f"monthly_income_{self.current_year}"
-        if cache_key in self._cache:
+        if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
             
-        pagos = self.payment_controller.get_payments({'year': self.current_year})
-        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-        ingresos = [0]*12
-        for pago in pagos:
-            mes = pago.fecha_pago.month - 1
-            ingresos[mes] += pago.monto
-        
-        result = {"meses": meses, "ingresos": ingresos}
-        self._cache[cache_key] = result
-        return result
+        try:
+            pagos = self.payment_controller.get_payments({'year': self.current_year})
+            meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+            ingresos = [0]*12
+            for pago in pagos:
+                mes = pago.fecha_pago.month - 1
+                ingresos[mes] += pago.monto
+            
+            result = {"meses": meses, "ingresos": ingresos}
+            self._cache[cache_key] = result
+            self._cache_timestamps[cache_key] = datetime.now().timestamp()
+            return result
+        except Exception:
+            return {"meses": [], "ingresos": []}
 
-    def get_payment_methods_distribution(self):
-        """Devuelve un diccionario con la suma de pagos por método de pago del año actual."""
+    def _get_cached_payment_methods_distribution(self):
+        """Devuelve un diccionario con la suma de pagos por método de pago del año actual con cache mejorado."""
         cache_key = f"payment_methods_{self.current_year}"
-        if cache_key in self._cache:
+        if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
             
-        pagos = self.payment_controller.get_payments({'year': self.current_year})
-        distribucion = {}
-        for pago in pagos:
-            metodo = pago.metodo_pago.descripcion
-            distribucion[metodo] = distribucion.get(metodo, 0) + pago.monto
-        
-        self._cache[cache_key] = distribucion
-        return distribucion
+        try:
+            pagos = self.payment_controller.get_payments({'year': self.current_year})
+            distribucion = {}
+            for pago in pagos:
+                metodo = pago.metodo_pago.descripcion
+                distribucion[metodo] = distribucion.get(metodo, 0) + pago.monto
+            
+            self._cache[cache_key] = distribucion
+            self._cache_timestamps[cache_key] = datetime.now().timestamp()
+            return distribucion
+        except Exception:
+            return {}
 
-    def get_new_members_per_month(self):
-        """Devuelve un diccionario con la cantidad de nuevos miembros por mes del año actual."""
+    def _get_cached_new_members_per_month(self):
+        """Devuelve un diccionario con la cantidad de nuevos miembros por mes del año actual con cache mejorado."""
         cache_key = f"new_members_{self.current_year}"
-        if cache_key in self._cache:
+        if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
             
-        miembros = self.member_controller.get_members({'year': self.current_year})
-        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-        nuevos = [0]*12
-        for m in miembros:
-            if m.fecha_registro and m.fecha_registro.year == self.current_year:
-                mes = m.fecha_registro.month - 1
-                nuevos[mes] += 1
-        
-        result = {"meses": meses, "nuevos": nuevos}
-        self._cache[cache_key] = result
-        return result
+        try:
+            miembros = self.member_controller.get_members({'year': self.current_year})
+            meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+            nuevos = [0]*12
+            for m in miembros:
+                if m.fecha_registro and m.fecha_registro.year == self.current_year:
+                    mes = m.fecha_registro.month - 1
+                    nuevos[mes] += 1
+            
+            result = {"meses": meses, "nuevos": nuevos}
+            self._cache[cache_key] = result
+            self._cache_timestamps[cache_key] = datetime.now().timestamp()
+            return result
+        except Exception:
+            return {"meses": [], "nuevos": []}
 
-    def get_active_memberships_by_type(self):
-        """Devuelve un diccionario con la cantidad de miembros activos por tipo de membresía."""
+    def _get_cached_active_memberships_by_type(self):
+        """Devuelve un diccionario con la cantidad de miembros activos por tipo de membresía con cache mejorado."""
         cache_key = "active_memberships_by_type"
-        if cache_key in self._cache:
+        if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
             
-        miembros = self.member_controller.get_members({'status': True})
-        tipos = {}
-        for m in miembros:
-            tipo = getattr(m, 'tipo_membresia', 'Sin tipo')
-            tipos[tipo] = tipos.get(tipo, 0) + 1
-        
-        self._cache[cache_key] = tipos
-        return tipos 
+        try:
+            miembros = self.member_controller.get_members({'status': True})
+            tipos = {}
+            for m in miembros:
+                tipo = getattr(m, 'tipo_membresia', 'Sin tipo')
+                tipos[tipo] = tipos.get(tipo, 0) + 1
+            
+            self._cache[cache_key] = tipos
+            self._cache_timestamps[cache_key] = datetime.now().timestamp()
+            return tipos
+        except Exception:
+            return {}
+    
+    # Mantener métodos originales para compatibilidad
+    def get_monthly_income_data(self):
+        return self._get_cached_monthly_income_data()
+    
+    def get_payment_methods_distribution(self):
+        return self._get_cached_payment_methods_distribution()
+    
+    def get_new_members_per_month(self):
+        return self._get_cached_new_members_per_month()
+    
+    def get_active_memberships_by_type(self):
+        return self._get_cached_active_memberships_by_type()
+    
+    def clear_cache(self):
+        """Limpia el cache manualmente si es necesario"""
+        self._cache.clear()
+        self._cache_timestamps.clear() 
