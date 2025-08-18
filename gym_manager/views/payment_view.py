@@ -32,6 +32,7 @@ class PaymentsView(ModuleView):
         self.monthly_fee_controller = MonthlyFeeController(get_db_session())
         self.db_session = get_db_session()
         self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
+        self.temp_receipt_content = None  # Variable para almacenar temporalmente el contenido del comprobante
         
         # Inicializar paginación ANTES de setup_payment_view
         from gym_manager.utils.pagination import PaginationController, PaginationWidget
@@ -953,6 +954,7 @@ class PaymentsView(ModuleView):
         self.member_search_results_container.height = 0
         self.amount_warning_text.visible = False
         self.receipt_validation_text.visible = False  # Ocultar el mensaje de validación
+        self.temp_receipt_content = None  # Limpiar el contenido temporal del comprobante
         self.new_payment_modal.open = False
         self.page.update()
 
@@ -1377,7 +1379,7 @@ class PaymentsView(ModuleView):
             with open(pdf_path, 'rb') as pdf_file:
                 pdf_content = pdf_file.read()
 
-            # Si es un pago temporal (desde el formulario), no guardamos en la base de datos
+            # Si es un pago existente (desde la tabla), guardar el comprobante en la base de datos
             if hasattr(self.selected_payment_for_receipt, 'id_pago') and self.selected_payment_for_receipt.id_pago > 0:
                 # Guardar el comprobante en la base de datos
                 success, message = self.payment_controller.save_payment_receipt(
@@ -1391,12 +1393,15 @@ class PaymentsView(ModuleView):
                     self.receipt_validation_text.value = "Comprobante generado y guardado exitosamente"
                     self.receipt_validation_text.color = ft.colors.GREEN
             else:
+                # Es un comprobante temporal (desde el formulario), solo generar el PDF
+                # Guardar el contenido temporalmente para cuando se guarde el pago
+                self.temp_receipt_content = pdf_content
                 self.receipt_validation_text.value = "Comprobante generado exitosamente, se ha guardado en la carpeta de descargas."
                 self.receipt_validation_text.color = ft.colors.GREEN
             
             self.receipt_validation_text.visible = True
             
-            # Cerrar el modal
+            # Cerrar solo el modal de comprobante, NO el modal de nuevo pago
             self.close_receipt_modal(e)
 
         except Exception as e:
@@ -1539,97 +1544,21 @@ class PaymentsView(ModuleView):
             if success:
                 payment_id = response['id_pago']  # Obtener el ID del pago creado
                 
-                # Generar el comprobante para el pago recién creado
-                try:
-                    # Crear el documento PDF
-                    downloads_path = os.path.expanduser("~/Downloads")
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    pdf_path = os.path.join(downloads_path, f"comprobante_pago_{timestamp}.pdf")
-                    
-                    doc = SimpleDocTemplate(
-                        pdf_path,
-                        pagesize=letter,
-                        rightMargin=30,
-                        leftMargin=30,
-                        topMargin=30,
-                        bottomMargin=30
-                    )
-
-                    # Crear los estilos
-                    styles = getSampleStyleSheet()
-                    title_style = ParagraphStyle(
-                        'CustomTitle',
-                        parent=styles['Heading1'],
-                        fontSize=24,
-                        spaceAfter=30,
-                        textColor=colors.HexColor('#1F4E78'),
-                        alignment=1  # Centrado
-                    )
-
-                    # Crear el contenido
-                    elements = []
-
-                    # Título
-                    elements.append(Paragraph("Comprobante de Pago", title_style))
-                    elements.append(Spacer(1, 20))
-
-                    # Información del pago
-                    payment_info = [
-                        ["Miembro:", f"{self.selected_member_data['nombre']} {self.selected_member_data['apellido']}"],
-                        ["Fecha:", self.new_payment_date_value.strftime("%d/%m/%Y")],
-                        ["Monto:", f"${monto:,.2f}"],
-                        ["Método de Pago:", self.new_payment_method_field.value],
-                        ["Referencia:", self.new_payment_observations_field.value or "-"]
-                    ]
-
-                    # Crear la tabla de información
-                    table = Table(payment_info, colWidths=[150, 350])
-                    table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#1F4E78')),
-                        ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
-                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-                        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-                        ('FONTSIZE', (0, 0), (-1, -1), 12),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-                        ('TOPPADDING', (0, 0), (-1, -1), 12),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
-                    ]))
-
-                    elements.append(table)
-                    elements.append(Spacer(1, 30))
-
-                    # Pie de página
-                    footer_style = ParagraphStyle(
-                        'Footer',
-                        parent=styles['Normal'],
-                        fontSize=8,
-                        textColor=colors.gray,
-                        alignment=1
-                    )
-                    footer = Paragraph(
-                        f"Comprobante generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-                        footer_style
-                    )
-                    elements.append(footer)
-
-                    # Construir el PDF
-                    doc.build(elements)
-
-                    # Leer el contenido del PDF generado
-                    with open(pdf_path, 'rb') as pdf_file:
-                        pdf_content = pdf_file.read()
-
-                    # Guardar el comprobante en la base de datos
-                    success, message = self.payment_controller.save_payment_receipt(
-                        payment_id,  # Usar el ID del pago recién creado
-                        pdf_content
-                    )
-                    if not success:
-                        self.show_message(f"Error al guardar el comprobante: {message}", ft.colors.RED)
-
-                except Exception as ex:
-                    self.show_message(f"Error al generar el comprobante: {str(ex)}", ft.colors.RED)
+                # Si se generó un comprobante desde el formulario, guardarlo en la base de datos
+                if hasattr(self, 'temp_receipt_content') and self.temp_receipt_content:
+                    try:
+                        receipt_success, receipt_message = self.payment_controller.save_payment_receipt(
+                            payment_id,
+                            self.temp_receipt_content
+                        )
+                        if not receipt_success:
+                            self.show_message(f"Pago guardado, pero error al guardar comprobante: {receipt_message}", ft.colors.ORANGE)
+                        else:
+                            self.show_message("Pago y comprobante guardados exitosamente", ft.colors.GREEN)
+                        # Limpiar el contenido temporal del comprobante
+                        self.temp_receipt_content = None
+                    except Exception as ex:
+                        self.show_message(f"Pago guardado, pero error al guardar comprobante: {str(ex)}", ft.colors.ORANGE)
                 
                 self.close_modal(e)
                 self.load_data()
