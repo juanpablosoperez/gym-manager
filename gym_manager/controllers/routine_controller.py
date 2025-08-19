@@ -1,68 +1,12 @@
 from sqlalchemy.exc import SQLAlchemyError
-from gym_manager.models.routine import Rutina
-from gym_manager.utils.database import get_db_session
-import os
 import datetime
 
+from gym_manager.models.routine import Rutina
+from gym_manager.utils.database import get_db_session
+
 class RoutineController:
-    def _init_(self):
+    def __init__(self):
         pass  # Ya no se guarda una sesión
-
-    def assign_routine(self, member_id, file_path, nombre, descripcion, nivel_dificultad, fecha_horario=None):
-        """
-        Asigna una rutina a un miembro
-        """
-        try:
-            # Verificar que el archivo existe
-            if not os.path.exists(file_path):
-                return False, "El archivo no existe"
-
-            # Obtener el nombre y tipo del archivo
-            file_name = os.path.basename(file_path)
-            file_type = os.path.splitext(file_name)[1].lower().replace('.', '')
-
-            # Verificar que el tipo de archivo es válido
-            if file_type not in ['pdf', 'xlsx', 'xls']:
-                return False, "Tipo de archivo no válido. Solo se permiten PDF y Excel"
-
-            # Leer el archivo
-            with open(file_path, 'rb') as file:
-                file_content = file.read()
-
-            # Crear la rutina
-            session = get_db_session()
-            try:
-                rutina = Rutina(
-                    id_miembro=member_id,
-                    nombre=nombre,
-                    descripcion=descripcion,
-                    documento_rutina=file_content,
-                    nivel_dificultad=nivel_dificultad,
-                    fecha_horario=fecha_horario
-                )
-                session.add(rutina)
-                session.commit()
-                return True, "Rutina asignada exitosamente"
-            except Exception as e:
-                session.rollback()
-                return False, f"Error al asignar la rutina: {str(e)}"
-            finally:
-                session.close()
-        except SQLAlchemyError as e:
-            return False, f"Error al asignar la rutina: {str(e)}"
-
-    def get_member_routines(self, member_id):
-        """
-        Obtiene las rutinas de un miembro
-        """
-        session = get_db_session()
-        try:
-            return session.query(Rutina).filter_by(id_miembro=member_id).all()
-        except SQLAlchemyError as e:
-            print(f"Error al obtener rutinas: {str(e)}")
-            return []
-        finally:
-            session.close()
 
     def get_routines(self, filters=None):
         """
@@ -104,7 +48,6 @@ class RoutineController:
             count = session.query(Miembro).filter(Miembro.id_rutina == routine_id).count()
             return count
         except Exception as e:
-            print(f"Error al contar miembros asignados a rutina {routine_id}: {str(e)}")
             return 0
         finally:
             session.close()

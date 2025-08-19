@@ -260,20 +260,15 @@ class RoutinesView(ModuleView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Rutinas] Iniciando load_data asíncrono")
             rutinas = self.routine_controller.get_routines()
-            print(f"[DEBUG - Rutinas] Obtenidas {len(rutinas)} rutinas")
             
             self.pagination_controller.set_items(rutinas)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(rutinas)
-            print("[DEBUG - Rutinas] Paginación actualizada")
             
             self.update_routines_table()
-            print("[DEBUG - Rutinas] Tabla actualizada")
             
         except Exception as ex:
-            print(f"[DEBUG - Rutinas] Error en load_data asíncrono: {str(ex)}")
             self.show_message(f"Error al cargar las rutinas: {str(ex)}", ft.colors.RED)
 
     def setup_confirm_dialog(self):
@@ -308,14 +303,10 @@ class RoutinesView(ModuleView):
         """
         Carga los datos iniciales de la vista y actualiza la UI
         """
-        print("[DEBUG - Rutinas] Iniciando load_data")
         try:
-            print("[DEBUG - Rutinas] Llamando a routine_controller.get_routines()")
             rutinas = self.routine_controller.get_routines()
-            print(f"[DEBUG - Rutinas] routine_controller.get_routines() devolvió {len(rutinas)} rutinas")
             
             if not rutinas:
-                print("[DEBUG - Rutinas] No se encontraron rutinas")
                 self.show_message("No hay rutinas registradas", ft.colors.ORANGE)
             
             # Actualizar paginación
@@ -323,14 +314,10 @@ class RoutinesView(ModuleView):
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(rutinas)
             
-            print("[DEBUG - Rutinas] Llamando a update_routines_table")
             self.update_routines_table()
-            print("[DEBUG - Rutinas] Llamando a page.update()")
             self.page.update()
-            print("[DEBUG - Rutinas] load_data finalizado")
             
         except Exception as ex:
-            print(f"[DEBUG - Rutinas] Excepción en load_data: {str(ex)}")
             self.show_message(f"Error al cargar las rutinas: {str(ex)}", ft.colors.RED)
 
     def _on_page_change(self):
@@ -345,13 +332,11 @@ class RoutinesView(ModuleView):
         if rutinas is None:
             rutinas = self.pagination_controller.get_current_page_items()
         
-        print(f"[DEBUG - Rutinas] Actualizando tabla con {len(rutinas)} rutinas")
         self.routines_table.rows.clear()
         
         # (contador removido en esta vista)
         
         if not rutinas:
-            print("[DEBUG - Rutinas] No hay rutinas para mostrar")
             self.routines_table.rows.append(
                 ft.DataRow(
                     cells=[
@@ -390,7 +375,6 @@ class RoutinesView(ModuleView):
             return
 
         for rutina in rutinas:
-            print(f"[DEBUG - Rutinas] Procesando rutina: {rutina.nombre}")
             
             # Contar miembros asignados
             miembros_asignados = self.routine_controller.count_members_assigned_to_routine(rutina.id_rutina)
@@ -451,7 +435,6 @@ class RoutinesView(ModuleView):
                     ]
                 )
             )
-        print("[DEBUG - Rutinas] Tabla actualizada exitosamente")
         self.page.update()
 
     def show_new_routine_modal(self, e):
@@ -541,18 +524,14 @@ class RoutinesView(ModuleView):
         self.page.update()
 
     def save_routine(self, e):
-        print("[DEBUG] save_routine llamado")
         try:
             if not self.new_routine_name.current.value:
-                print("[DEBUG] Falta nombre")
                 self.show_message("El nombre es requerido", ft.colors.RED)
                 return
             if not self.new_routine_difficulty.current.value:
-                print("[DEBUG] Falta dificultad")
                 self.show_message("La dificultad es requerida", ft.colors.RED)
                 return
             if not hasattr(self, 'selected_file'):
-                print("[DEBUG] Falta archivo")
                 self.show_message("Por favor, seleccione un archivo de rutina", ft.colors.RED)
                 return
             
@@ -562,8 +541,6 @@ class RoutinesView(ModuleView):
             if file_size > MAX_FILE_SIZE:
                 self.show_message(f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB", ft.colors.RED)
                 return
-            
-            print("[DEBUG] Todos los campos requeridos presentes")
             with open(self.selected_file.path, 'rb') as file:
                 file_content = file.read()
             import datetime
@@ -583,9 +560,7 @@ class RoutinesView(ModuleView):
                 routine_data['fecha_creacion'] = now
             if not routine_data.get('fecha_horario'):
                 routine_data['fecha_horario'] = now
-            print(f"[DEBUG] routine_data a guardar: {routine_data}")
             success, message = self.routine_controller.create_routine(routine_data)
-            print(f"[DEBUG] Resultado create_routine: success={success}, message={message}")
             if success:
                 self.close_modal(e)
                 self.load_data()
@@ -593,7 +568,6 @@ class RoutinesView(ModuleView):
             else:
                 self.show_message(f"Error al crear la rutina: {message}", ft.colors.RED)
         except Exception as e:
-            print(f"[DEBUG] Excepción inesperada en save_routine: {str(e)}")
             self.show_message(f"Error inesperado: {str(e)}", ft.colors.RED)
 
     def edit_routine(self, rutina):
@@ -791,9 +765,7 @@ class RoutinesView(ModuleView):
             if self.difficulty_filter.value and self.difficulty_filter.value != "Todas":
                 filters['nivel_dificultad'] = self.difficulty_filter.value
             
-            print(f"[DEBUG] Aplicando filtros: {filters}")  # Debug log
             rutinas = self.routine_controller.get_routines(filters)
-            print(f"[DEBUG] Rutinas encontradas: {len(rutinas)}")  # Debug log
             
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(rutinas)
@@ -801,7 +773,6 @@ class RoutinesView(ModuleView):
             self.pagination_widget.update_items(rutinas)
             self.update_routines_table()
         except Exception as ex:
-            print(f"[DEBUG] Error al aplicar filtros: {str(ex)}")  # Debug log
             self.show_message(f"Error al aplicar filtros: {str(ex)}", ft.colors.RED)
 
     def clear_filters(self, e):
