@@ -1,4 +1,5 @@
 import flet as ft
+
 from gym_manager.views.module_views import ModuleView
 from gym_manager.utils.database import get_db_session
 from gym_manager.models.payment_method import MetodoPago
@@ -449,23 +450,18 @@ class PaymentMethodView(ModuleView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Métodos de Pago] Iniciando load_data asíncrono")
             methods = self.payment_method_controller.get_payment_methods()
-            print(f"[DEBUG - Métodos de Pago] Obtenidos {len(methods)} métodos")
             
             # Actualizar paginación
             self.pagination_controller.set_items(methods)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(methods)
-            print("[DEBUG - Métodos de Pago] Paginación actualizada")
             
             # Actualizar tabla y estadísticas
             self.update_methods_table(methods)
             self.update_stats_cards(methods)
-            print("[DEBUG - Métodos de Pago] Tabla y estadísticas actualizadas")
             
         except Exception as e:
-            print(f"[DEBUG - Métodos de Pago] Error en load_data asíncrono: {str(e)}")
             self.update_methods_table([])
     
     def _on_page_change(self):
@@ -487,14 +483,12 @@ class PaymentMethodView(ModuleView):
         """
         Actualiza la tabla de métodos de pago
         """
-        print(f"[DEBUG - Métodos de Pago] Actualizando tabla con {len(methods) if methods else 'None'} métodos")
         try:
             self.methods_table.rows.clear()
             
             # Obtener métodos de la página actual
             if methods is None:
                 methods = self.pagination_controller.get_current_page_items()
-                print(f"[DEBUG - Métodos de Pago] Métodos de página actual: {len(methods)}")
             
             # (contador removido en esta vista)
             
@@ -591,10 +585,8 @@ class PaymentMethodView(ModuleView):
                             )
                         )
                     except Exception as e:
-                        print(f"Error al procesar método de pago: {str(e)}")
                         continue
         except Exception as e:
-            print(f"Error al actualizar la tabla: {str(e)}")
             self.show_message("Error al cargar los métodos de pago", ft.colors.RED)
         finally:
             self.page.update()
@@ -623,7 +615,6 @@ class PaymentMethodView(ModuleView):
 
             self.page.update()
         except Exception as e:
-            print(f"Error al actualizar estadísticas: {str(e)}")
             self.show_message("Error al actualizar estadísticas", ft.colors.RED)
 
     def show_new_method_modal(self, e):
@@ -768,41 +759,7 @@ class PaymentMethodView(ModuleView):
             self.update_stats_cards(methods)
         except Exception as e:
             self.show_message(f"Error al aplicar filtros: {str(e)}", ft.colors.RED)
-            # Limpiar la tabla y mostrar mensaje de error
-            self.methods_table.rows.clear()
-            self.methods_table.rows.append(
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(
-                            ft.Container(
-                                content=ft.Column(
-                                    controls=[
-                                        ft.Icon(name=ft.icons.ERROR_OUTLINE, size=48, color=ft.colors.RED_400),
-                                        ft.Text(
-                                            "Error al cargar los datos",
-                                            size=20,
-                                            weight=ft.FontWeight.BOLD,
-                                            color=ft.colors.RED_700
-                                        ),
-                                        ft.Text(
-                                            "Por favor, intente nuevamente",
-                                            size=16,
-                                            color=ft.colors.GREY_600
-                                        ),
-                                    ],
-                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                                    spacing=10,
-                                ),
-                                padding=40,
-                                alignment=ft.alignment.center,
-                            )
-                        ),
-                        ft.DataCell(ft.Container()),
-                        ft.DataCell(ft.Container()),
-                    ]
-                )
-            )
-            self.page.update()
+            self.update_methods_table([])
 
     def clear_filters(self, e):
         """
@@ -880,7 +837,6 @@ class PaymentMethodView(ModuleView):
             self.history_modal.open = True
             self.page.update()
         except Exception as e:
-            print(f"Error al mostrar historial: {str(e)}")
             self.show_message("Error al cargar el historial de pagos", ft.colors.RED)
 
     def close_history_modal(self, e):

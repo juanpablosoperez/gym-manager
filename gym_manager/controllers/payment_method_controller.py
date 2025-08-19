@@ -1,8 +1,9 @@
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import DBAPIError, PendingRollbackError
+
 from gym_manager.models.payment_method import MetodoPago
 from gym_manager.models.payment import Pago
-from sqlalchemy.orm import Session, joinedload
 from gym_manager.utils.database import session_scope
-from sqlalchemy.exc import DBAPIError, PendingRollbackError
 
 class PaymentMethodController:
     def __init__(self, db_session: Session):
@@ -49,7 +50,6 @@ class PaymentMethodController:
                 
                 return result
         except (DBAPIError, PendingRollbackError) as e:
-            print(f"Error de base de datos: {str(e)}")
             # Intentar reconectar
             try:
                 self.db_session.rollback()
