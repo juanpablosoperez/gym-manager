@@ -1,4 +1,5 @@
 import flet as ft
+
 from gym_manager.views.module_views import ModuleView
 from gym_manager.utils.database import get_db_session
 from gym_manager.models.user import Usuario
@@ -165,23 +166,6 @@ class UsersView(ModuleView):
             max_length=50,
             on_change=lambda e: self.validar_campo_con_tocado("contrasena"),
             on_blur=lambda e: self.marcar_tocado("contrasena"),
-            focused_border_color=ft.colors.BLUE,
-            border_color=ft.colors.GREY_400
-        )
-        
-        # Campo para confirmar contraseña actual (solo en edición)
-        self.contrasena_actual = ft.TextField(
-            label="Contraseña actual (para confirmar cambios)",
-            prefix_icon=ft.icons.LOCK,
-            password=True,
-            can_reveal_password=True,
-            border_radius=8,
-            width=500,
-            height=40,
-            max_length=50,
-            visible=False,  # Solo visible en modo edición
-            on_change=lambda e: self.validar_campo_con_tocado("contrasena_actual"),
-            on_blur=lambda e: self.marcar_tocado("contrasena_actual"),
             focused_border_color=ft.colors.BLUE,
             border_color=ft.colors.GREY_400
         )
@@ -411,20 +395,15 @@ class UsersView(ModuleView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Usuarios] Iniciando load_data asíncrono")
             usuarios = self.user_controller.get_users()
-            print(f"[DEBUG - Usuarios] Obtenidos {len(usuarios)} usuarios")
             
             self.pagination_controller.set_items(usuarios)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(usuarios)
-            print("[DEBUG - Usuarios] Paginación actualizada")
             
             self.update_users_table()
-            print("[DEBUG - Usuarios] Tabla actualizada")
             
         except Exception as ex:
-            print(f"[DEBUG - Usuarios] Error en load_data asíncrono: {str(ex)}")
             self.show_message(f"Error al cargar los usuarios: {str(ex)}", ft.colors.RED)
 
     def load_data(self):
@@ -432,20 +411,15 @@ class UsersView(ModuleView):
         Carga los datos iniciales de la vista
         """
         try:
-            print("[DEBUG - Usuarios] Iniciando load_data")
             usuarios = self.user_controller.get_users()
-            print(f"[DEBUG - Usuarios] Obtenidos {len(usuarios)} usuarios")
             
             self.pagination_controller.set_items(usuarios)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(usuarios)
-            print("[DEBUG - Usuarios] Paginación actualizada")
             
             self.update_users_table()
-            print("[DEBUG - Usuarios] Tabla actualizada")
             
         except Exception as ex:
-            print(f"[DEBUG - Usuarios] Error en load_data: {str(ex)}")
             self.show_message(f"Error al cargar los usuarios: {str(ex)}", ft.colors.RED)
 
     def _on_page_change(self):
@@ -456,13 +430,11 @@ class UsersView(ModuleView):
         """
         Actualiza la tabla de usuarios con datos reales
         """
-        print(f"[DEBUG - Usuarios] Actualizando tabla con {len(usuarios) if usuarios else 'None'} usuarios")
         self.users_table.rows.clear()
         
         # Obtener usuarios de la página actual
         if usuarios is None:
             usuarios = self.pagination_controller.get_current_page_items()
-            print(f"[DEBUG - Usuarios] Usuarios de página actual: {len(usuarios)}")
         
         if not usuarios:
             self.users_table.rows.append(
@@ -601,20 +573,20 @@ class UsersView(ModuleView):
         self.apellido.value = ""
         self.rol.value = None
         self.contrasena.value = ""
-        self.contrasena_actual.value = ""
+
         # Configurar placeholder para nuevo usuario
         self.contrasena.hint_text = "Ingrese la contraseña"
         # Mostrar campo de contraseña para nuevos usuarios
         self.contrasena.visible = True
         # Ocultar campo de contraseña actual para nuevos usuarios
-        self.contrasena_actual.visible = False
+
         # Mostrar contenedor de contraseña para nuevos usuarios
         self.mostrar_contenedor_contrasena(True)
-        self.tocado = {"nombre": False, "apellido": False, "contrasena": False, "contrasena_actual": False}
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
         self.intento_guardar = False
         
         # Limpiar contenedores de error solo si existen
-        for campo in ['nombre', 'apellido', 'contrasena', 'contrasena_actual']:
+        for campo in ['nombre', 'apellido', 'contrasena']:
             if hasattr(self, f"error_container_{campo}"):
                 self.actualizar_error_campo(campo, None)
 
@@ -624,19 +596,19 @@ class UsersView(ModuleView):
         self.apellido.value = ""
         self.rol.value = None
         self.contrasena.value = ""
-        self.contrasena_actual.value = ""
+
         # Configurar placeholder para nuevo usuario
         self.contrasena.hint_text = "Ingrese la contraseña"
         # Mostrar campo de contraseña para nuevos usuarios
         self.contrasena.visible = True
         # Ocultar campo de contraseña actual para nuevos usuarios
-        self.contrasena_actual.visible = False
+
         # NO cambiar la visibilidad del contenedor de contraseña aquí
-        self.tocado = {"nombre": False, "apellido": False, "contrasena": False, "contrasena_actual": False}
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
         self.intento_guardar = False
         
         # Limpiar contenedores de error solo si existen
-        for campo in ['nombre', 'apellido', 'contrasena', 'contrasena_actual']:
+        for campo in ['nombre', 'apellido', 'contrasena']:
             if hasattr(self, f"error_container_{campo}"):
                 self.actualizar_error_campo(campo, None)
 
@@ -717,15 +689,15 @@ class UsersView(ModuleView):
         self.rol.value = usuario.rol
         # Ocultar campos de contraseña en edición (no se pueden mostrar)
         self.contrasena.visible = False
-        self.contrasena_actual.visible = False
+
         # Ocultar contenedor de contraseña en edición
         self.mostrar_contenedor_contrasena(False)
         # Resetear las banderas de validación para que no se muestren errores al abrir
-        self.tocado = {"nombre": False, "apellido": False, "contrasena": False, "contrasena_actual": False}
+        self.tocado = {"nombre": False, "apellido": False, "contrasena": False}
         self.intento_guardar = False
         
         # Limpiar contenedores de error solo si existen
-        for campo in ['nombre', 'apellido', 'contrasena', 'contrasena_actual']:
+        for campo in ['nombre', 'apellido', 'contrasena']:
             if hasattr(self, f"error_container_{campo}"):
                 self.actualizar_error_campo(campo, None)
 
