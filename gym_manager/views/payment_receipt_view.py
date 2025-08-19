@@ -1,10 +1,12 @@
 import flet as ft
+from datetime import datetime
+import os
+import subprocess
+import tempfile
+
 from gym_manager.views.module_views import ModuleView
 from gym_manager.controllers.payment_receipt_controller import PaymentReceiptController
 from gym_manager.utils.database import get_db_session
-from datetime import datetime
-import os
-import tempfile
 
 class PaymentReceiptView(ModuleView):
     def __init__(self, page: ft.Page):
@@ -97,49 +99,6 @@ class PaymentReceiptView(ModuleView):
                 text_style=ft.TextStyle(size=16),
             ),
             on_click=self.clear_filters
-        )
-
-        # Filtros
-        self.filters_container = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Row(
-                        controls=[
-                            # Fecha desde
-                            ft.Column(
-                                controls=[
-                                    ft.Text("Fecha desde", size=16),
-                                    self.date_from_field,
-                                ],
-                            ),
-                            # Fecha hasta
-                            ft.Column(
-                                controls=[
-                                    ft.Text("Fecha hasta", size=16),
-                                    self.date_to_field,
-                                ],
-                            ),
-                            # Botón limpiar
-                            ft.Column(
-                                controls=[
-                                    ft.Text("", size=16),  # Espaciador
-                                    self.clear_btn,
-                                ],
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.START,
-                    ),
-                ],
-                spacing=20,
-            ),
-            padding=20,
-            bgcolor=ft.colors.WHITE,
-            border_radius=10,
-            shadow=ft.BoxShadow(
-                spread_radius=1,
-                blur_radius=10,
-                color=ft.colors.GREY_300,
-            ),
         )
 
         # Tabla de comprobantes
@@ -248,8 +207,6 @@ class PaymentReceiptView(ModuleView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Comprobantes] Iniciando load_data asíncrono")
-            
             filters = {}
             if self.date_from_value:
                 filters['fecha_desde'] = self.date_from_value
@@ -257,20 +214,16 @@ class PaymentReceiptView(ModuleView):
                 filters['fecha_hasta'] = self.date_to_value
 
             receipts = self.payment_receipt_controller.get_receipts(filters)
-            print(f"[DEBUG - Comprobantes] Obtenidos {len(receipts)} comprobantes")
             
             # Actualizar paginación
             self.pagination_controller.set_items(receipts)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(receipts)
-            print("[DEBUG - Comprobantes] Paginación actualizada")
             
             # Actualizar tabla
             self.update_receipts_table(receipts)
-            print("[DEBUG - Comprobantes] Tabla actualizada")
             
         except Exception as e:
-            print(f"[DEBUG - Comprobantes] Error en load_data asíncrono: {str(e)}")
             self.show_message(f"Error al cargar los comprobantes: {str(e)}", ft.colors.RED)
     
     def _on_page_change(self):
@@ -317,13 +270,11 @@ class PaymentReceiptView(ModuleView):
         """
         Actualiza la tabla de comprobantes
         """
-        print(f"[DEBUG - Comprobantes] Actualizando tabla con {len(receipts) if receipts else 'None'} comprobantes")
         self.receipts_table.rows.clear()
         
         # Obtener comprobantes de la página actual
         if receipts is None:
             receipts = self.pagination_controller.get_current_page_items()
-            print(f"[DEBUG - Comprobantes] Comprobantes de página actual: {len(receipts)}")
         
         # (contador removido en esta vista)
         
@@ -412,7 +363,6 @@ class PaymentReceiptView(ModuleView):
             if os.name == 'nt':  # Windows
                 os.startfile(temp_file_path)
             elif os.name == 'posix':  # macOS y Linux
-                import subprocess
                 subprocess.run(['xdg-open', temp_file_path])
 
         except Exception as e:

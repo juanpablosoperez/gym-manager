@@ -1,8 +1,7 @@
-from datetime import datetime
+import logging
+
 from gym_manager.models.payment_receipt import ComprobantePago
 from gym_manager.utils.database import session_scope
-from sqlalchemy.exc import DBAPIError, PendingRollbackError, SQLAlchemyError
-import logging
 
 class PaymentReceiptController:
     def __init__(self, db_session=None):
