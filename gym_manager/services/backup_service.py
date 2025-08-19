@@ -6,15 +6,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
 from gym_manager.models.backup import Backup
 import traceback
-from typing import List, Optional, Tuple
-# from dotenv import load_dotenv
-from sqlalchemy.orm import sessionmaker
+from typing import Tuple
 import base64
 import sys
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class BackupService:
     """
@@ -31,7 +28,6 @@ class BackupService:
             base_dir = Path(sys.executable).parent
         else:
             base_dir = Path(__file__).resolve().parent.parent.parent
-        project_root = base_dir
         # Ubicación de datos escribible por el usuario
         data_root = Path(os.getenv('LOCALAPPDATA', str(Path.home()))) / 'GymManager'
         data_root.mkdir(parents=True, exist_ok=True)

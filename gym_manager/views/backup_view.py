@@ -175,22 +175,17 @@ class BackupView(BaseView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Backups] Iniciando load_backups asíncrono")
             backups = self.backup_service.get_backups()
-            print(f"[DEBUG - Backups] Obtenidos {len(backups)} backups")
             
             # Actualizar paginación
             self.pagination_controller.set_items(backups)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(backups)
-            print("[DEBUG - Backups] Paginación actualizada")
             
             # Actualizar tabla
             self.update_backups_table()
-            print("[DEBUG - Backups] Tabla actualizada")
             
         except Exception as e:
-            print(f"[DEBUG - Backups] Error en load_backups asíncrono: {str(e)}")
             self.show_error_message(f"Error al cargar los backups: {str(e)}")
     
     def _on_page_change(self):
@@ -314,12 +309,10 @@ class BackupView(BaseView):
     
     def update_backups_table(self, backups=None):
         """Actualiza la tabla de backups con paginación"""
-        print(f"[DEBUG - Backups] Actualizando tabla con {len(backups) if backups else 'None'} backups")
         try:
             # Obtener backups de la página actual
             if backups is None:
                 backups = self.pagination_controller.get_current_page_items()
-                print(f"[DEBUG - Backups] Backups de página actual: {len(backups)}")
             
             # Actualizar contador de registros
             count = len(backups)
@@ -370,7 +363,6 @@ class BackupView(BaseView):
             logger.info("Tabla de backups actualizada exitosamente")
             
         except Exception as e:
-            print(f"[DEBUG - Backups] Error al actualizar tabla: {str(e)}")
             self._handle_error("Error al actualizar la tabla de backups", e)
 
     def show_restore_dialog(self, backup_id: int):
