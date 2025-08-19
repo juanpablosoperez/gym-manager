@@ -1,16 +1,17 @@
 import flet as ft
 from datetime import datetime
-from gym_manager.controllers.member_controller import MemberController
-from gym_manager.controllers.routine_controller import RoutineController
-from gym_manager.utils.database import get_db_session
-from gym_manager.services.excel_utils import export_members_to_excel, export_members_to_pdf
-from gym_manager.utils.pagination import PaginationController, PaginationWidget
 import os
 import subprocess
 import tempfile
+import webbrowser
+from pathlib import Path
+
+from gym_manager.controllers.member_controller import MemberController
+from gym_manager.controllers.routine_controller import RoutineController
+from gym_manager.utils.database import get_db_session
+from gym_manager.utils.pagination import PaginationController, PaginationWidget
 from gym_manager.views.module_views import ModuleView
 from gym_manager.models.member import Miembro
-from pathlib import Path
 
 class MembersView(ModuleView):
     def __init__(self, page: ft.Page):
@@ -409,20 +410,15 @@ class MembersView(ModuleView):
             import asyncio
             await asyncio.sleep(0.1)
             
-            print("[DEBUG - Miembros] Iniciando load_data asíncrono")
             members = self.member_controller.get_members()
-            print(f"[DEBUG - Miembros] Obtenidos {len(members)} miembros")
             
             self.pagination_controller.set_items(members)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(members)
-            print("[DEBUG - Miembros] Paginación actualizada")
             
             self.update_members_table()
-            print("[DEBUG - Miembros] Tabla actualizada")
             
         except Exception as e:
-            print(f"[DEBUG - Miembros] Error en load_data asíncrono: {str(e)}")
             self.show_message(f"Error al cargar los datos: {str(e)}", ft.colors.RED)
             # Intentar reconectar
             try:
@@ -435,20 +431,15 @@ class MembersView(ModuleView):
         Carga los datos de miembros
         """
         try:
-            print("[DEBUG - Miembros] Iniciando load_data")
             members = self.member_controller.get_members()
-            print(f"[DEBUG - Miembros] Obtenidos {len(members)} miembros")
             
             self.pagination_controller.set_items(members)
             self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(members)
-            print("[DEBUG - Miembros] Paginación actualizada")
             
             self.update_members_table()
-            print("[DEBUG - Miembros] Tabla actualizada")
             
         except Exception as e:
-            print(f"[DEBUG - Miembros] Error en load_data: {str(e)}")
             self.show_message(f"Error al cargar los datos: {str(e)}", ft.colors.RED)
             # Intentar reconectar
             try:
@@ -464,13 +455,11 @@ class MembersView(ModuleView):
         """
         Actualiza la tabla con los miembros
         """
-        print(f"[DEBUG - Miembros] Actualizando tabla con {len(miembros) if miembros else 'None'} miembros")
         self.members_table.rows.clear()
         
         # Obtener miembros de la página actual
         if miembros is None:
             miembros = self.pagination_controller.get_current_page_items()
-            print(f"[DEBUG - Miembros] Miembros de página actual: {len(miembros)}")
         
         # (contador removido en esta vista)
         
@@ -883,7 +872,6 @@ class MembersView(ModuleView):
             self.page.update()
 
         except Exception as e:
-            print(f"[DEBUG] Error al ver rutina del miembro: {str(e)}")
             self.show_message(f"Error al ver la rutina: {str(e)}", ft.colors.RED)
 
     def _preview_routine_file(self, rutina):
@@ -1447,101 +1435,6 @@ class MembersView(ModuleView):
             self.load_data()  # Recargar los datos para actualizar la vista
         else:
             self.show_message(f"Error al asignar la rutina: {message}", ft.colors.RED)
-
-    def view_member_routines(self, member):
-        routines = self.routine_controller.get_member_routines(member.id_miembro)
-        routines_list = ft.Column([
-            ft.Text(f"Rutinas de {member.nombre} {member.apellido}", size=20, weight=ft.FontWeight.BOLD),
-            ft.Container(height=20),
-        ])
-        if routines:
-            for routine in routines:
-                routines_list.controls.append(
-                    ft.Card(
-                        content=ft.Container(
-                            content=ft.Column([
-                                ft.Row([
-                                    ft.Icon(
-                                        ft.icons.PICTURE_AS_PDF if routine.documento_rutina and routine.nombre and routine.nombre.lower().endswith('.pdf') else ft.icons.TABLE_VIEW,
-                                        color=ft.colors.BLUE
-                                    ),
-                                    ft.Text(routine.nombre, size=16, weight=ft.FontWeight.BOLD),
-                                ]),
-                                ft.Text(f"Nivel: {routine.nivel_dificultad}"),
-                                ft.Text(f"Descripción: {routine.descripcion or 'Sin descripción'}"),
-                                ft.Text(f"Fecha: {routine.fecha_horario.strftime('%d/%m/%Y %H:%M') if routine.fecha_horario else '-'}"),
-                                ft.Row([
-                                    ft.ElevatedButton(
-                                        "Descargar",
-                                        icon=ft.icons.DOWNLOAD,
-                                        on_click=lambda e, r=routine: self.download_routine(r)
-                                    ),
-                                    ft.IconButton(
-                                        icon=ft.icons.DELETE,
-                                        icon_color=ft.colors.RED,
-                                        tooltip="Eliminar",
-                                        on_click=lambda e, m=member, r=routine: self.delete_routine(m, r)
-                                    ),
-                                ]),
-                            ]),
-                            padding=20,
-                        ),
-                        margin=10,
-                    )
-                )
-        else:
-            routines_list.controls.append(
-                ft.Text("No hay rutinas asignadas", size=16, color=ft.colors.GREY)
-            )
-        self.routines_modal = ft.AlertDialog(
-            title=ft.Text("Rutinas Asignadas", size=26, weight=ft.FontWeight.BOLD),
-            content=ft.Container(
-                content=routines_list,
-                width=600,
-                height=400,
-                padding=20,
-            ),
-            actions=[
-                ft.TextButton("Cerrar", on_click=lambda e: self.close_routines_modal()),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        if self.routines_modal not in self.page.overlay:
-            self.page.overlay.append(self.routines_modal)
-        self.routines_modal.open = True
-        self.page.update()
-
-    def close_routines_modal(self):
-        """
-        Cierra el modal de rutinas
-        """
-        self.routines_modal.open = False
-        self.page.update()
-
-    def download_routine(self, routine):
-        try:
-            import tempfile, os, webbrowser
-            with tempfile.TemporaryDirectory() as temp_dir:
-                ext = '.pdf' if routine.nombre and routine.nombre.lower().endswith('.pdf') else '.xlsx'
-                file_path = os.path.join(temp_dir, (routine.nombre or f"rutina_{routine.id_rutina}") + ext)
-                with open(file_path, 'wb') as f:
-                    f.write(routine.documento_rutina)
-                webbrowser.open(file_path)
-            self.show_message("Archivo descargado exitosamente", ft.colors.GREEN)
-        except Exception as e:
-            self.show_message(f"Error al descargar el archivo: {str(e)}", ft.colors.RED)
-
-    def delete_routine(self, member, routine):
-        """
-        Elimina una rutina y recarga las rutinas del miembro
-        """
-        success, message = self.routine_controller.delete_routine(routine.id_rutina)
-        if success:
-            self.show_message(message, ft.colors.GREEN)
-            # Después de eliminar, recargar la lista de rutinas para este miembro
-            self.view_member_routines(member)
-        else:
-            self.show_message(message, ft.colors.RED)
 
     def close_assign_routine_modal(self, e=None):
         if hasattr(self, 'assign_routine_modal'):

@@ -153,21 +153,6 @@ class MemberController:
             self.db_session.rollback()
             return False, f"Error inesperado: {str(e)}"
 
-    def search_members(self, search_term):
-        """
-        Busca miembros por nombre, apellido o documento
-        """
-        try:
-            return self.db_session.query(Miembro).filter(
-                (Miembro.nombre.ilike(f"%{search_term}%")) |
-                (Miembro.apellido.ilike(f"%{search_term}%")) |
-                (Miembro.documento.ilike(f"%{search_term}%"))
-            ).all()
-        except SQLAlchemyError as e:
-            self.logger.error(f"Error al buscar miembros: {str(e)}")
-            self.db_session.rollback()
-            raise
-
     def get_active_members_count(self):
         """
         Obtiene el conteo total de miembros activos
