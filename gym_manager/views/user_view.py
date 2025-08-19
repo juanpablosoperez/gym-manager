@@ -57,6 +57,15 @@ class UsersView(ModuleView):
         )
 
         # Filtros
+        self.search_field = ft.TextField(
+            label="Buscar por nombre o apellido",
+            prefix_icon=ft.icons.SEARCH,
+            border_radius=8,
+            width=260,
+            height=48,
+            text_size=16,
+            on_change=self.aplicar_filtros,
+        )
         self.filtro_rol = ft.Dropdown(
             label="Filtrar por rol",
             width=200,
@@ -346,6 +355,7 @@ class UsersView(ModuleView):
                     ft.Container(
                         content=ft.Row(
                             controls=[
+                                self.search_field,
                                 self.filtro_rol,
                                 self.filtro_estado,
                                 self.limpiar_filtros_btn,
@@ -851,11 +861,21 @@ class UsersView(ModuleView):
             usuarios = self.user_controller.get_users()
             usuarios_filtrados = []
 
+            # Filtrar por búsqueda (nombre o apellido)
+            search_text = (self.search_field.value or "").strip().lower()
+            if search_text:
+                usuarios_filtrados = [
+                    u for u in usuarios
+                    if (u.nombre and search_text in u.nombre.lower()) or (u.apellido and search_text in u.apellido.lower())
+                ]
+            else:
+                usuarios_filtrados = usuarios
+
             # Filtrar por rol
             if self.filtro_rol.value != "Todos":
                 usuarios_filtrados = [u for u in usuarios if u.rol == self.filtro_rol.value]
             else:
-                usuarios_filtrados = usuarios
+                usuarios_filtrados = usuarios_filtrados
 
             # Filtrar por estado
             if self.filtro_estado.value == "Activos":
@@ -875,6 +895,7 @@ class UsersView(ModuleView):
         """
         Limpia los filtros y muestra todos los usuarios
         """
+        self.search_field.value = ""
         self.filtro_rol.value = "Todos"
         self.filtro_estado.value = "Todos"
         self.load_data()
