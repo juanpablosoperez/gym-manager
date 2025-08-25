@@ -154,7 +154,7 @@ class PaymentMethodView(ModuleView):
             border_radius=12,
             vertical_lines=ft.border.all(1, ft.colors.GREY_300),
             horizontal_lines=ft.border.all(1, ft.colors.GREY_300),
-            column_spacing=60,
+            column_spacing=120,
             heading_row_color=ft.colors.GREY_100,
             heading_row_height=60,
             data_row_color=ft.colors.WHITE,
