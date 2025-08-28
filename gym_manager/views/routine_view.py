@@ -490,6 +490,7 @@ class RoutinesView(ModuleView):
                     spacing=0,
                 ),
                 width=540,
+                height=400,
                 padding=20,
             ),
             actions=[

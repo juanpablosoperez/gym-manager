@@ -32,7 +32,6 @@ class PaymentsView(ModuleView):
         self.monthly_fee_controller = MonthlyFeeController(get_db_session())
         self.db_session = get_db_session()
         self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
-        self.temp_receipt_content = None  # Variable para almacenar temporalmente el contenido del comprobante
         
         # Inicializar paginación ANTES de setup_payment_view
         from gym_manager.utils.pagination import PaginationController, PaginationWidget
@@ -268,7 +267,19 @@ class PaymentsView(ModuleView):
             border_radius=8,
             width=500,
             value="0.00",
-            on_change=self.validate_payment_amount
+            on_change=self.validate_payment_amount,
+            visible=False  # Oculto por defecto
+        )
+        
+        # Botón para mostrar/ocultar el campo monto
+        self.toggle_amount_field_btn = ft.TextButton(
+            text="Modificar monto",
+            icon=ft.icons.EDIT,
+            on_click=self.toggle_amount_field,
+            style=ft.ButtonStyle(
+                color=ft.colors.BLUE_700,
+                text_style=ft.TextStyle(size=14)
+            )
         )
         
         # Mensaje de advertencia para el monto
@@ -316,6 +327,7 @@ class PaymentsView(ModuleView):
                     ft.Text("Fecha", size=16, weight=ft.FontWeight.BOLD),
                     self.new_payment_date_field,
                     ft.Text("Monto", size=16, weight=ft.FontWeight.BOLD),
+                    self.toggle_amount_field_btn,  # Agregar el botón aquí
                     self.new_payment_amount_field,
                     self.amount_warning_text,  # Agregar el mensaje de advertencia aquí
                     ft.Text("Método de pago", size=16, weight=ft.FontWeight.BOLD),
@@ -326,18 +338,6 @@ class PaymentsView(ModuleView):
                     ft.Row(
                         controls=[
                             ft.TextButton("Cancelar", on_click=self.close_modal, style=ft.ButtonStyle(bgcolor=ft.colors.WHITE, color=ft.colors.BLACK87, shape=ft.RoundedRectangleBorder(radius=8), padding=ft.padding.symmetric(horizontal=28, vertical=12), text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD))),
-                            ft.ElevatedButton(
-                                "Comprobante",
-                                icon=ft.icons.RECEIPT,
-                                style=ft.ButtonStyle(
-                                    bgcolor=ft.colors.GREEN_700,
-                                    color=ft.colors.WHITE,
-                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                    padding=ft.padding.symmetric(horizontal=20, vertical=12),
-                                    text_style=ft.TextStyle(size=16, weight=ft.FontWeight.BOLD),
-                                ),
-                                on_click=self.generate_receipt_from_form
-                            ),
                             ft.ElevatedButton(
                                 "Guardar",
                                 style=ft.ButtonStyle(
@@ -707,7 +707,7 @@ class PaymentsView(ModuleView):
             content=ft.Column(
                 controls=[
                     ft.Icon(ft.icons.CHECK_CIRCLE, color=ft.colors.GREEN, size=40),
-                    ft.Text("El pago se ha guardado correctamente", size=14),
+                    ft.Text("El pago y comprobante se han guardado correctamente", size=14),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=10,
@@ -900,6 +900,18 @@ class PaymentsView(ModuleView):
     def show_new_payment_modal(self, e):
         if self.new_payment_modal not in self.page.overlay:
             self.page.overlay.append(self.new_payment_modal)
+        
+        # Pre-llenar el campo monto con la cuota mensual actual
+        if self.current_monthly_fee:
+            self.new_payment_amount_field.value = f"{self.current_monthly_fee:.2f}"
+        else:
+            self.new_payment_amount_field.value = "0.00"
+        
+        # Asegurar que el campo esté oculto por defecto
+        self.new_payment_amount_field.visible = False
+        self.toggle_amount_field_btn.text = "Modificar monto"
+        self.toggle_amount_field_btn.icon = ft.icons.EDIT
+        
         self.new_payment_modal.open = True
         self.page.update()
         # Forzar scroll al tope tras cambiar de página o actualizar filas
@@ -946,7 +958,15 @@ class PaymentsView(ModuleView):
         self.new_payment_date_value = None
         self.new_payment_date_picker.value = None
         self.new_payment_date_field.content.controls[0].value = "Seleccionar fecha"
-        self.new_payment_amount_field.value = "0.00"
+        # Restaurar el valor de la cuota mensual y ocultar el campo
+        if self.current_monthly_fee:
+            self.new_payment_amount_field.value = f"{self.current_monthly_fee:.2f}"
+        else:
+            self.new_payment_amount_field.value = "0.00"
+        self.new_payment_amount_field.visible = False
+        # Restaurar el botón
+        self.toggle_amount_field_btn.text = "Modificar monto"
+        self.toggle_amount_field_btn.icon = ft.icons.EDIT
         self.new_payment_method_field.value = None
         self.new_payment_observations_field.value = ""
         self.selected_member_data = None
@@ -954,7 +974,6 @@ class PaymentsView(ModuleView):
         self.member_search_results_container.height = 0
         self.amount_warning_text.visible = False
         self.receipt_validation_text.visible = False  # Ocultar el mensaje de validación
-        self.temp_receipt_content = None  # Limpiar el contenido temporal del comprobante
         self.new_payment_modal.open = False
         self.page.update()
 
@@ -1504,14 +1523,23 @@ class PaymentsView(ModuleView):
             self.show_message("Debe seleccionar una fecha", ft.colors.RED)
             return
 
-        try:
-            monto = float(self.new_payment_amount_field.value)
-            if monto <= 0:
-                self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+        # Determinar el monto a usar
+        if self.new_payment_amount_field.visible:
+            # Si el campo está visible, usar el valor ingresado
+            try:
+                monto = float(self.new_payment_amount_field.value)
+                if monto <= 0:
+                    self.show_message("Debe ingresar un monto válido", ft.colors.RED)
+                    return
+            except ValueError:
+                self.show_message("El monto ingresado no es válido", ft.colors.RED)
                 return
-        except ValueError:
-            self.show_message("El monto ingresado no es válido", ft.colors.RED)
-            return
+        else:
+            # Si el campo está oculto, usar la cuota mensual actual
+            if not self.current_monthly_fee:
+                self.show_message("No hay cuota mensual configurada. Debe mostrar y modificar el campo monto.", ft.colors.RED)
+                return
+            monto = self.current_monthly_fee
 
         if not self.new_payment_method_field.value:
             self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
@@ -1544,21 +1572,117 @@ class PaymentsView(ModuleView):
             if success:
                 payment_id = response['id_pago']  # Obtener el ID del pago creado
                 
-                # Si se generó un comprobante desde el formulario, guardarlo en la base de datos
-                if hasattr(self, 'temp_receipt_content') and self.temp_receipt_content:
-                    try:
-                        receipt_success, receipt_message = self.payment_controller.save_payment_receipt(
-                            payment_id,
-                            self.temp_receipt_content
-                        )
-                        if not receipt_success:
-                            self.show_message(f"Pago guardado, pero error al guardar comprobante: {receipt_message}", ft.colors.ORANGE)
-                        else:
-                            self.show_message("Pago y comprobante guardados exitosamente", ft.colors.GREEN)
-                        # Limpiar el contenido temporal del comprobante
-                        self.temp_receipt_content = None
-                    except Exception as ex:
-                        self.show_message(f"Pago guardado, pero error al guardar comprobante: {str(ex)}", ft.colors.ORANGE)
+                # Generar automáticamente el comprobante y guardarlo en la base de datos
+                try:
+                    # Crear un objeto temporal con los datos del pago para generar el comprobante
+                    temp_payment = type('TempPayment', (), {
+                        'id_pago': payment_id,
+                        'fecha_pago': self.new_payment_date_value,
+                        'monto': monto,
+                        'miembro': type('TempMember', (), {
+                            'nombre': self.selected_member_data['nombre'],
+                            'apellido': self.selected_member_data['apellido'],
+                            'documento': self.selected_member_data.get('documento', '')
+                        }),
+                        'metodo_pago': type('TempPaymentMethod', (), {
+                            'descripcion': self.new_payment_method_field.value
+                        }),
+                        'referencia': self.new_payment_observations_field.value,
+                        'estado': 1
+                    })
+                    
+                    # Generar el comprobante PDF
+                    downloads_path = os.path.expanduser("~/Downloads")
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    pdf_path = os.path.join(downloads_path, f"comprobante_pago_{timestamp}.pdf")
+                    
+                    doc = SimpleDocTemplate(
+                        pdf_path,
+                        pagesize=letter,
+                        rightMargin=30,
+                        leftMargin=30,
+                        topMargin=30,
+                        bottomMargin=30
+                    )
+
+                    # Crear los estilos
+                    styles = getSampleStyleSheet()
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Heading1'],
+                        fontSize=24,
+                        spaceAfter=30,
+                        textColor=colors.HexColor('#1F4E78'),
+                        alignment=1  # Centrado
+                    )
+
+                    # Crear el contenido
+                    elements = []
+
+                    # Título
+                    elements.append(Paragraph("Comprobante de Pago", title_style))
+                    elements.append(Spacer(1, 20))
+
+                    # Información del pago
+                    payment_info = [
+                        ["Miembro:", f"{temp_payment.miembro.nombre} {temp_payment.miembro.apellido}"],
+                        ["Fecha:", temp_payment.fecha_pago.strftime("%d/%m/%Y")],
+                        ["Monto:", f"${temp_payment.monto:,.2f}"],
+                        ["Método de Pago:", temp_payment.metodo_pago.descripcion],
+                        ["Referencia:", temp_payment.referencia or "-"]
+                    ]
+
+                    # Crear la tabla de información
+                    table = Table(payment_info, colWidths=[150, 350])
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#1F4E78')),
+                        ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 12),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                        ('TOPPADDING', (0, 0), (-1, -1), 12),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E0E0E0')),
+                    ]))
+
+                    elements.append(table)
+                    elements.append(Spacer(1, 30))
+
+                    # Pie de página
+                    footer_style = ParagraphStyle(
+                        'Footer',
+                        parent=styles['Normal'],
+                        fontSize=8,
+                        textColor=colors.gray,
+                        alignment=1
+                    )
+                    footer = Paragraph(
+                        f"Comprobante generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                        footer_style
+                    )
+                    elements.append(footer)
+
+                    # Construir el PDF
+                    doc.build(elements)
+
+                    # Leer el contenido del PDF generado
+                    with open(pdf_path, 'rb') as pdf_file:
+                        pdf_content = pdf_file.read()
+
+                    # Guardar el comprobante en la base de datos
+                    receipt_success, receipt_message = self.payment_controller.save_payment_receipt(
+                        payment_id,
+                        pdf_content
+                    )
+                    
+                    if receipt_success:
+                        self.show_message("Pago y comprobante guardados exitosamente", ft.colors.GREEN)
+                    else:
+                        self.show_message(f"Pago guardado, pero error al guardar comprobante: {receipt_message}", ft.colors.ORANGE)
+                        
+                except Exception as ex:
+                    self.show_message(f"Pago guardado, pero error al generar comprobante: {str(ex)}", ft.colors.ORANGE)
                 
                 self.close_modal(e)
                 self.load_data()
@@ -2030,57 +2154,31 @@ class PaymentsView(ModuleView):
             self.amount_warning_text.visible = False
             self.page.update()
 
-    def generate_receipt_from_form(self, e):
+
+
+    def toggle_amount_field(self, e):
         """
-        Genera un comprobante con los datos ingresados en el formulario
+        Muestra u oculta el campo de monto
         """
-        if not self.selected_member_data:
-            self.show_message("Debe seleccionar un miembro", ft.colors.RED)
-            return
-
-        if not self.new_payment_date_value:
-            self.show_message("Debe seleccionar una fecha", ft.colors.RED)
-            return
-
-        try:
-            monto = float(self.new_payment_amount_field.value)
-            if monto <= 0:
-                self.show_message("Debe ingresar un monto válido", ft.colors.RED)
-                return
-        except ValueError:
-            self.show_message("El monto ingresado no es válido", ft.colors.RED)
-            return
-
-        if not self.new_payment_method_field.value:
-            self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
-            return
-
-        try:
-            # Crear un objeto temporal con los datos del formulario
-            temp_payment = type('TempPayment', (), {
-                'id_pago': 0,  # ID temporal
-                'fecha_pago': self.new_payment_date_value,
-                'monto': monto,
-                'miembro': type('TempMember', (), {
-                    'nombre': self.selected_member_data['nombre'],
-                    'apellido': self.selected_member_data['apellido'],
-                    'documento': self.selected_member_data.get('documento', '')
-                }),
-                'metodo_pago': type('TempPaymentMethod', (), {
-                    'descripcion': self.new_payment_method_field.value
-                }),
-                'referencia': self.new_payment_observations_field.value,
-                'estado': 1
-            })
-
-            # Guardar el pago temporal para la generación del comprobante
-            self.selected_payment_for_receipt = temp_payment
-            
-            # Generar el comprobante
-            self.confirm_generate_receipt(e)
-
-        except Exception as e:
-            self.show_message(f"Error al generar el comprobante: {str(e)}", ft.colors.RED)
+        if self.new_payment_amount_field.visible:
+            # Ocultar el campo
+            self.new_payment_amount_field.visible = False
+            self.toggle_amount_field_btn.text = "Modificar monto"
+            self.toggle_amount_field_btn.icon = ft.icons.EDIT
+            # Restaurar el valor de la cuota mensual
+            if self.current_monthly_fee:
+                self.new_payment_amount_field.value = f"{self.current_monthly_fee:.2f}"
+        else:
+            # Mostrar el campo
+            self.new_payment_amount_field.visible = True
+            self.toggle_amount_field_btn.text = "Ocultar monto"
+            self.toggle_amount_field_btn.icon = ft.icons.VISIBILITY_OFF
+            # Mantener el valor actual
+            if not self.new_payment_amount_field.value or self.new_payment_amount_field.value == "0.00":
+                if self.current_monthly_fee:
+                    self.new_payment_amount_field.value = f"{self.current_monthly_fee:.2f}"
+        
+        self.page.update()
 
     def close_success_modal(self, e):
         """
