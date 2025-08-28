@@ -32,6 +32,7 @@ class PaymentsView(ModuleView):
         self.monthly_fee_controller = MonthlyFeeController(get_db_session())
         self.db_session = get_db_session()
         self.current_monthly_fee = None  # Variable para almacenar la cuota mensual actual
+        self.selected_member_data = None  # Variable para almacenar el miembro seleccionado
         
         # Inicializar paginación ANTES de setup_payment_view
         from gym_manager.utils.pagination import PaginationController, PaginationWidget
@@ -212,13 +213,14 @@ class PaymentsView(ModuleView):
 
         # Modal de nuevo pago
         self.new_payment_client_field = ft.TextField(
-            label="Miembro",
+            label="Miembro *",
             prefix_icon=ft.icons.SEARCH,
             border_radius=8,
             hint_text="Buscar miembro por nombre o documento...",
             width=500,
             height= 40,
-            on_change=self.search_member
+            on_change=self.search_member,
+            border_color=ft.colors.RED_400 if not self.selected_member_data else ft.colors.GREY_400
         )
         
         # Primero define el ListView
@@ -907,6 +909,12 @@ class PaymentsView(ModuleView):
         else:
             self.new_payment_amount_field.value = "0.00"
         
+        # Limpiar datos del miembro seleccionado
+        self.selected_member_data = None
+        # Resetear el color del borde del campo cliente
+        self.new_payment_client_field.border_color = ft.colors.RED_400
+        self.new_payment_client_field.border_width = 1
+        
         # Asegurar que el campo esté oculto por defecto
         self.new_payment_amount_field.visible = False
         self.toggle_amount_field_btn.text = "Modificar monto"
@@ -955,6 +963,9 @@ class PaymentsView(ModuleView):
         Cierra el modal de nuevo pago y limpia los campos
         """
         self.new_payment_client_field.value = ""
+        # Restaurar el color del borde del campo cliente
+        self.new_payment_client_field.border_color = ft.colors.RED_400
+        self.new_payment_client_field.border_width = 1
         self.new_payment_date_value = None
         self.new_payment_date_picker.value = None
         self.new_payment_date_field.content.controls[0].value = "Seleccionar fecha"
@@ -969,7 +980,7 @@ class PaymentsView(ModuleView):
         self.toggle_amount_field_btn.icon = ft.icons.EDIT
         self.new_payment_method_field.value = None
         self.new_payment_observations_field.value = ""
-        self.selected_member_data = None
+        self.selected_member_data = None  # Limpiar el miembro seleccionado
         self.member_search_results.visible = False
         self.member_search_results_container.height = 0
         self.amount_warning_text.visible = False
@@ -1507,6 +1518,9 @@ class PaymentsView(ModuleView):
             'documento': member.documento
         }
         self.new_payment_client_field.value = f"{member.nombre} {member.apellido}"
+        # Actualizar el color del borde para indicar que está seleccionado
+        self.new_payment_client_field.border_color = ft.colors.GREEN_400
+        self.new_payment_client_field.border_width = 1
         self.member_search_results.visible = False
         self.member_search_results_container.height = 0
         self.page.update()
@@ -1515,8 +1529,12 @@ class PaymentsView(ModuleView):
         """
         Guarda un nuevo pago
         """
-        if not self.selected_member_data:
-            self.show_message("Debe seleccionar un miembro", ft.colors.RED)
+        if not self.selected_member_data or not self.new_payment_client_field.value:
+            self.show_message("⚠️ Debe seleccionar un miembro para continuar", ft.colors.RED)
+            # Resaltar visualmente el campo requerido
+            self.new_payment_client_field.border_color = ft.colors.RED_600
+            self.new_payment_client_field.border_width = 2
+            self.page.update()
             return
 
         if not self.new_payment_date_value:
