@@ -165,7 +165,6 @@ class PaymentReceiptView(ModuleView):
                                     expand=True,
                                     alignment=ft.alignment.top_left,
                                     padding=ft.padding.symmetric(horizontal=20),
-                                    height=600,
                                 )
                             ],
                             alignment=ft.MainAxisAlignment.START,
