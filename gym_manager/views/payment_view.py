@@ -47,13 +47,7 @@ class PaymentsView(ModuleView):
         self.check_overdue_payments()  # Verificar pagos vencidos al iniciar
 
     def setup_payment_view(self):
-        # Título amigable arriba de los filtros, en negro y bien arriba
-        self.title = ft.Text(
-            "Gestión de Pagos",
-            size=32,
-            weight=ft.FontWeight.BOLD,
-            color=ft.colors.BLACK,
-        )
+        
 
         # Botón Nuevo Pago
         self.new_payment_btn = ft.ElevatedButton(
@@ -741,12 +735,6 @@ class PaymentsView(ModuleView):
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Container(
-                        content=self.title,
-                        padding=ft.padding.only(bottom=30, top=0, left=10, right=10),
-                        alignment=ft.alignment.top_left,
-                        
-                    ),
                     # Encabezado (título a la izquierda, alta y export a la derecha)
                     ft.Container(
                         content=ft.Row(
