@@ -857,8 +857,9 @@ class MembersView(ModuleView):
                 title=ft.Text(f"Rutina de {member.nombre} {member.apellido}", size=26, weight=ft.FontWeight.BOLD),
                 content=ft.Container(
                     content=ft.Column(controls=controls, spacing=0),
-                    width=600,
+                    width=400,
                     padding=20,
+                    height=300,
                 ),
                 actions=[
                     ft.TextButton("Cerrar", on_click=lambda e: self._close_dialog(details_modal)),
@@ -1387,8 +1388,9 @@ class MembersView(ModuleView):
                         width=400,
                     ),
                 ]),
-                width=500,
+                width=400,
                 padding=20,
+                height=300,
             ),
             actions=[
                 ft.TextButton("Cancelar", on_click=self.close_assign_routine_modal),

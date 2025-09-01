@@ -7,15 +7,8 @@ from pathlib import Path
 import os
 import asyncio
 
-# Imports para gráficos - solo importar una vez
-try:
-    import plotly.graph_objs as go
-    from flet.plotly_chart import PlotlyChart
-    HAS_PLOTLY = True
-except ImportError:
-    go = None
-    PlotlyChart = None
-    HAS_PLOTLY = False
+# Imports para gráficos nativos de Flet
+import flet as ft
 
 class StatisticsController:
     def __init__(self, view, page):
@@ -208,11 +201,7 @@ class StatisticsController:
             print(f"Error estableciendo valores por defecto: {e}")  # Debug
 
     async def load_charts_data(self):
-        """Carga y configura los datos para los gráficos de manera optimizada con lazy loading."""
-        if not HAS_PLOTLY:
-            print("⚠️ Plotly no disponible, saltando gráficos")
-            return
-            
+        """Carga y configura los datos para los gráficos usando Flet nativo."""
         try:
             # Obtener datos de gráficos de forma secuencial para evitar problemas de concurrencia
             print("📈 Obteniendo datos para gráficos...")
@@ -229,17 +218,17 @@ class StatisticsController:
             data_tipos = self._get_cached_active_memberships_by_type()
             print("✓ Datos de tipos de membresía obtenidos")
             
-            # Crear gráficos uno por uno para mejor UX
-            await self._create_chart_async("income", data_ingresos, 0)
-            await self._create_chart_async("payment_methods", data_metodos, 0.5)
-            await self._create_chart_async("new_members", data_nuevos, 1)
-            await self._create_chart_async("memberships_by_type", data_tipos, 1.5)
+            # Crear gráficos nativos de Flet uno por uno para mejor UX
+            await self._create_flet_chart_async("income", data_ingresos, 0)
+            await self._create_flet_chart_async("payment_methods", data_metodos, 0.5)
+            await self._create_flet_chart_async("new_members", data_nuevos, 1)
+            await self._create_flet_chart_async("memberships_by_type", data_tipos, 1.5)
             
         except Exception as e:
             print(f"Error en load_charts_data: {e}")
     
-    async def _create_chart_async(self, chart_type, data, delay_seconds):
-        """Crea un gráfico específico de forma asíncrona con un pequeño delay para mejorar UX"""
+    async def _create_flet_chart_async(self, chart_type, data, delay_seconds):
+        """Crea un gráfico nativo de Flet de forma asíncrona con un pequeño delay para mejorar UX"""
         try:
             # Pequeño delay para escalonar la creación de gráficos
             if delay_seconds > 0:
@@ -251,64 +240,162 @@ class StatisticsController:
             chart = None
             
             if chart_type == "income" and hasattr(self.view, 'income_bar_chart'):
-                fig = go.Figure(data=[go.Bar(
-                    x=data["meses"], 
-                    y=data["ingresos"], 
-                    marker_color="#1F4E78",
-                    name="Ingresos"
-                )])
-                fig.update_layout(
-                    title="Ingresos Mensuales",
-                    xaxis_title="Mes",
-                    yaxis_title="Monto ($)",
-                    height=400
+                # Crear gráfico de barras para ingresos
+                chart = ft.BarChart(
+                    bar_groups=[
+                        ft.BarChartGroup(
+                            x=i,
+                            bar_rods=[
+                                ft.BarChartRod(
+                                    from_y=0,
+                                    to_y=data["ingresos"][i],
+                                    width=40,
+                                    color=ft.colors.BLUE_600,
+                                    tooltip=f"{data['meses'][i]}: ${data['ingresos'][i]:,.0f}",
+                                    border_radius=0,
+                                )
+                            ],
+                        ) for i in range(len(data["meses"]))
+                    ],
+                    border=ft.border.all(3, ft.colors.with_opacity(0.2, ft.colors.ON_SURFACE)),
+                    left_axis=ft.ChartAxis(
+                        labels_size=40,
+                    ),
+                    bottom_axis=ft.ChartAxis(
+                        labels=[
+                            ft.ChartAxisLabel(
+                                value=i,
+                                label=ft.Container(
+                                    ft.Text(data["meses"][i][:3], size=12),
+                                    margin=ft.margin.only(top=10),
+                                ),
+                            ) for i in range(len(data["meses"]))
+                        ],
+                        labels_size=40,
+                    ),
+                    tooltip_bgcolor=ft.colors.with_opacity(0.8, ft.colors.BLUE_GREY_900),
+                    min_y=0,
+                    max_y=max(data["ingresos"]) * 1.1 if data["ingresos"] else 1000,
+                    expand=True,
                 )
-                chart = PlotlyChart(fig, expand=True)
                 self.view.income_bar_chart.content.controls[1] = chart
                 
             elif chart_type == "payment_methods" and hasattr(self.view, 'payment_method_pie_chart'):
-                labels = list(data.keys())
-                values = list(data.values())
-                fig = go.Figure(data=[go.Pie(
-                    labels=labels, 
-                    values=values, 
-                    hole=0.3
-                )])
-                fig.update_layout(title="Métodos de Pago", height=400)
-                chart = PlotlyChart(fig, expand=True)
+                # Crear gráfico de torta para métodos de pago
+                colors = [ft.colors.BLUE_400, ft.colors.GREEN_400, ft.colors.ORANGE_400, ft.colors.PURPLE_400, ft.colors.RED_400]
+                sections = []
+                total = sum(data.values()) if data else 1
+                
+                for i, (label, value) in enumerate(data.items()):
+                    percentage = (value / total) * 100 if total > 0 else 0
+                    sections.append(
+                        ft.PieChartSection(
+                            value=value,
+                            title=f"{label}\n{percentage:.1f}%",
+                            color=colors[i % len(colors)],
+                            radius=100,
+                            title_style=ft.TextStyle(
+                                size=12,
+                                weight=ft.FontWeight.BOLD,
+                                color=ft.colors.WHITE,
+                            ),
+                        )
+                    )
+                
+                chart = ft.PieChart(
+                    sections=sections,
+                    sections_space=2,
+                    center_space_radius=40,
+                    expand=True,
+                )
                 self.view.payment_method_pie_chart.content.controls[1] = chart
                 
             elif chart_type == "new_members" and hasattr(self.view, 'new_members_line_chart'):
-                fig = go.Figure(data=[go.Scatter(
-                    x=data["meses"], 
-                    y=data["nuevos"], 
-                    mode="lines+markers", 
-                    line=dict(color="#4CAF50"),
-                    name="Nuevos Miembros"
-                )])
-                fig.update_layout(
-                    title="Nuevos Miembros por Mes",
-                    xaxis_title="Mes",
-                    yaxis_title="Cantidad",
-                    height=400
+                # Crear gráfico de líneas para nuevos miembros
+                data_points = []
+                for i, mes in enumerate(data["meses"]):
+                    data_points.append(ft.LineChartDataPoint(i, data["nuevos"][i]))
+                
+                chart = ft.LineChart(
+                    data_series=[
+                        ft.LineChartData(
+                            data_points=data_points,
+                            stroke_width=3,
+                            color=ft.colors.GREEN_600,
+                            curved=True,
+                            stroke_cap_round=True,
+                        ),
+                    ],
+                    border=ft.border.all(3, ft.colors.with_opacity(0.2, ft.colors.ON_SURFACE)),
+                    horizontal_grid_lines=ft.ChartGridLines(
+                        color=ft.colors.with_opacity(0.2, ft.colors.ON_SURFACE),
+                        width=1,
+                    ),
+                    vertical_grid_lines=ft.ChartGridLines(
+                        color=ft.colors.with_opacity(0.2, ft.colors.ON_SURFACE),
+                        width=1,
+                    ),
+                    left_axis=ft.ChartAxis(
+                        labels_size=40,
+                    ),
+                    bottom_axis=ft.ChartAxis(
+                        labels=[
+                            ft.ChartAxisLabel(
+                                value=i,
+                                label=ft.Container(
+                                    ft.Text(mes[:3], size=12),
+                                    margin=ft.margin.only(top=10),
+                                ),
+                            ) for i, mes in enumerate(data["meses"])
+                        ],
+                        labels_size=40,
+                    ),
+                    tooltip_bgcolor=ft.colors.with_opacity(0.8, ft.colors.BLUE_GREY_900),
+                    min_y=0,
+                    max_y=max(data["nuevos"]) * 1.1 if data["nuevos"] else 10,
+                    expand=True,
                 )
-                chart = PlotlyChart(fig, expand=True)
                 self.view.new_members_line_chart.content.controls[1] = chart
                 
             elif chart_type == "memberships_by_type" and hasattr(self.view, 'active_memberships_by_type_chart'):
-                fig = go.Figure(data=[go.Bar(
-                    x=list(data.keys()), 
-                    y=list(data.values()), 
-                    marker_color="#FF9800",
-                    name="Membresías Activas"
-                )])
-                fig.update_layout(
-                    title="Membresías Activas por Tipo",
-                    xaxis_title="Tipo de Membresía",
-                    yaxis_title="Cantidad",
-                    height=400
+                # Crear gráfico de barras para tipos de membresía
+                chart = ft.BarChart(
+                    bar_groups=[
+                        ft.BarChartGroup(
+                            x=i,
+                            bar_rods=[
+                                ft.BarChartRod(
+                                    from_y=0,
+                                    to_y=list(data.values())[i],
+                                    width=40,
+                                    color=ft.colors.ORANGE_600,
+                                    tooltip=f"{list(data.keys())[i]}: {list(data.values())[i]}",
+                                    border_radius=0,
+                                )
+                            ],
+                        ) for i in range(len(data))
+                    ],
+                    border=ft.border.all(3, ft.colors.with_opacity(0.2, ft.colors.ON_SURFACE)),
+                    left_axis=ft.ChartAxis(
+                        labels_size=40,
+                    ),
+                    bottom_axis=ft.ChartAxis(
+                        labels=[
+                            ft.ChartAxisLabel(
+                                value=i,
+                                label=ft.Container(
+                                    ft.Text(list(data.keys())[i][:8], size=10),
+                                    margin=ft.margin.only(top=10),
+                                ),
+                            ) for i in range(len(data))
+                        ],
+                        labels_size=40,
+                    ),
+                    tooltip_bgcolor=ft.colors.with_opacity(0.8, ft.colors.BLUE_GREY_900),
+                    min_y=0,
+                    max_y=max(data.values()) * 1.1 if data.values() else 10,
+                    expand=True,
                 )
-                chart = PlotlyChart(fig, expand=True)
                 self.view.active_memberships_by_type_chart.content.controls[1] = chart
             
             # Actualizar UI después de crear cada gráfico
