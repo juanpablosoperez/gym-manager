@@ -31,6 +31,8 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+.zip
+
 
 # Installer logs
 pip-log.txt
@@ -169,18 +171,12 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-\ndist/\nbuild/\nGym Manager.spec\ngym_manager/pack/GymManagerSetup.exe\ngym_manager/pack/files/Gym Manager.exe\ngym_manager/pack/files/pack.7z
 
+# Project specific files
 dist/
 build/
 Gym Manager.spec
 gym_manager/pack/GymManagerSetup.exe
 gym_manager/pack/files/Gym Manager.exe
 gym_manager/pack/files/pack.7z
-
-dist/
-build/
-Gym Manager.spec
-gym_manager/pack/GymManagerSetup.exe
-gym_manager/pack/files/Gym Manager.exe
-gym_manager/pack/files/pack.7z
+*.zip
