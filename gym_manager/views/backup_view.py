@@ -90,6 +90,7 @@ class BackupView(BaseView):
         self.backup_service = BackupService(db_session)
         self.restore_service = RestoreService(db_session, page=page)
         self.current_backup_thread: Optional[threading.Thread] = None
+        self.backup_to_delete_id: Optional[int] = None
         
         # Inicializar paginación ANTES de setup_backup_view
         from gym_manager.utils.pagination import PaginationController, PaginationWidget
@@ -105,15 +106,19 @@ class BackupView(BaseView):
         # Definir diálogo de restauración
         self.restore_dialog = ft.AlertDialog(
             title=ft.Text("Restaurar Backup"),
-            content=ft.Column([
-                ft.Text("", size=16, weight=ft.FontWeight.BOLD),
-                ft.Text("Detalles del backup:", size=14, weight=ft.FontWeight.W_500),
-                ft.Text("Nombre: ", size=14),
-                ft.Text("Fecha: ", size=14),
-                ft.Text("Tamaño: ", size=14),
-                ft.Text("Creado por: ", size=14),
-                ft.Text("\n¿Estás seguro de que deseas restaurar este backup?\nEsta acción no se puede deshacer.", size=14, color=ft.colors.RED),
-            ], spacing=10),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Detalles del backup:", size=14, weight=ft.FontWeight.W_500),
+                    ft.Text("Nombre: ", size=14),
+                    ft.Text("Fecha: ", size=14),
+                    ft.Text("Tamaño: ", size=14),
+                    ft.Text("Creado por: ", size=14),
+                    ft.Text("\n¿Estás seguro de que deseas restaurar este backup?\nEsta acción no se puede deshacer.", size=14, color=ft.colors.RED),
+                ], spacing=10),
+                width=500,
+                height=350
+            ),
             actions=[
                 ft.TextButton("Cancelar", on_click=lambda e: self._close_dialog(self.restore_dialog)),
                 ft.TextButton("Restaurar", on_click=self._restore_backup),
@@ -150,13 +155,38 @@ class BackupView(BaseView):
             ],
             actions_alignment=ft.MainAxisAlignment.END
         )
+
+        # Definir diálogo de confirmación de eliminación
+        self.delete_confirm_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Confirmar Eliminación", size=20, weight=ft.FontWeight.BOLD),
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("", size=16, weight=ft.FontWeight.BOLD),
+                    ft.Text("Detalles del backup:", size=14, weight=ft.FontWeight.W_500),
+                    ft.Text("Nombre: ", size=14),
+                    ft.Text("Fecha: ", size=14),
+                    ft.Text("Tamaño: ", size=14),
+                    ft.Text("Creado por: ", size=14),
+                    ft.Text("\n¿Estás seguro de que deseas eliminar este backup?\nEsta acción no se puede deshacer.", size=14, color=ft.colors.RED),
+                ], spacing=10),
+                width=450,
+                height=300
+            ),
+            actions=[
+                ft.TextButton("Cancelar", on_click=lambda e: self._close_dialog(self.delete_confirm_dialog)),
+                ft.TextButton("Eliminar", on_click=self._confirm_delete_backup, style=ft.ButtonStyle(color=ft.colors.RED)),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
         
         # Agregar diálogos a la página
         self.page.overlay.extend([
             self.progress_modal.modal,
             self.restore_dialog,
             self.restore_success_dialog,
-            self.restore_error_dialog
+            self.restore_error_dialog,
+            self.delete_confirm_dialog
         ])
         
         self.setup_backup_view()
@@ -375,11 +405,13 @@ class BackupView(BaseView):
                 return
 
             # Actualizar el contenido del diálogo con los detalles del backup
-            self.restore_dialog.content.controls[0].value = backup.name  # Título
-            self.restore_dialog.content.controls[2].value = f"Nombre: {backup.name}"
-            self.restore_dialog.content.controls[3].value = f"Fecha: {backup.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
-            self.restore_dialog.content.controls[4].value = f"Tamaño: {backup.size_mb:.2f} MB"
-            self.restore_dialog.content.controls[5].value = f"Creado por: {backup.created_by or 'Sistema'}"
+            # Acceder al contenido del Container que envuelve la Column
+            column_content = self.restore_dialog.content.content
+            column_content.controls[0].value = backup.name  # Título
+            column_content.controls[2].value = f"Nombre: {backup.name}"
+            column_content.controls[3].value = f"Fecha: {backup.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            column_content.controls[4].value = f"Tamaño: {backup.size_mb:.2f} MB"
+            column_content.controls[5].value = f"Creado por: {backup.created_by or 'Sistema'}"
 
             # Guardar el ID del backup para la restauración
             self.restore_dialog.content.value = str(backup_id)
@@ -463,14 +495,50 @@ class BackupView(BaseView):
             self._handle_error("Error al crear backup", e)
 
     def delete_backup(self, backup_id: int):
-        """Elimina un backup"""
+        """Muestra el modal de confirmación para eliminar un backup"""
         try:
+            # Buscar el backup en la base de datos
+            backup = self.backup_service.get_backup(backup_id)
+            if not backup:
+                self.show_message("Backup no encontrado", ft.colors.RED)
+                return
+
+            # Actualizar el contenido del diálogo con los detalles del backup
+            column_content = self.delete_confirm_dialog.content.content
+            column_content.controls[0].value = backup.name  # Título
+            column_content.controls[2].value = f"Nombre: {backup.name}"
+            column_content.controls[3].value = f"Fecha: {backup.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            column_content.controls[4].value = f"Tamaño: {backup.size_mb:.2f} MB"
+            column_content.controls[5].value = f"Creado por: {backup.created_by or 'Sistema'}"
+
+            # Guardar el ID del backup para la eliminación
+            self.backup_to_delete_id = backup_id
+
+            # Mostrar el diálogo
+            self.delete_confirm_dialog.open = True
+            self.page.update()
+
+        except Exception as e:
+            self._handle_error("Error al mostrar diálogo de eliminación", e)
+
+    def _confirm_delete_backup(self, e):
+        """Confirma y ejecuta la eliminación del backup"""
+        try:
+            backup_id = self.backup_to_delete_id
+            if backup_id is None:
+                self.show_error_message("No se ha seleccionado ningún backup para eliminar")
+                return
+            
+            self._close_dialog(self.delete_confirm_dialog)
+            
+            # Ejecutar la eliminación
             success, message = self.backup_service.delete_backup(backup_id)
             if success:
-                self.show_message("Backup eliminado exitosamente", ft.colors.GREEN)
-                self.load_backups()
+                self.show_success_message("Backup eliminado exitosamente")
+                self.load_backups()  # Recargar la lista
             else:
-                self.show_message(f"Error al eliminar backup: {message}", ft.colors.RED)
+                self.show_error_message(f"Error al eliminar backup: {message}")
+                
         except Exception as e:
             self._handle_error("Error al eliminar backup", e)
 

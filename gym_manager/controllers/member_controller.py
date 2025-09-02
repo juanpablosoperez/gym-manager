@@ -74,6 +74,11 @@ class MemberController:
             existing = self.db_session.query(Miembro).filter_by(documento=member_data['documento']).first()
             if existing:
                 return False, "Ya existe un miembro con ese documento. Por favor, ingrese uno diferente."
+            # Log para debugging
+            fecha_inicio = member_data.get('fecha_inicio')
+            self.logger.info(f"Fecha de inicio recibida: {fecha_inicio}")
+            self.logger.info(f"Tipo de fecha_inicio: {type(fecha_inicio)}")
+            
             new_member = Miembro(
                 nombre=member_data['nombre'],
                 apellido=member_data['apellido'],
@@ -85,7 +90,7 @@ class MemberController:
                 tipo_membresia=member_data.get('tipo_membresia'),
                 direccion=member_data.get('direccion'),
                 telefono=member_data.get('telefono'),
-                fecha_registro=datetime.now(),
+                fecha_registro=fecha_inicio or datetime.now(),
                 informacion_medica=member_data.get('informacion_medica')
             )
             self.db_session.add(new_member)
@@ -121,6 +126,8 @@ class MemberController:
             member.informacion_medica = member_data.get('informacion_medica')
             if 'estado' in member_data:
                 member.estado = member_data['estado']
+            if 'fecha_inicio' in member_data and member_data['fecha_inicio']:
+                member.fecha_registro = member_data['fecha_inicio']
 
             self.db_session.commit()
             return True, "Miembro actualizado exitosamente"
