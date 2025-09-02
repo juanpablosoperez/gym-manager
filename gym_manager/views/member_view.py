@@ -222,11 +222,11 @@ class MembersView(ModuleView):
                                             ref=self.new_member_membership,
                                             border_radius=10,
                                             text_size=16,
-                                            width=200
+                                            expand=True
                                         ),
                                     ],
                                     expand=True,
-                                    spacing=12
+                                    spacing=16
                                 ),
                                 ft.Column(
                                     [
@@ -264,9 +264,10 @@ class MembersView(ModuleView):
                                             spacing=12,
                                             expand=True
                                         ),
+
                                     ],
                                     expand=True,
-                                    spacing=12
+                                    spacing=16
                                 ),
                             ],
                             spacing=24
@@ -659,6 +660,7 @@ class MembersView(ModuleView):
                 "Teléfono": self.new_member_phone.current.value,
                 "Dirección": self.new_member_address.current.value,
                 "Estado": self.new_member_status.current.value,
+                "Fecha de Inicio": self.start_date_picker.value,
             }
 
             # Recolectar campos faltantes
@@ -680,6 +682,21 @@ class MembersView(ModuleView):
             if not required_fields["Documento"].isdigit():
                 self.show_message("El documento debe contener solo números", ft.colors.RED)
                 return
+                
+            # Validar que la fecha de inicio sea válida
+            if not self.start_date_picker.value:
+                self.show_message("Por favor seleccione una fecha de inicio válida", ft.colors.RED)
+                return
+                
+            # Validar que la fecha de inicio no sea futura (opcional)
+            if self.start_date_picker.value > datetime.now():
+                self.show_message("La fecha de inicio no puede ser futura", ft.colors.RED)
+                return
+                
+            # Validar que la fecha de inicio no sea muy antigua (antes de 2020)
+            if self.start_date_picker.value < datetime(2020, 1, 1):
+                self.show_message("La fecha de inicio no puede ser anterior a 2020", ft.colors.RED)
+                return
 
             # Preparar datos del miembro
             member_data = {
@@ -693,8 +710,13 @@ class MembersView(ModuleView):
                 "telefono": required_fields["Teléfono"].strip() if required_fields["Teléfono"] else None,
                 "direccion": required_fields["Dirección"].strip() if required_fields["Dirección"] else None,
                 "informacion_medica": self.new_member_medical.current.value.strip() if self.new_member_medical.current.value else None,
-                "estado": required_fields["Estado"] == "Activo"
+                "estado": required_fields["Estado"] == "Activo",
+                "fecha_inicio": self.start_date_picker.value
             }
+            
+            # Log para debugging
+            print(f"Fecha de inicio que se enviará: {self.start_date_picker.value}")
+            print(f"Tipo de fecha de inicio: {type(self.start_date_picker.value)}")
 
             if self.is_editing:
                 # Actualizar miembro existente
