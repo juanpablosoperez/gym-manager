@@ -27,16 +27,46 @@ Gym Manager_1.0.0_Complete/
 │   └── 📁 assets/
 ├── 📁 assets/                  ← Recursos adicionales
 ├── 🔧 GymManagerSetup.exe      ← Instalador completo (si está disponible)
+├── 📦 Gym Manager_Portable_1.0.0.zip  ← Versión portable (RECOMENDADA)
 └── 📖 README_INSTALACION.txt   ← Instrucciones técnicas
+
+Gym Manager_Portable_1.0.0/     ← Versión portable (descomprimir)
+├── 🚀 Iniciar_Gym_Manager.bat  ← Script de inicio (EJECUTAR ESTE)
+├── 📁 app/                     ← Aplicación y dependencias
+│   ├── 🚀 Gym Manager.exe
+│   └── 📁 assets/
+├── 📁 data/                    ← Datos y configuración
+│   └── 📄 schema.sql
+├── 📁 mysql/                   ← Instalador MySQL
+│   └── 🗄️ MySQLInstallerConsole.exe
+└── 📖 README_PORTABLE.txt      ← Instrucciones de la versión portable
 ```
 
 ---
 
 ## 🚀 **Métodos de Instalación**
 
-### **🎯 Opción 1: Instalación Automática (RECOMENDADA)**
+### **🎯 Opción 1: Versión Portable (MÁS RECOMENDADA)**
 
-**Para usuarios que quieren la instalación más simple:**
+**Para usuarios que quieren la máxima simplicidad:**
+
+1. **Descomprimir el archivo `Gym Manager_Portable_1.0.0.zip`**
+2. **Ejecutar `Iniciar_Gym_Manager.bat` como administrador**
+3. **¡Listo! Todo se configura automáticamente**
+
+**Ventajas:**
+- ✅ **No requiere instalación** - Solo ejecutar
+- ✅ **No modifica el registro** de Windows
+- ✅ **Fácil de transportar** - Copiar carpeta completa
+- ✅ **Fácil de desinstalar** - Solo eliminar carpeta
+- ✅ **Configuración automática** de MySQL
+- ✅ **Funciona en cualquier PC** sin configuración previa
+
+---
+
+### **🎯 Opción 2: Instalación Automática**
+
+**Para usuarios que prefieren instalación tradicional:**
 
 1. **Hacer doble clic en `GymManagerSetup.exe`**
 2. **Seguir el asistente de instalación**
@@ -51,7 +81,7 @@ Gym Manager_1.0.0_Complete/
 
 ---
 
-### **⚙️ Opción 2: Instalación Semi-Automática**
+### **⚙️ Opción 3: Instalación Semi-Automática**
 
 **Para usuarios que prefieren más control:**
 
@@ -68,7 +98,7 @@ Gym Manager_1.0.0_Complete/
 
 ---
 
-### **🔧 Opción 3: Instalación Manual**
+### **🔧 Opción 4: Instalación Manual**
 
 **Para usuarios técnicos o si las opciones anteriores fallan:**
 

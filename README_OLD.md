@@ -35,98 +35,82 @@ Antes de instalar el proyecto, asegúrate de tener:
 - **Poetry** instalado:
   ```bash
   curl -sSL https://install.python-poetry.org | python3 -
-  ```
 
----
 
-## 🚀 **Instalación**
-
-### **1️⃣ Clonar el Repositorio**
-```bash
+**🚀 Instalación**
+1️⃣ Clonar el Repositorio
 git clone https://github.com/TU_USUARIO/gym-manager.git
 cd gym-manager
-```
 
-### **2️⃣ Configurar Poetry y Dependencias**
-```bash
+**2️⃣ Configurar Poetry y Dependencias**
 poetry install
-```
 
-### **3️⃣ Activar el Entorno Virtual**
-```bash
+**3️⃣ Activar el Entorno Virtual**
 poetry shell
-```
 
-### **4️⃣ Instalar Dependencias Adicionales**
-```bash
+**4️⃣ Instalar Dependencias Adicionales**
 poetry add flet sqlalchemy alembic pymysql
 poetry add pandas openpyxl matplotlib seaborn numpy
 poetry add --dev black isort pylint pytest
-```
 
----
 
-## 🏃 **Ejecutar el Proyecto (Desarrollo)**
-
-```bash
+**🏃 Ejecutar el Proyecto**
 python gym_manager/main.py
-```
 
-### **Con Poetry:**
-```bash
-# Modo Desarrollo
-poetry run dev
 
-# Modo Producción
-poetry run prod
-```
+**🛠 Migraciones con Alembic**
 
----
+1️⃣ Inicializar Alembic
 
-## 🛠 **Migraciones con Alembic**
-
-### **1️⃣ Inicializar Alembic**
-```bash
 alembic init alembic
-```
 
-### **2️⃣ Configurar alembic.ini**
-Abre el archivo `alembic.ini` y edita la línea:
-```ini
+2️⃣ Configurar alembic.ini
+
+Abre el archivo alembic.ini y edita la línea:
+
 sqlalchemy.url = mysql+pymysql://usuario:contraseña@localhost/gym_manager
-```
 
-### **3️⃣ Crear y Aplicar Migraciones**
-```bash
+3️⃣ Crear y Aplicar Migraciones
 alembic revision --autogenerate -m "Inicialización de la BD"
 alembic upgrade head
-```
 
-### **Con Poetry:**
-```bash
-# Correr Alembic con Poetry
-poetry run alembic upgrade head
-
-# Crear migraciones
-poetry run alembic revision --autogenerate -m "Migración inicial"
-```
-
----
-
-## 🛠 **Uso de Git**
-
-### **📌 Subir Cambios a GitHub**
-```bash
+**🛠 Uso de Git**
+📌 Subir Cambios a GitHub
 git add .
 git commit -m "Estructura inicial del proyecto"
 git push origin main
-```
 
-### **🆕 Crear y Cambiar de Ramas**
-```bash
+🆕 Crear y Cambiar de Ramas
 git checkout -b nueva-feature
+
+Crear pull request
 git push origin rama-a-pushear
-```
+
+
+**4️⃣ Ejecutar la App con Poetry**
+Ahora puedes ejecutar la aplicación con:
+
+Modo Desarrollo:
+poetry run dev
+
+Modo Producción:
+poetry run prod
+
+Correr Alembic con Poetry:
+poetry run alembic upgrade head
+
+3️⃣ Crear migraciones:
+poetry run alembic revision --autogenerate -m "Migración inicial"
+
+
+📌 1️⃣0️⃣ Resumen de Comandos
+Acción	                        Comando
+Instalar Alembic	            poetry add alembic
+Inicializar Alembic	            poetry run alembic init alembic
+Crear una migración	            poetry run alembic revision --autogenerate -m "Descripción"
+Aplicar migraciones	            poetry run alembic upgrade head
+Ver historial de migraciones	poetry run alembic history
+Ver estado actual	            poetry run alembic current
 
 ---
 
@@ -203,9 +187,114 @@ gym_manager/
 
 ---
 
-## 🚀 **Sistema de Build y Distribución**
+## 🚀 **Inicio Rápido**
 
-### **📦 Generación de Ejecutables**
+### **Para Desarrolladores:**
+```bash
+# 1. Clonar repositorio
+git clone https://github.com/TU_USUARIO/gym-manager.git
+cd gym-manager
+
+# 2. Instalar dependencias
+poetry install
+
+# 3. Activar entorno
+poetry shell
+
+# 4. Ejecutar aplicación
+python gym_manager/main.py
+```
+
+### **Para Distribución:**
+```bash
+# Generar todas las versiones
+build_all_versions.bat
+
+# O solo la portable (recomendada)
+create_portable_version.bat
+```
+
+### **Para Clientes Finales:**
+1. **Descargar** `Gym Manager_Portable_1.0.0.zip`
+2. **Descomprimir** en cualquier carpeta
+3. **Ejecutar** `Iniciar_Gym_Manager.bat` como administrador
+4. **¡Listo!** Todo se configura automáticamente
+
+---
+
+## 📞 **Soporte y Contacto**
+
+### **🐛 Reportar Problemas**
+- **GitHub Issues:** [Crear un issue](https://github.com/TU_USUARIO/gym-manager/issues)
+- **Email:** soporte@gymmanager.com
+- **Documentación:** Revisar README_CLIENTE.md
+
+### **💡 Solicitar Funcionalidades**
+- **GitHub Discussions:** [Discusiones](https://github.com/TU_USUARIO/gym-manager/discussions)
+- **Email:** desarrollo@gymmanager.com
+
+### **📚 Documentación Adicional**
+- **README_CLIENTE.md** - Guía completa para usuarios finales
+- **BUILD_INSTRUCTIONS.md** - Instrucciones detalladas de build
+- **docs/** - Documentación técnica (si está disponible)
+
+---
+
+## 📄 **Licencia y Créditos**
+
+### **📜 Licencia**
+Este proyecto está bajo la licencia **MIT**. Ver el archivo `LICENSE` para más detalles.
+
+### **👥 Desarrolladores**
+- **Desarrollador Principal:** [Tu Nombre]
+- **Contribuidores:** [Lista de contribuidores]
+
+### **🙏 Agradecimientos**
+- **Flet** - Framework de interfaz gráfica
+- **SQLAlchemy** - ORM para Python
+- **MySQL** - Base de datos relacional
+- **Plotly** - Visualización de datos
+- **Poetry** - Gestión de dependencias
+
+---
+
+## 🔄 **Historial de Versiones**
+
+### **v1.0.0** (Actual)
+- ✅ Sistema completo de gestión de gimnasios
+- ✅ Interfaz moderna con Flet
+- ✅ Sistema de backups automáticos
+- ✅ Reportes y estadísticas avanzadas
+- ✅ Versión portable y instalable
+- ✅ Configuración automática de MySQL
+- ✅ Documentación completa
+
+### **Próximas Versiones**
+- 🔄 **v1.1.0** - Mejoras en reportes
+- 🔄 **v1.2.0** - Integración con sistemas de pago
+- 🔄 **v2.0.0** - Versión web/móvil
+
+---
+
+## 🎉 **¡Gracias por usar Gym Manager!**
+
+**Gym Manager** es una solución completa y profesional para la gestión de gimnasios. 
+Con su interfaz moderna, funcionalidades avanzadas y facilidad de uso, 
+te ayudará a administrar tu negocio de manera eficiente.
+
+### **⭐ Si te gusta el proyecto:**
+- Dale una estrella en GitHub
+- Comparte con otros gimnasios
+- Contribuye al desarrollo
+- Reporta bugs o sugiere mejoras
+
+### **🚀 ¡Comienza hoy mismo!**
+Descarga la versión portable, descomprime y ejecuta. 
+¡En menos de 5 minutos tendrás tu sistema de gestión funcionando!
+
+---
+
+**Desarrollado con ❤️ para la comunidad fitness** 🏋️‍♂️
 
 El proyecto incluye un sistema completo de build que genera **dos versiones** listas para distribución:
 
@@ -358,111 +447,4 @@ py -m PyInstaller Gym_Manager_Optimized.spec --noconfirm
 
 ---
 
-## 🚀 **Inicio Rápido**
-
-### **Para Desarrolladores:**
-```bash
-# 1. Clonar repositorio
-git clone https://github.com/TU_USUARIO/gym-manager.git
-cd gym-manager
-
-# 2. Instalar dependencias
-poetry install
-
-# 3. Activar entorno
-poetry shell
-
-# 4. Ejecutar aplicación
-python gym_manager/main.py
-```
-
-### **Para Distribución:**
-```bash
-# Generar todas las versiones
-build_all_versions.bat
-
-# O solo la portable (recomendada)
-create_portable_version.bat
-```
-
-### **Para Clientes Finales:**
-1. **Descargar** `Gym Manager_Portable_1.0.0.zip`
-2. **Descomprimir** en cualquier carpeta
-3. **Ejecutar** `Iniciar_Gym_Manager.bat` como administrador
-4. **¡Listo!** Todo se configura automáticamente
-
----
-
-## 📞 **Soporte y Contacto**
-
-### **🐛 Reportar Problemas**
-- **GitHub Issues:** [Crear un issue](https://github.com/TU_USUARIO/gym-manager/issues)
-- **Email:** soporte@gymmanager.com
-- **Documentación:** Revisar README_CLIENTE.md
-
-### **💡 Solicitar Funcionalidades**
-- **GitHub Discussions:** [Discusiones](https://github.com/TU_USUARIO/gym-manager/discussions)
-- **Email:** desarrollo@gymmanager.com
-
-### **📚 Documentación Adicional**
-- **README_CLIENTE.md** - Guía completa para usuarios finales
-- **BUILD_INSTRUCTIONS.md** - Instrucciones detalladas de build
-- **docs/** - Documentación técnica (si está disponible)
-
----
-
-## 📄 **Licencia y Créditos**
-
-### **📜 Licencia**
-Este proyecto está bajo la licencia **MIT**. Ver el archivo `LICENSE` para más detalles.
-
-### **👥 Desarrolladores**
-- **Desarrollador Principal:** [Tu Nombre]
-- **Contribuidores:** [Lista de contribuidores]
-
-### **🙏 Agradecimientos**
-- **Flet** - Framework de interfaz gráfica
-- **SQLAlchemy** - ORM para Python
-- **MySQL** - Base de datos relacional
-- **Plotly** - Visualización de datos
-- **Poetry** - Gestión de dependencias
-
----
-
-## 🔄 **Historial de Versiones**
-
-### **v1.0.0** (Actual)
-- ✅ Sistema completo de gestión de gimnasios
-- ✅ Interfaz moderna con Flet
-- ✅ Sistema de backups automáticos
-- ✅ Reportes y estadísticas avanzadas
-- ✅ Versión portable y instalable
-- ✅ Configuración automática de MySQL
-- ✅ Documentación completa
-
-### **Próximas Versiones**
-- 🔄 **v1.1.0** - Mejoras en reportes
-- 🔄 **v1.2.0** - Integración con sistemas de pago
-- 🔄 **v2.0.0** - Versión web/móvil
-
----
-
-## 🎉 **¡Gracias por usar Gym Manager!**
-
-**Gym Manager** es una solución completa y profesional para la gestión de gimnasios. 
-Con su interfaz moderna, funcionalidades avanzadas y facilidad de uso, 
-te ayudará a administrar tu negocio de manera eficiente.
-
-### **⭐ Si te gusta el proyecto:**
-- Dale una estrella en GitHub
-- Comparte con otros gimnasios
-- Contribuye al desarrollo
-- Reporta bugs o sugiere mejoras
-
-### **🚀 ¡Comienza hoy mismo!**
-Descarga la versión portable, descomprime y ejecuta. 
-¡En menos de 5 minutos tendrás tu sistema de gestión funcionando!
-
----
-
-**Desarrollado con ❤️ para la comunidad fitness** 🏋️‍♂️
+## 🏃 **Ejecutar el Proyecto (Desarrollo)**

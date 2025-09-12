@@ -466,3 +466,6 @@ Descarga la versión portable, descomprime y ejecuta.
 ---
 
 **Desarrollado con ❤️ para la comunidad fitness** 🏋️‍♂️
+
+
+

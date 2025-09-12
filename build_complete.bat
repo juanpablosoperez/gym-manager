@@ -289,6 +289,16 @@ if errorlevel 1 (
 
 echo ✓ Paquete ZIP creado exitosamente: %OUTPUT_ZIP%
 
+:: Crear también versión portable
+echo.
+echo [6/6] Creando versión portable...
+call create_portable_version.bat
+if errorlevel 1 (
+    echo ADVERTENCIA: No se pudo crear la versión portable
+) else (
+    echo ✓ Versión portable creada exitosamente
+)
+
 :: Limpiar directorio temporal
 rmdir /s /q "%TEMP_PACKAGE_DIR%"
 
