@@ -142,8 +142,6 @@ class MembersView(ModuleView):
             options=[
                 ft.dropdown.Option("Todos"),
                 ft.dropdown.Option("Mensual"),
-                ft.dropdown.Option("Trimestral"),
-                ft.dropdown.Option("Semestral"),
                 ft.dropdown.Option("Anual")
             ],
             border_radius=10,
@@ -218,7 +216,7 @@ class MembersView(ModuleView):
                                         ft.TextField(label="Teléfono", ref=self.new_member_phone, border_radius=10, text_size=16, expand=True),
                                         ft.Dropdown(
                                             label="Tipo de Membresía",
-                                            options=[ft.dropdown.Option("Mensual"), ft.dropdown.Option("Trimestral"), ft.dropdown.Option("Anual")],
+                                            options=[ft.dropdown.Option("Mensual"), ft.dropdown.Option("Anual")],
                                             ref=self.new_member_membership,
                                             border_radius=10,
                                             text_size=16,
