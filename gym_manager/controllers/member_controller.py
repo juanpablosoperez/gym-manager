@@ -70,38 +70,28 @@ class MemberController:
         Crea un nuevo miembro
         """
         try:
-            # Validar si el documento ya existe (solo si se proporciona y no está vacío)
-            documento = str(member_data.get('documento') or '').strip()
-            if documento:
-                existing = self.db_session.query(Miembro).filter_by(documento=documento).first()
-                if existing:
-                    return False, "Ya existe un miembro con ese documento. Por favor, ingrese uno diferente."
-            
-            # Validar si el email ya existe (solo si se proporciona y no está vacío)
-            email = str(member_data.get('correo_electronico') or '').strip()
-            if email:
-                existing_email = self.db_session.query(Miembro).filter_by(correo_electronico=email).first()
-                if existing_email:
-                    return False, "Ya existe un miembro con ese email. Por favor, ingrese uno diferente."
+            # Validar si el documento ya existe
+            existing = self.db_session.query(Miembro).filter_by(documento=member_data['documento']).first()
+            if existing:
+                return False, "Ya existe un miembro con ese documento. Por favor, ingrese uno diferente."
             # Log para debugging
             fecha_inicio = member_data.get('fecha_inicio')
             self.logger.info(f"Fecha de inicio recibida: {fecha_inicio}")
             self.logger.info(f"Tipo de fecha_inicio: {type(fecha_inicio)}")
             
             new_member = Miembro(
-                nombre=str(member_data['nombre']).strip(),
-                apellido=str(member_data['apellido']).strip(),
-                telefono=str(member_data['telefono']).strip(),
-                tipo_membresia=str(member_data['tipo_membresia']).strip(),
-                # Campos opcionales - usar espacios si no se proporcionan (base de datos no acepta nulos)
-                documento=documento if documento else " ",
-                fecha_nacimiento=member_data.get('fecha_nacimiento') or datetime.now().date(),
-                genero=str(member_data.get('genero') or " ").strip(),
-                correo_electronico=email if email else " ",
-                estado=member_data.get('estado', True),
-                direccion=str(member_data.get('direccion') or " ").strip(),
+                nombre=member_data['nombre'],
+                apellido=member_data['apellido'],
+                documento=member_data['documento'],
+                fecha_nacimiento=member_data['fecha_nacimiento'],
+                genero=member_data['genero'],
+                correo_electronico=member_data.get('correo_electronico'),
+                estado=True,
+                tipo_membresia=member_data.get('tipo_membresia'),
+                direccion=member_data.get('direccion'),
+                telefono=member_data.get('telefono'),
                 fecha_registro=fecha_inicio or datetime.now(),
-                informacion_medica=str(member_data.get('informacion_medica') or " ").strip()
+                informacion_medica=member_data.get('informacion_medica')
             )
             self.db_session.add(new_member)
             self.db_session.commit()

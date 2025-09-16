@@ -222,8 +222,7 @@ class MembersView(ModuleView):
                                             ref=self.new_member_membership,
                                             border_radius=10,
                                             text_size=16,
-                                            expand=True,
-                                            value="Mensual"
+                                            expand=True
                                         ),
                                     ],
                                     expand=True,
@@ -649,12 +648,19 @@ class MembersView(ModuleView):
         Guarda un nuevo miembro o actualiza uno existente
         """
         try:
-            # Validar campos obligatorios: NOMBRE, APELLIDO, TELEFONO y TIPO DE MEMBRESÍA
+            # Validar campos requeridos (excepto información médica)
             required_fields = {
                 "Nombre": self.new_member_name.current.value,
                 "Apellido": self.new_member_lastname.current.value,
-                "Teléfono": self.new_member_phone.current.value,
+                "Documento": self.new_member_document.current.value,
+                "Email": self.new_member_email.current.value,
+                "Fecha de Nacimiento": self.birth_date_picker.value,
+                "Género": self.new_member_gender.current.value,
                 "Tipo de Membresía": self.new_member_membership.current.value,
+                "Teléfono": self.new_member_phone.current.value,
+                "Dirección": self.new_member_address.current.value,
+                "Estado": self.new_member_status.current.value,
+                "Fecha de Inicio": self.start_date_picker.value,
             }
 
             # Recolectar campos faltantes
@@ -667,45 +673,45 @@ class MembersView(ModuleView):
                 self.page.update()
                 return
 
-            # Validar formato de email solo si se proporciona
-            email_value = self.new_member_email.current.value
-            if email_value and not "@" in email_value:
+            # Validar formato de email
+            if not "@" in required_fields["Email"]:
                 self.show_message("El email no tiene un formato válido", ft.colors.RED)
                 return
 
-            # Validar documento (solo números) solo si se proporciona
-            document_value = self.new_member_document.current.value
-            if document_value and not document_value.isdigit():
+            # Validar documento (solo números)
+            if not required_fields["Documento"].isdigit():
                 self.show_message("El documento debe contener solo números", ft.colors.RED)
                 return
                 
-            # Validar que la fecha de inicio sea válida solo si se proporciona
-            if self.start_date_picker.value:
-                # Validar que la fecha de inicio no sea futura (opcional)
-                if self.start_date_picker.value > datetime.now():
-                    self.show_message("La fecha de inicio no puede ser futura", ft.colors.RED)
-                    return
-                    
-                # Validar que la fecha de inicio no sea muy antigua (antes de 2020)
-                if self.start_date_picker.value < datetime(2020, 1, 1):
-                    self.show_message("La fecha de inicio no puede ser anterior a 2020", ft.colors.RED)
-                    return
+            # Validar que la fecha de inicio sea válida
+            if not self.start_date_picker.value:
+                self.show_message("Por favor seleccione una fecha de inicio válida", ft.colors.RED)
+                return
+                
+            # Validar que la fecha de inicio no sea futura (opcional)
+            if self.start_date_picker.value > datetime.now():
+                self.show_message("La fecha de inicio no puede ser futura", ft.colors.RED)
+                return
+                
+            # Validar que la fecha de inicio no sea muy antigua (antes de 2020)
+            if self.start_date_picker.value < datetime(2020, 1, 1):
+                self.show_message("La fecha de inicio no puede ser anterior a 2020", ft.colors.RED)
+                return
 
             # Preparar datos del miembro
             member_data = {
                 "nombre": required_fields["Nombre"].strip(),
                 "apellido": required_fields["Apellido"].strip(),
-                "telefono": required_fields["Teléfono"].strip(),
+                "documento": required_fields["Documento"].strip(),
+                "correo_electronico": required_fields["Email"].strip(),
+                "fecha_nacimiento": required_fields["Fecha de Nacimiento"],
+                "genero": required_fields["Género"],
                 "tipo_membresia": required_fields["Tipo de Membresía"],
-                # Campos opcionales - solo incluir si tienen valor
-                "documento": document_value.strip() if document_value else None,
-                "correo_electronico": email_value.strip() if email_value else None,
-                "fecha_nacimiento": self.birth_date_picker.value if self.birth_date_picker.value else None,
-                "genero": self.new_member_gender.current.value if self.new_member_gender.current.value else None,
-                "direccion": self.new_member_address.current.value.strip() if self.new_member_address.current.value else None,
+                "telefono": required_fields["Teléfono"].strip() if required_fields["Teléfono"] else None,
+                "direccion": required_fields["Dirección"].strip() if required_fields["Dirección"] else None,
                 "informacion_medica": self.new_member_medical.current.value.strip() if self.new_member_medical.current.value else None,
-                "estado": self.new_member_status.current.value == "Activo" if self.new_member_status.current.value else True,
-                "fecha_inicio": self.start_date_picker.value if self.start_date_picker.value else datetime.now()
+                "estado": required_fields["Estado"] == "Activo",
+                "fecha_inicio": self.start_date_picker.value
             }
             
             # Log para debugging
