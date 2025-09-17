@@ -468,13 +468,23 @@ class PaymentMethodView(ModuleView):
         """Callback cuando cambia la página"""
         self.update_methods_table()
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos iniciales de la vista
         """
         methods = self.payment_method_controller.get_payment_methods()
+        
+        # Guardar la página actual si se debe preservar
+        current_page = self.pagination_controller.current_page if preserve_page else 1
+        
         self.pagination_controller.set_items(methods)
-        self.pagination_controller.current_page = 1
+        self.pagination_controller.current_page = current_page
+        
+        # Ajustar la página si está fuera de rango
+        total_pages = self.pagination_controller.total_pages
+        if current_page > total_pages and total_pages > 0:
+            self.pagination_controller.current_page = total_pages
+        
         self.pagination_widget.update_items(methods)
         self.update_methods_table()
         self.update_stats_cards(methods)
@@ -650,7 +660,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_modal(e)
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -697,7 +707,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -732,7 +742,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_delete_modal(e)
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -753,7 +763,15 @@ class PaymentMethodView(ModuleView):
             
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(methods)
-            self.pagination_controller.current_page = 1
+            # Solo resetear a página 1 si hay cambios significativos en los filtros
+            # Para cambios menores, mantener la página actual si es posible
+            total_pages = self.pagination_controller.total_pages
+            if self.pagination_controller.current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            elif total_pages == 0:
+                self.pagination_controller.current_page = 1
+            # Si la página actual es válida, mantenerla
+            
             self.pagination_widget.update_items(methods)
             self.update_methods_table()
             self.update_stats_cards(methods)

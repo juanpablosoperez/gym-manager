@@ -190,7 +190,7 @@ class BackupView(BaseView):
         ])
         
         self.setup_backup_view()
-        self.load_backups()
+        # load_backups se llama de forma asíncrona en get_content()
 
     def get_content(self):
         """Implementación del método requerido por BaseView"""
@@ -326,12 +326,22 @@ class BackupView(BaseView):
             bgcolor=ft.colors.WHITE,
         )
 
-    def load_backups(self):
+    def load_backups(self, preserve_page=False):
         """Carga la lista de backups"""
         try:
             backups = self.backup_service.get_backups()
+            
+            # Guardar la página actual si se debe preservar
+            current_page = self.pagination_controller.current_page if preserve_page else 1
+            
             self.pagination_controller.set_items(backups)
-            self.pagination_controller.current_page = 1
+            self.pagination_controller.current_page = current_page
+            
+            # Ajustar la página si está fuera de rango
+            total_pages = self.pagination_controller.total_pages
+            if current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            
             self.pagination_widget.update_items(backups)
             self.update_backups_table()
         except Exception as e:
@@ -482,7 +492,7 @@ class BackupView(BaseView):
                     )
                     self.progress_modal.hide()
                     self.show_success_message(f"Backup creado exitosamente: {backup.name}")
-                    self.load_backups()  # Recargar la lista
+                    self.load_backups(preserve_page=True)  # Recargar la lista
                 except Exception as e:
                     self.progress_modal.hide()
                     self.show_error_message(f"Error al crear backup: {str(e)}")
@@ -535,7 +545,7 @@ class BackupView(BaseView):
             success, message = self.backup_service.delete_backup(backup_id)
             if success:
                 self.show_success_message("Backup eliminado exitosamente")
-                self.load_backups()  # Recargar la lista
+                self.load_backups(preserve_page=True)  # Recargar la lista
             else:
                 self.show_error_message(f"Error al eliminar backup: {message}")
                 

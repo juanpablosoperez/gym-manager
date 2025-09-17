@@ -142,8 +142,6 @@ class MembersView(ModuleView):
             options=[
                 ft.dropdown.Option("Todos"),
                 ft.dropdown.Option("Mensual"),
-                ft.dropdown.Option("Trimestral"),
-                ft.dropdown.Option("Semestral"),
                 ft.dropdown.Option("Anual")
             ],
             border_radius=10,
@@ -218,7 +216,7 @@ class MembersView(ModuleView):
                                         ft.TextField(label="Teléfono", ref=self.new_member_phone, border_radius=10, text_size=16, expand=True),
                                         ft.Dropdown(
                                             label="Tipo de Membresía",
-                                            options=[ft.dropdown.Option("Mensual"), ft.dropdown.Option("Trimestral"), ft.dropdown.Option("Anual")],
+                                            options=[ft.dropdown.Option("Mensual"), ft.dropdown.Option("Anual")],
                                             ref=self.new_member_membership,
                                             border_radius=10,
                                             text_size=16,
@@ -427,15 +425,24 @@ class MembersView(ModuleView):
             except:
                 pass
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos de miembros
         """
         try:
             members = self.member_controller.get_members()
             
+            # Guardar la página actual si se debe preservar
+            current_page = self.pagination_controller.current_page if preserve_page else 1
+            
             self.pagination_controller.set_items(members)
-            self.pagination_controller.current_page = 1
+            self.pagination_controller.current_page = current_page
+            
+            # Ajustar la página si está fuera de rango
+            total_pages = self.pagination_controller.total_pages
+            if current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            
             self.pagination_widget.update_items(members)
             
             self.update_members_table()
@@ -724,7 +731,7 @@ class MembersView(ModuleView):
                 if success:
                     self.show_message("Miembro actualizado exitosamente", ft.colors.GREEN)
                     self.close_modal(e)
-                    self.load_data()
+                    self.load_data(preserve_page=True)
                 else:
                     self.show_message(f"Error al actualizar el miembro: {message}", ft.colors.RED)
             else:
@@ -733,7 +740,7 @@ class MembersView(ModuleView):
                 if success:
                     self.show_message("Miembro agregado exitosamente", ft.colors.GREEN)
                     self.close_modal(e)
-                    self.load_data()
+                    self.load_data(preserve_page=True)
                 else:
                     self.show_message(f"Error al crear el miembro: {message}", ft.colors.RED)
 
@@ -818,7 +825,7 @@ class MembersView(ModuleView):
             success, message = self.member_controller.delete_member(member.id_miembro)
             if success:
                 self.show_message(message, ft.colors.GREEN)
-                self.load_data()
+                self.load_data(preserve_page=True)
             else:
                 # Si el mensaje indica que tiene pagos asociados, mostrar en rojo
                 if "tiene pagos asociados" in message:
@@ -925,7 +932,15 @@ class MembersView(ModuleView):
         members = self.member_controller.get_members(filters)
         # Actualizar paginación con los datos filtrados
         self.pagination_controller.set_items(members)
-        self.pagination_controller.current_page = 1
+        # Solo resetear a página 1 si hay cambios significativos en los filtros
+        # Para cambios menores, mantener la página actual si es posible
+        total_pages = self.pagination_controller.total_pages
+        if self.pagination_controller.current_page > total_pages and total_pages > 0:
+            self.pagination_controller.current_page = total_pages
+        elif total_pages == 0:
+            self.pagination_controller.current_page = 1
+        # Si la página actual es válida, mantenerla
+        
         self.pagination_widget.update_items(members)
         self.update_members_table()
 
@@ -1456,7 +1471,7 @@ class MembersView(ModuleView):
         if success:
             self.show_message("Rutina asignada exitosamente", ft.colors.GREEN)
             self.close_assign_routine_modal(e)
-            self.load_data()  # Recargar los datos para actualizar la vista
+            self.load_data(preserve_page=True)  # Recargar los datos para actualizar la vista
         else:
             self.show_message(f"Error al asignar la rutina: {message}", ft.colors.RED)
 

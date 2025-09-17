@@ -246,7 +246,7 @@ class PaymentReceiptView(ModuleView):
         self.page.update()
         self.apply_filters()  # Aplicar filtros automáticamente al cambiar la fecha hasta
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos de los comprobantes
         """
@@ -258,8 +258,18 @@ class PaymentReceiptView(ModuleView):
                 filters['fecha_hasta'] = self.date_to_value
 
             receipts = self.payment_receipt_controller.get_receipts(filters)
+            
+            # Guardar la página actual si se debe preservar
+            current_page = self.pagination_controller.current_page if preserve_page else 1
+            
             self.pagination_controller.set_items(receipts)
-            self.pagination_controller.current_page = 1
+            self.pagination_controller.current_page = current_page
+            
+            # Ajustar la página si está fuera de rango
+            total_pages = self.pagination_controller.total_pages
+            if current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            
             self.pagination_widget.update_items(receipts)
             self.update_receipts_table()
         except Exception as e:

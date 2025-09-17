@@ -854,9 +854,10 @@ class PaymentsView(ModuleView):
             try:
                 with session_scope() as session:
                     active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
-                    self.new_payment_method_field.options = [
-                        ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-                    ]
+                    options = [ft.dropdown.Option(method.descripcion) for method in active_payment_methods]
+                    # Popular ambos dropdowns (nuevo y edición)
+                    self.new_payment_method_field.options = options
+                    self.edit_payment_method_field.options = options
             except Exception:
                 pass
                 
@@ -979,7 +980,7 @@ class PaymentsView(ModuleView):
         self.new_payment_modal.open = False
         self.page.update()
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos iniciales de la vista
         """
@@ -990,11 +991,25 @@ class PaymentsView(ModuleView):
                 temp_controller = PaymentController(session)
                 payments = [p for p in temp_controller.get_payments() if p.estado == 1]
                 mapped_payments = self._map_payments(payments)
+                
+                # Guardar la página actual si se debe preservar
+                current_page = self.pagination_controller.current_page if preserve_page else 1
+                
                 self.pagination_controller.set_items(mapped_payments)
-                self.pagination_controller.current_page = 1
+                self.pagination_controller.current_page = current_page
+                
+                # Ajustar la página si está fuera de rango
+                total_pages = self.pagination_controller.total_pages
+                if current_page > total_pages and total_pages > 0:
+                    self.pagination_controller.current_page = total_pages
+                
                 self.pagination_widget.update_items(mapped_payments)
-                self.update_payments_table()
-        except Exception:
+                
+                # Actualizar la tabla con los datos de la página actual
+                current_page_items = self.pagination_controller.get_current_page_items()
+                self.update_payments_table(current_page_items)
+        except Exception as e:
+            print(f"Error en load_data: {e}")  # Debug
             self.update_payments_table([])
 
         # Cargar la cuota mensual actual
@@ -1154,7 +1169,15 @@ class PaymentsView(ModuleView):
                 mapped_payments = self._map_payments(payments)
                 # Actualizar paginación con los datos filtrados
                 self.pagination_controller.set_items(mapped_payments)
-                self.pagination_controller.current_page = 1
+                # Solo resetear a página 1 si hay cambios significativos en los filtros
+                # Para cambios menores, mantener la página actual si es posible
+                total_pages = self.pagination_controller.total_pages
+                if self.pagination_controller.current_page > total_pages and total_pages > 0:
+                    self.pagination_controller.current_page = total_pages
+                elif total_pages == 0:
+                    self.pagination_controller.current_page = 1
+                # Si la página actual es válida, mantenerla
+                
                 self.pagination_widget.update_items(mapped_payments)
                 self.update_payments_table()
         except Exception:
@@ -1191,6 +1214,15 @@ class PaymentsView(ModuleView):
                     self.show_message("No se pudo encontrar el pago", ft.colors.RED)
                     return
                 
+                # Asegurar que el dropdown de métodos de pago de edición tenga opciones
+                try:
+                    active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
+                    self.edit_payment_method_field.options = [
+                        ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                    ]
+                except Exception:
+                    self.edit_payment_method_field.options = []
+                
                 self.selected_payment = payment_fresh
                 # Almacenar datos importantes para evitar problemas de sesión
                 self.selected_payment_id = payment_fresh.id_pago
@@ -1201,7 +1233,16 @@ class PaymentsView(ModuleView):
                 self.edit_payment_date_picker.value = payment_fresh.fecha_pago
                 self.edit_payment_date_field.content.controls[0].value = payment_fresh.fecha_pago.strftime("%d/%m/%Y")
                 self.edit_payment_amount_field.value = str(payment_fresh.monto)
-                self.edit_payment_method_field.value = payment_fresh.metodo_pago.descripcion
+                # Seleccionar el método de pago actual si está entre las opciones
+                current_method_desc = payment_fresh.metodo_pago.descripcion if payment_fresh.metodo_pago else None
+                if current_method_desc:
+                    option_values = {opt.key if hasattr(opt, 'key') else opt.text for opt in (self.edit_payment_method_field.options or [])}
+                    if current_method_desc in option_values:
+                        self.edit_payment_method_field.value = current_method_desc
+                    else:
+                        # Si no está en opciones (p. ej., método inactivo), agregarlo temporalmente y seleccionarlo
+                        (self.edit_payment_method_field.options or []).append(ft.dropdown.Option(current_method_desc))
+                        self.edit_payment_method_field.value = current_method_desc
                 self.edit_payment_observations_field.value = payment_fresh.referencia if payment_fresh.referencia else ""
                 self.edit_payment_modal.open = True
                 self.page.update()
@@ -1255,7 +1296,7 @@ class PaymentsView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -1286,7 +1327,7 @@ class PaymentsView(ModuleView):
             self.show_message("Pago cancelado correctamente", ft.colors.GREEN)
             self.delete_confirm_modal.open = False
             self.selected_payment_to_delete = None
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message("Error al cancelar el pago", ft.colors.RED)
             self.delete_confirm_modal.open = False
@@ -1694,7 +1735,7 @@ class PaymentsView(ModuleView):
                     self.show_message(f"Pago guardado, pero error al generar comprobante: {str(ex)}", ft.colors.ORANGE)
                 
                 self.close_modal(e)
-                self.load_data()
+                self.load_data(preserve_page=True)
                 # Mostrar modal de éxito
                 self.success_modal.open = True
                 self.page.update()

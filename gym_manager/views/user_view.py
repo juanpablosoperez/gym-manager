@@ -416,15 +416,24 @@ class UsersView(ModuleView):
         except Exception as ex:
             self.show_message(f"Error al cargar los usuarios: {str(ex)}", ft.colors.RED)
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos iniciales de la vista
         """
         try:
             usuarios = self.user_controller.get_users()
             
+            # Guardar la página actual si se debe preservar
+            current_page = self.pagination_controller.current_page if preserve_page else 1
+            
             self.pagination_controller.set_items(usuarios)
-            self.pagination_controller.current_page = 1
+            self.pagination_controller.current_page = current_page
+            
+            # Ajustar la página si está fuera de rango
+            total_pages = self.pagination_controller.total_pages
+            if current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            
             self.pagination_widget.update_items(usuarios)
             
             self.update_users_table()
@@ -681,7 +690,7 @@ class UsersView(ModuleView):
 
             self.show_message(mensaje, ft.colors.GREEN)
             self.cancelar_formulario(e)
-            self.load_data()
+            self.load_data(preserve_page=True)
 
         except Exception as ex:
             # Mostrar error en el formulario
@@ -839,7 +848,7 @@ class UsersView(ModuleView):
                     raise Exception(message)
                 mensaje = "Usuario activado" if not self.usuario_a_toggle.estado else "Usuario desactivado"
                 self.show_message(mensaje, ft.colors.GREEN)
-                self.load_data()
+                self.load_data(preserve_page=True)
             except Exception as ex:
                 self.show_message(f"Error al cambiar estado: {str(ex)}", ft.colors.RED)
             finally:
@@ -885,7 +894,15 @@ class UsersView(ModuleView):
 
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(usuarios_filtrados)
-            self.pagination_controller.current_page = 1
+            # Solo resetear a página 1 si hay cambios significativos en los filtros
+            # Para cambios menores, mantener la página actual si es posible
+            total_pages = self.pagination_controller.total_pages
+            if self.pagination_controller.current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            elif total_pages == 0:
+                self.pagination_controller.current_page = 1
+            # Si la página actual es válida, mantenerla
+            
             self.pagination_widget.update_items(usuarios_filtrados)
             self.update_users_table()
         except Exception as ex:
