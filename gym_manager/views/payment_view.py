@@ -854,9 +854,10 @@ class PaymentsView(ModuleView):
             try:
                 with session_scope() as session:
                     active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
-                    self.new_payment_method_field.options = [
-                        ft.dropdown.Option(method.descripcion) for method in active_payment_methods
-                    ]
+                    options = [ft.dropdown.Option(method.descripcion) for method in active_payment_methods]
+                    # Popular ambos dropdowns (nuevo y edición)
+                    self.new_payment_method_field.options = options
+                    self.edit_payment_method_field.options = options
             except Exception:
                 pass
                 
@@ -1213,6 +1214,15 @@ class PaymentsView(ModuleView):
                     self.show_message("No se pudo encontrar el pago", ft.colors.RED)
                     return
                 
+                # Asegurar que el dropdown de métodos de pago de edición tenga opciones
+                try:
+                    active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
+                    self.edit_payment_method_field.options = [
+                        ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                    ]
+                except Exception:
+                    self.edit_payment_method_field.options = []
+                
                 self.selected_payment = payment_fresh
                 # Almacenar datos importantes para evitar problemas de sesión
                 self.selected_payment_id = payment_fresh.id_pago
@@ -1223,7 +1233,16 @@ class PaymentsView(ModuleView):
                 self.edit_payment_date_picker.value = payment_fresh.fecha_pago
                 self.edit_payment_date_field.content.controls[0].value = payment_fresh.fecha_pago.strftime("%d/%m/%Y")
                 self.edit_payment_amount_field.value = str(payment_fresh.monto)
-                self.edit_payment_method_field.value = payment_fresh.metodo_pago.descripcion
+                # Seleccionar el método de pago actual si está entre las opciones
+                current_method_desc = payment_fresh.metodo_pago.descripcion if payment_fresh.metodo_pago else None
+                if current_method_desc:
+                    option_values = {opt.key if hasattr(opt, 'key') else opt.text for opt in (self.edit_payment_method_field.options or [])}
+                    if current_method_desc in option_values:
+                        self.edit_payment_method_field.value = current_method_desc
+                    else:
+                        # Si no está en opciones (p. ej., método inactivo), agregarlo temporalmente y seleccionarlo
+                        (self.edit_payment_method_field.options or []).append(ft.dropdown.Option(current_method_desc))
+                        self.edit_payment_method_field.value = current_method_desc
                 self.edit_payment_observations_field.value = payment_fresh.referencia if payment_fresh.referencia else ""
                 self.edit_payment_modal.open = True
                 self.page.update()
