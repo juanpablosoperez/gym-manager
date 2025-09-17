@@ -979,7 +979,7 @@ class PaymentsView(ModuleView):
         self.new_payment_modal.open = False
         self.page.update()
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos iniciales de la vista
         """
@@ -990,11 +990,25 @@ class PaymentsView(ModuleView):
                 temp_controller = PaymentController(session)
                 payments = [p for p in temp_controller.get_payments() if p.estado == 1]
                 mapped_payments = self._map_payments(payments)
+                
+                # Guardar la página actual si se debe preservar
+                current_page = self.pagination_controller.current_page if preserve_page else 1
+                
                 self.pagination_controller.set_items(mapped_payments)
-                self.pagination_controller.current_page = 1
+                self.pagination_controller.current_page = current_page
+                
+                # Ajustar la página si está fuera de rango
+                total_pages = self.pagination_controller.total_pages
+                if current_page > total_pages and total_pages > 0:
+                    self.pagination_controller.current_page = total_pages
+                
                 self.pagination_widget.update_items(mapped_payments)
-                self.update_payments_table()
-        except Exception:
+                
+                # Actualizar la tabla con los datos de la página actual
+                current_page_items = self.pagination_controller.get_current_page_items()
+                self.update_payments_table(current_page_items)
+        except Exception as e:
+            print(f"Error en load_data: {e}")  # Debug
             self.update_payments_table([])
 
         # Cargar la cuota mensual actual
@@ -1154,7 +1168,15 @@ class PaymentsView(ModuleView):
                 mapped_payments = self._map_payments(payments)
                 # Actualizar paginación con los datos filtrados
                 self.pagination_controller.set_items(mapped_payments)
-                self.pagination_controller.current_page = 1
+                # Solo resetear a página 1 si hay cambios significativos en los filtros
+                # Para cambios menores, mantener la página actual si es posible
+                total_pages = self.pagination_controller.total_pages
+                if self.pagination_controller.current_page > total_pages and total_pages > 0:
+                    self.pagination_controller.current_page = total_pages
+                elif total_pages == 0:
+                    self.pagination_controller.current_page = 1
+                # Si la página actual es válida, mantenerla
+                
                 self.pagination_widget.update_items(mapped_payments)
                 self.update_payments_table()
         except Exception:
@@ -1255,7 +1277,7 @@ class PaymentsView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -1286,7 +1308,7 @@ class PaymentsView(ModuleView):
             self.show_message("Pago cancelado correctamente", ft.colors.GREEN)
             self.delete_confirm_modal.open = False
             self.selected_payment_to_delete = None
-            self.load_data()
+            self.load_data(preserve_page=True)
         else:
             self.show_message("Error al cancelar el pago", ft.colors.RED)
             self.delete_confirm_modal.open = False
@@ -1694,7 +1716,7 @@ class PaymentsView(ModuleView):
                     self.show_message(f"Pago guardado, pero error al generar comprobante: {str(ex)}", ft.colors.ORANGE)
                 
                 self.close_modal(e)
-                self.load_data()
+                self.load_data(preserve_page=True)
                 # Mostrar modal de éxito
                 self.success_modal.open = True
                 self.page.update()

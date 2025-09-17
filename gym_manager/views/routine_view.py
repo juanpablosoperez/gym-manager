@@ -294,12 +294,12 @@ class RoutinesView(ModuleView):
             success, message = self.routine_controller.delete_routine(self.routine_to_delete.id_rutina)
             if success:
                 self.show_message("Rutina eliminada exitosamente", ft.colors.GREEN)
-                self.load_data()
+                self.load_data(preserve_page=True)
             else:
                 self.show_message(f"Error al eliminar la rutina: {message}", ft.colors.RED)
         self.close_confirm_dialog()
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos iniciales de la vista y actualiza la UI
         """
@@ -309,9 +309,18 @@ class RoutinesView(ModuleView):
             if not rutinas:
                 self.show_message("No hay rutinas registradas", ft.colors.ORANGE)
             
+            # Guardar la página actual si se debe preservar
+            current_page = self.pagination_controller.current_page if preserve_page else 1
+            
             # Actualizar paginación
             self.pagination_controller.set_items(rutinas)
-            self.pagination_controller.current_page = 1
+            self.pagination_controller.current_page = current_page
+            
+            # Ajustar la página si está fuera de rango
+            total_pages = self.pagination_controller.total_pages
+            if current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            
             self.pagination_widget.update_items(rutinas)
             
             self.update_routines_table()
@@ -564,7 +573,7 @@ class RoutinesView(ModuleView):
             success, message = self.routine_controller.create_routine(routine_data)
             if success:
                 self.close_modal(e)
-                self.load_data()
+                self.load_data(preserve_page=True)
                 self.show_message("Rutina creada exitosamente", ft.colors.GREEN)
             else:
                 self.show_message(f"Error al crear la rutina: {message}", ft.colors.RED)
@@ -674,7 +683,7 @@ class RoutinesView(ModuleView):
             success, message = self.routine_controller.update_routine(self.editing_routine.id_rutina, routine_data)
             if success:
                 self.close_modal(e)
-                self.load_data()
+                self.load_data(preserve_page=True)
                 self.show_message("Rutina actualizada exitosamente", ft.colors.GREEN)
             else:
                 self.show_message(f"Error al actualizar la rutina: {message}", ft.colors.RED)
@@ -771,7 +780,15 @@ class RoutinesView(ModuleView):
             
             # Actualizar paginación con los datos filtrados
             self.pagination_controller.set_items(rutinas)
-            self.pagination_controller.current_page = 1
+            # Solo resetear a página 1 si hay cambios significativos en los filtros
+            # Para cambios menores, mantener la página actual si es posible
+            total_pages = self.pagination_controller.total_pages
+            if self.pagination_controller.current_page > total_pages and total_pages > 0:
+                self.pagination_controller.current_page = total_pages
+            elif total_pages == 0:
+                self.pagination_controller.current_page = 1
+            # Si la página actual es válida, mantenerla
+            
             self.pagination_widget.update_items(rutinas)
             self.update_routines_table()
         except Exception as ex:

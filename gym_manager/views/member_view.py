@@ -439,7 +439,7 @@ class MembersView(ModuleView):
             self.pagination_controller.current_page = current_page
             
             # Ajustar la página si está fuera de rango
-            total_pages = self.pagination_controller.get_total_pages()
+            total_pages = self.pagination_controller.total_pages
             if current_page > total_pages and total_pages > 0:
                 self.pagination_controller.current_page = total_pages
             
@@ -934,7 +934,7 @@ class MembersView(ModuleView):
         self.pagination_controller.set_items(members)
         # Solo resetear a página 1 si hay cambios significativos en los filtros
         # Para cambios menores, mantener la página actual si es posible
-        total_pages = self.pagination_controller.get_total_pages()
+        total_pages = self.pagination_controller.total_pages
         if self.pagination_controller.current_page > total_pages and total_pages > 0:
             self.pagination_controller.current_page = total_pages
         elif total_pages == 0:
