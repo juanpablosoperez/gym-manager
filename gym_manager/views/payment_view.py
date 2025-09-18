@@ -1021,6 +1021,51 @@ class PaymentsView(ModuleView):
         
         self.page.update()
 
+    def _collect_payment_filters(self):
+        """
+        Construye el dict de filtros actuales según los controles visibles.
+        """
+        filters = {}
+        if getattr(self, 'search_field', None) and self.search_field.value:
+            filters['member_name'] = self.search_field.value
+        if getattr(self, 'date_from', None) and self.date_from.value:
+            filters['date_from'] = self.date_from.value
+        if getattr(self, 'date_to', None) and self.date_to.value:
+            filters['date_to'] = self.date_to.value
+        if getattr(self, 'status_filter', None) and self.status_filter.value == "Pagado":
+            filters['estado'] = 1
+        elif getattr(self, 'status_filter', None) and self.status_filter.value == "Cancelado":
+            filters['estado'] = 0
+        return filters
+
+    def refresh_payments_preserving_state(self):
+        """
+        Recarga la grilla de pagos preservando filtros y la página actual.
+        """
+        try:
+            current_page = self.pagination_controller.current_page
+            filters = self._collect_payment_filters()
+            with session_scope() as session:
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments(filters)
+                # Por si el controlador no aplicó estado, filtrar aquí también
+                if 'estado' in filters:
+                    payments = [p for p in payments if p.estado == filters['estado']]
+                mapped_payments = self._map_payments(payments)
+                self.pagination_controller.set_items(mapped_payments)
+                total_pages = self.pagination_controller.total_pages if hasattr(self.pagination_controller, 'total_pages') else self.pagination_controller.get_total_pages()
+                if current_page > total_pages and total_pages > 0:
+                    current_page = total_pages
+                if total_pages == 0:
+                    current_page = 1
+                self.pagination_controller.current_page = current_page
+                self.pagination_widget.update_items(mapped_payments)
+                self.update_payments_table()
+                self.page.update()
+        except Exception:
+            # Como fallback, al menos refrescar la tabla con lo que haya
+            self.update_payments_table()
+
     def update_payments_table(self, payments=None):
         """
         Actualiza la tabla de pagos con datos reales
@@ -1115,6 +1160,11 @@ class PaymentsView(ModuleView):
                         ]
                     )
                 )
+        # Forzar refresco de la tabla sin depender del update global
+        try:
+            self.payments_table.update()
+        except Exception:
+            pass
         self.page.update()
 
     def apply_filters(self, e=None):
@@ -1327,7 +1377,7 @@ class PaymentsView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data()
+            self.refresh_payments_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -1358,7 +1408,7 @@ class PaymentsView(ModuleView):
             self.show_message("Pago cancelado correctamente", ft.colors.GREEN)
             self.delete_confirm_modal.open = False
             self.selected_payment_to_delete = None
-            self.load_data()
+            self.refresh_payments_preserving_state()
         else:
             self.show_message("Error al cancelar el pago", ft.colors.RED)
             self.delete_confirm_modal.open = False
@@ -1766,7 +1816,7 @@ class PaymentsView(ModuleView):
                     self.show_message(f"Pago guardado, pero error al generar comprobante: {str(ex)}", ft.colors.ORANGE)
                 
                 self.close_modal(e)
-                self.load_data()
+                self.refresh_payments_preserving_state()
                 # Mostrar modal de éxito
                 self.success_modal.open = True
                 self.page.update()
@@ -2212,7 +2262,7 @@ class PaymentsView(ModuleView):
                 # Actualizar la cuota mensual en memoria
                 self.current_monthly_fee = new_amount
                 self.close_edit_fee_modal(e)
-                self.page.update()
+                self.refresh_payments_preserving_state()
             else:
                 self.show_message(message, ft.colors.RED)
         except ValueError:
