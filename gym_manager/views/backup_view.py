@@ -305,7 +305,14 @@ class BackupView(BaseView):
                         alignment=ft.alignment.top_left,
                     ),
                     ft.Container(
-                        content=self.backup_table,
+                        content=ft.Column(
+                            controls=[
+                                self.backup_table
+                            ],
+                            spacing=0,
+                            scroll=ft.ScrollMode.ALWAYS,
+                            expand=True,
+                        ),
                         padding=ft.padding.symmetric(horizontal=20),
                         height=600,
                         alignment=ft.alignment.top_left,

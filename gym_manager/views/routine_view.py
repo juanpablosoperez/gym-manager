@@ -187,7 +187,14 @@ class RoutinesView(ModuleView):
                     ),
                     # Tabla con scroll (altura fija)
                     ft.Container(
-                        content=self.routines_table,
+                        content=ft.Column(
+                            controls=[
+                                self.routines_table
+                            ],
+                            spacing=0,
+                            scroll=ft.ScrollMode.ALWAYS,
+                            expand=True,
+                        ),
                         expand=True,
                         height=600,
                     ),
@@ -294,7 +301,7 @@ class RoutinesView(ModuleView):
             success, message = self.routine_controller.delete_routine(self.routine_to_delete.id_rutina)
             if success:
                 self.show_message("Rutina eliminada exitosamente", ft.colors.GREEN)
-                self.load_data()
+                self.refresh_routines_preserving_state()
             else:
                 self.show_message(f"Error al eliminar la rutina: {message}", ft.colors.RED)
         self.close_confirm_dialog()
@@ -323,6 +330,33 @@ class RoutinesView(ModuleView):
     def _on_page_change(self):
         """Callback cuando cambia la página"""
         self.update_routines_table()
+
+    def _collect_filters(self):
+        filters = {}
+        if self.search_field.value:
+            filters['search'] = self.search_field.value
+        if self.difficulty_filter.value and self.difficulty_filter.value != "Todas":
+            filters['nivel_dificultad'] = self.difficulty_filter.value
+        return filters
+
+    def refresh_routines_preserving_state(self):
+        current_page = self.pagination_controller.current_page
+        filters = self._collect_filters()
+        rutinas = self.routine_controller.get_routines(filters)
+        self.pagination_controller.set_items(rutinas)
+        total_pages = self.pagination_controller.total_pages if hasattr(self.pagination_controller, 'total_pages') else self.pagination_controller.get_total_pages()
+        if total_pages == 0:
+            current_page = 1
+        elif current_page > total_pages:
+            current_page = total_pages
+        self.pagination_controller.current_page = current_page
+        self.pagination_widget.update_items(rutinas)
+        self.update_routines_table()
+        try:
+            self.routines_table.update()
+        except Exception:
+            pass
+        self.page.update()
 
     def update_routines_table(self, rutinas=None):
         """
@@ -564,7 +598,7 @@ class RoutinesView(ModuleView):
             success, message = self.routine_controller.create_routine(routine_data)
             if success:
                 self.close_modal(e)
-                self.load_data()
+                self.refresh_routines_preserving_state()
                 self.show_message("Rutina creada exitosamente", ft.colors.GREEN)
             else:
                 self.show_message(f"Error al crear la rutina: {message}", ft.colors.RED)
@@ -674,7 +708,7 @@ class RoutinesView(ModuleView):
             success, message = self.routine_controller.update_routine(self.editing_routine.id_rutina, routine_data)
             if success:
                 self.close_modal(e)
-                self.load_data()
+                self.refresh_routines_preserving_state()
                 self.show_message("Rutina actualizada exitosamente", ft.colors.GREEN)
             else:
                 self.show_message(f"Error al actualizar la rutina: {message}", ft.colors.RED)

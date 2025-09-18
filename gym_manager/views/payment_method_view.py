@@ -468,6 +468,35 @@ class PaymentMethodView(ModuleView):
         """Callback cuando cambia la página"""
         self.update_methods_table()
 
+    def _collect_filters(self):
+        filters = {}
+        if self.search_field.value:
+            filters['search'] = self.search_field.value
+        if self.status_filter.value and self.status_filter.value != "Todos":
+            filters['status'] = self.status_filter.value == "Activo"
+        return filters
+
+    def refresh_methods_preserving_state(self):
+        """Recarga la grilla preservando filtros y página actual."""
+        current_page = self.pagination_controller.current_page
+        filters = self._collect_filters()
+        methods = self.payment_method_controller.get_payment_methods(filters)
+        self.pagination_controller.set_items(methods)
+        # Ajustar página si cambió el total
+        total_pages = self.pagination_controller.total_pages if hasattr(self.pagination_controller, 'total_pages') else self.pagination_controller.get_total_pages()
+        if total_pages == 0:
+            current_page = 1
+        elif current_page > total_pages:
+            current_page = total_pages
+        self.pagination_controller.current_page = current_page
+        self.pagination_widget.update_items(methods)
+        self.update_methods_table()
+        try:
+            self.methods_table.update()
+        except Exception:
+            pass
+        self.page.update()
+
     def load_data(self):
         """
         Carga los datos iniciales de la vista
@@ -650,7 +679,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_modal(e)
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -697,7 +726,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -732,7 +761,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_delete_modal(e)
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -800,7 +829,7 @@ class PaymentMethodView(ModuleView):
                 f"Método de pago {'activado' if method_data['estado'] else 'desactivado'} exitosamente",
                 ft.colors.GREEN
             )
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
