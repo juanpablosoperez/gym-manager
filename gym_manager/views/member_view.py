@@ -602,6 +602,9 @@ class MembersView(ModuleView):
         self.is_editing = False
         self.editing_member_id = None
         self.clear_member_fields()
+        # Limpiar mensaje de error del modal
+        self.member_modal_error.value = ""
+        self.member_modal_error.visible = False
         self.new_member_modal.title = ft.Text("Registrar Nuevo Miembro", size=26, weight=ft.FontWeight.BOLD)
         self.new_member_modal.actions[1].text = "Guardar"
         self.new_member_status.current.value = "Activo"  # Establecer valor por defecto
@@ -757,6 +760,9 @@ class MembersView(ModuleView):
     def edit_member(self, member):
         self.is_editing = True
         self.editing_member_id = member.id_miembro
+        # Limpiar mensaje de error del modal
+        self.member_modal_error.value = ""
+        self.member_modal_error.visible = False
         self.new_member_modal.title = ft.Text("Editar Miembro", size=26, weight=ft.FontWeight.BOLD)
         self.new_member_modal.actions[1].text = "Actualizar"
         # Autocompletar campos
@@ -794,6 +800,9 @@ class MembersView(ModuleView):
         self.new_member_start_date.current.text = self.get_start_date_btn_text()
         self.new_member_medical.current.value = ""
         self.new_member_status.current.value = None
+        # Limpiar mensaje de error del modal
+        self.member_modal_error.value = ""
+        self.member_modal_error.visible = False
         self.page.update()
 
     def delete_member(self, member):
