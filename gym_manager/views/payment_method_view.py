@@ -468,7 +468,7 @@ class PaymentMethodView(ModuleView):
         """Callback cuando cambia la página"""
         self.update_methods_table()
 
-    def load_data(self):
+    def load_data(self, preserve_page=False):
         """
         Carga los datos iniciales de la vista
         """
@@ -488,6 +488,41 @@ class PaymentMethodView(ModuleView):
         self.pagination_widget.update_items(methods)
         self.update_methods_table()
         self.update_stats_cards(methods)
+
+    def _collect_method_filters(self):
+        """
+        Construye el dict de filtros actuales según los controles visibles.
+        """
+        filters = {}
+        if getattr(self, 'search_field', None) and self.search_field.value:
+            filters['search'] = self.search_field.value
+        if getattr(self, 'status_filter', None) and self.status_filter.value and self.status_filter.value != "Todos":
+            filters['status'] = self.status_filter.value == "Activo"
+        return filters
+
+    def refresh_methods_preserving_state(self):
+        """
+        Recarga la grilla de métodos preservando filtros y la página actual.
+        """
+        try:
+            current_page = self.pagination_controller.current_page
+            filters = self._collect_method_filters()
+            methods = self.payment_method_controller.get_payment_methods(filters)
+            
+            self.pagination_controller.set_items(methods)
+            total_pages = self.pagination_controller.total_pages if hasattr(self.pagination_controller, 'total_pages') else self.pagination_controller.get_total_pages()
+            if current_page > total_pages and total_pages > 0:
+                current_page = total_pages
+            if total_pages == 0:
+                current_page = 1
+            self.pagination_controller.current_page = current_page
+            self.pagination_widget.update_items(methods)
+            self.update_methods_table()
+            self.update_stats_cards(methods)
+            self.page.update()
+        except Exception:
+            # Como fallback, al menos refrescar la tabla con lo que haya
+            self.update_methods_table()
 
     def update_methods_table(self, methods=None):
         """
@@ -599,6 +634,11 @@ class PaymentMethodView(ModuleView):
         except Exception as e:
             self.show_message("Error al cargar los métodos de pago", ft.colors.RED)
         finally:
+            # Forzar refresco de la tabla sin depender del update global
+            try:
+                self.methods_table.update()
+            except Exception:
+                pass
             self.page.update()
 
     def update_stats_cards(self, methods):
@@ -660,7 +700,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_modal(e)
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -707,7 +747,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -742,7 +782,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_delete_modal(e)
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
