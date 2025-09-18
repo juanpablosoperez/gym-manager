@@ -190,7 +190,6 @@ class BackupView(BaseView):
         ])
         
         self.setup_backup_view()
-        # load_backups se llama de forma asíncrona en get_content()
 
     def get_content(self):
         """Implementación del método requerido por BaseView"""
@@ -305,7 +304,14 @@ class BackupView(BaseView):
                         alignment=ft.alignment.top_left,
                     ),
                     ft.Container(
-                        content=self.backup_table,
+                        content=ft.Column(
+                            controls=[
+                                self.backup_table
+                            ],
+                            spacing=0,
+                            scroll=ft.ScrollMode.ALWAYS,
+                            expand=True,
+                        ),
                         padding=ft.padding.symmetric(horizontal=20),
                         height=600,
                         alignment=ft.alignment.top_left,
@@ -335,13 +341,7 @@ class BackupView(BaseView):
             current_page = self.pagination_controller.current_page if preserve_page else 1
             
             self.pagination_controller.set_items(backups)
-            self.pagination_controller.current_page = current_page
-            
-            # Ajustar la página si está fuera de rango
-            total_pages = self.pagination_controller.total_pages
-            if current_page > total_pages and total_pages > 0:
-                self.pagination_controller.current_page = total_pages
-            
+            self.pagination_controller.current_page = 1
             self.pagination_widget.update_items(backups)
             self.update_backups_table()
         except Exception as e:
@@ -393,7 +393,11 @@ class BackupView(BaseView):
                 for backup in backups
             ]
             
-            # Actualizar la página y forzar scroll al tope
+            # Forzar update de la tabla para evitar dependencias de otros controles
+            try:
+                self.backup_table.update()
+            except Exception:
+                pass
             self.page.update()
             try:
                 if hasattr(self.page, "scroll_to"):

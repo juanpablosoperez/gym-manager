@@ -142,8 +142,6 @@ class PaymentsView(ModuleView):
             tooltip="Seleccionar fecha hasta",
         )
 
-        # Filtro de método de pago eliminado de la pantalla de pagos
-
         # Filtro de estado
         self.status_filter = ft.Dropdown(
             label="Estado",
@@ -210,7 +208,7 @@ class PaymentsView(ModuleView):
             label="Miembro *",
             prefix_icon=ft.icons.SEARCH,
             border_radius=8,
-            hint_text="Buscar miembro por nombre o documento...",
+            hint_text="Buscar miembro por nombre...",
             width=500,
             height= 40,
             on_change=self.search_member,
@@ -441,7 +439,7 @@ class PaymentsView(ModuleView):
                         padding=ft.padding.symmetric(horizontal=28, vertical=12),
                         text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
                     ),
-                    on_click=self.update_payment
+                    on_click=self.update_payment,
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
@@ -854,10 +852,9 @@ class PaymentsView(ModuleView):
             try:
                 with session_scope() as session:
                     active_payment_methods = session.query(MetodoPago).filter_by(estado=True).all()
-                    options = [ft.dropdown.Option(method.descripcion) for method in active_payment_methods]
-                    # Popular ambos dropdowns (nuevo y edición)
-                    self.new_payment_method_field.options = options
-                    self.edit_payment_method_field.options = options
+                    self.new_payment_method_field.options = [
+                        ft.dropdown.Option(method.descripcion) for method in active_payment_methods
+                    ]
             except Exception:
                 pass
                 
@@ -1035,6 +1032,51 @@ class PaymentsView(ModuleView):
         
         self.page.update()
 
+    def _collect_payment_filters(self):
+        """
+        Construye el dict de filtros actuales según los controles visibles.
+        """
+        filters = {}
+        if getattr(self, 'search_field', None) and self.search_field.value:
+            filters['member_name'] = self.search_field.value
+        if getattr(self, 'date_from', None) and self.date_from.value:
+            filters['date_from'] = self.date_from.value
+        if getattr(self, 'date_to', None) and self.date_to.value:
+            filters['date_to'] = self.date_to.value
+        if getattr(self, 'status_filter', None) and self.status_filter.value == "Pagado":
+            filters['estado'] = 1
+        elif getattr(self, 'status_filter', None) and self.status_filter.value == "Cancelado":
+            filters['estado'] = 0
+        return filters
+
+    def refresh_payments_preserving_state(self):
+        """
+        Recarga la grilla de pagos preservando filtros y la página actual.
+        """
+        try:
+            current_page = self.pagination_controller.current_page
+            filters = self._collect_payment_filters()
+            with session_scope() as session:
+                temp_controller = PaymentController(session)
+                payments = temp_controller.get_payments(filters)
+                # Por si el controlador no aplicó estado, filtrar aquí también
+                if 'estado' in filters:
+                    payments = [p for p in payments if p.estado == filters['estado']]
+                mapped_payments = self._map_payments(payments)
+                self.pagination_controller.set_items(mapped_payments)
+                total_pages = self.pagination_controller.total_pages if hasattr(self.pagination_controller, 'total_pages') else self.pagination_controller.get_total_pages()
+                if current_page > total_pages and total_pages > 0:
+                    current_page = total_pages
+                if total_pages == 0:
+                    current_page = 1
+                self.pagination_controller.current_page = current_page
+                self.pagination_widget.update_items(mapped_payments)
+                self.update_payments_table()
+                self.page.update()
+        except Exception:
+            # Como fallback, al menos refrescar la tabla con lo que haya
+            self.update_payments_table()
+
     def update_payments_table(self, payments=None):
         """
         Actualiza la tabla de pagos con datos reales
@@ -1129,6 +1171,11 @@ class PaymentsView(ModuleView):
                         ]
                     )
                 )
+        # Forzar refresco de la tabla sin depender del update global
+        try:
+            self.payments_table.update()
+        except Exception:
+            pass
         self.page.update()
 
     def apply_filters(self, e=None):
@@ -1157,6 +1204,9 @@ class PaymentsView(ModuleView):
             filters['estado'] = 0
         # Si es "Todos", no se agrega filtro
         
+        # Filtro por método de pago (se populará con métodos activos)
+        selected_methods = self.payment_method_filter.value if hasattr(self, 'payment_method_filter') else "Todos"
+        
         try:
             with session_scope() as session:
                 # Recrear el controlador con la nueva sesión
@@ -1165,6 +1215,13 @@ class PaymentsView(ModuleView):
                 # Si el filtro es por estado, filtrar aquí también por si acaso
                 if 'estado' in filters:
                     payments = [p for p in payments if p.estado == filters['estado']]
+
+                # Aplicar filtro de tipo de membresía si corresponde
+                if selected_methods in ("Mensual", "Anual"):
+                    try:
+                        payments = [p for p in payments if getattr(p.miembro, 'tipo_membresia', None) == selected_methods]
+                    except Exception:
+                        pass
 
                 mapped_payments = self._map_payments(payments)
                 # Actualizar paginación con los datos filtrados
@@ -1194,6 +1251,7 @@ class PaymentsView(ModuleView):
         self.date_to_field.content.controls[0].value = ""
         # Filtro por método de pago eliminado
         self.status_filter.value = "Pagado"
+        self.payment_method_filter.value = "Todos"
         self.page.update()
         # Recargar datos sin filtros usando el método asíncrono
         self.page.loop.create_task(self._load_data_async())
@@ -1233,17 +1291,35 @@ class PaymentsView(ModuleView):
                 self.edit_payment_date_picker.value = payment_fresh.fecha_pago
                 self.edit_payment_date_field.content.controls[0].value = payment_fresh.fecha_pago.strftime("%d/%m/%Y")
                 self.edit_payment_amount_field.value = str(payment_fresh.monto)
-                # Seleccionar el método de pago actual si está entre las opciones
-                current_method_desc = payment_fresh.metodo_pago.descripcion if payment_fresh.metodo_pago else None
-                if current_method_desc:
-                    option_values = {opt.key if hasattr(opt, 'key') else opt.text for opt in (self.edit_payment_method_field.options or [])}
-                    if current_method_desc in option_values:
-                        self.edit_payment_method_field.value = current_method_desc
-                    else:
-                        # Si no está en opciones (p. ej., método inactivo), agregarlo temporalmente y seleccionarlo
-                        (self.edit_payment_method_field.options or []).append(ft.dropdown.Option(current_method_desc))
-                        self.edit_payment_method_field.value = current_method_desc
+                self.edit_payment_method_field.value = payment_fresh.metodo_pago.descripcion
                 self.edit_payment_observations_field.value = payment_fresh.referencia if payment_fresh.referencia else ""
+                
+                # Reconfigurar acciones del modal para asegurar el handler
+                self.edit_payment_modal.actions = [
+                    ft.TextButton(
+                        "Cancelar",
+                        on_click=self.close_edit_modal,
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.colors.WHITE,
+                            color=ft.colors.BLACK87,
+                            shape=ft.RoundedRectangleBorder(radius=8),
+                            padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                            text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                        ),
+                    ),
+                    ft.ElevatedButton(
+                        "Actualizar",
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.colors.BLUE_900,
+                            color=ft.colors.WHITE,
+                            shape=ft.RoundedRectangleBorder(radius=8),
+                            padding=ft.padding.symmetric(horizontal=28, vertical=12),
+                            text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD),
+                        ),
+                        on_click=self.update_payment,
+                    ),
+                ]
+                
                 self.edit_payment_modal.open = True
                 self.page.update()
         except Exception as e:
@@ -1271,6 +1347,10 @@ class PaymentsView(ModuleView):
         self.page.update()
 
     def update_payment(self, e):
+        try:
+            print("DEBUG[PaymentsView]: update_payment handler invoked")
+        except Exception:
+            pass
         if not hasattr(self, 'selected_payment_id') or not self.selected_payment_id:
             self.show_message("No hay pago seleccionado para editar", ft.colors.RED)
             return
@@ -1284,19 +1364,41 @@ class PaymentsView(ModuleView):
             self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
             return
         
+        # Resolver id de método según la descripción elegida (desde métodos activos)
+        chosen_method_desc = (self.edit_payment_method_field.value or "").strip()
+        if not chosen_method_desc:
+            self.show_message("Debe seleccionar un método de pago", ft.colors.RED)
+            return
+        method_id = self.get_payment_method_id(chosen_method_desc)
+        if not method_id:
+            self.show_message("No se pudo resolver el método de pago", ft.colors.RED)
+            return
+        try:
+            print(f"DEBUG[PaymentsView]: update_payment -> elegido='{chosen_method_desc}', id_resuelto={method_id}")
+        except Exception:
+            pass
+        
         payment_data = {
             'fecha_pago': self.edit_payment_date_value,
             'monto': float(self.edit_payment_amount_field.value),
             'id_miembro': self.selected_payment_member_id,  # Usar el ID almacenado
-            'id_metodo_pago': self.get_payment_method_id(self.edit_payment_method_field.value),
+            'id_metodo_pago': method_id,
             'referencia': self.edit_payment_observations_field.value
         }
+        try:
+            print(f"DEBUG[PaymentsView]: update_payment -> enviando update con payment_id={self.selected_payment_id}")
+        except Exception:
+            pass
         
         success, message = self.payment_controller.update_payment(self.selected_payment_id, payment_data)
+        try:
+            print(f"DEBUG[PaymentsView]: update_payment -> resultado success={success}, message='{message}'")
+        except Exception:
+            pass
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data(preserve_page=True)
+            self.load_data()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -1327,7 +1429,7 @@ class PaymentsView(ModuleView):
             self.show_message("Pago cancelado correctamente", ft.colors.GREEN)
             self.delete_confirm_modal.open = False
             self.selected_payment_to_delete = None
-            self.load_data(preserve_page=True)
+            self.load_data()
         else:
             self.show_message("Error al cancelar el pago", ft.colors.RED)
             self.delete_confirm_modal.open = False
@@ -1735,7 +1837,7 @@ class PaymentsView(ModuleView):
                     self.show_message(f"Pago guardado, pero error al generar comprobante: {str(ex)}", ft.colors.ORANGE)
                 
                 self.close_modal(e)
-                self.load_data(preserve_page=True)
+                self.load_data()
                 # Mostrar modal de éxito
                 self.success_modal.open = True
                 self.page.update()
@@ -1749,8 +1851,21 @@ class PaymentsView(ModuleView):
         Obtiene el ID del método de pago según su nombre
         """
         try:
+            normalized = (method_name or "").strip()
+            if not normalized:
+                return None
             with session_scope() as session:
-                method = session.query(MetodoPago).filter_by(descripcion=method_name).first()
+                # Búsqueda exacta primero
+                method = session.query(MetodoPago).filter_by(descripcion=normalized).first()
+                if method:
+                    return method.id_metodo_pago
+                # Búsqueda case-insensitive
+                method = session.query(MetodoPago).filter(MetodoPago.descripcion.ilike(normalized)).first()
+                if method:
+                    return method.id_metodo_pago
+                # Búsqueda relajada sin dobles espacios
+                collapsed = " ".join(normalized.split())
+                method = session.query(MetodoPago).filter(MetodoPago.descripcion.ilike(collapsed)).first()
                 return method.id_metodo_pago if method else None
         except Exception:
             return None
@@ -2168,7 +2283,7 @@ class PaymentsView(ModuleView):
                 # Actualizar la cuota mensual en memoria
                 self.current_monthly_fee = new_amount
                 self.close_edit_fee_modal(e)
-                self.page.update()
+                self.refresh_payments_preserving_state()
             else:
                 self.show_message(message, ft.colors.RED)
         except ValueError:

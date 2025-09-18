@@ -366,16 +366,19 @@ class UsersView(ModuleView):
                         padding=ft.padding.only(bottom=20, left=10),
                     ),
                     ft.Container(
-                        content=ft.Container(
-                            content=self.users_table,
-                            alignment=ft.alignment.top_left,
-                            padding=ft.padding.symmetric(horizontal=20),
-                            height=600,
+                        content=ft.Column(
+                            controls=[
+                                self.users_table
+                            ],
+                            spacing=0,
+                            scroll=ft.ScrollMode.ALWAYS,
+                            expand=True,
                         ),
                         expand=True,
                         padding=ft.padding.symmetric(horizontal=20),
                         margin=ft.margin.only(top=10),
                         alignment=ft.alignment.top_left,
+                        height=600,
                     ),
                     # Widget de paginación
                     self.pagination_widget.get_widget(),
@@ -444,6 +447,50 @@ class UsersView(ModuleView):
     def _on_page_change(self):
         """Callback cuando cambia la página"""
         self.update_users_table()
+
+    def _collect_filters(self):
+        filters = {}
+        if self.search_field.value:
+            filters['search'] = self.search_field.value
+        if self.filtro_rol.value and self.filtro_rol.value != "Todos":
+            filters['rol'] = self.filtro_rol.value
+        if self.filtro_estado.value and self.filtro_estado.value != "Todos":
+            filters['estado'] = self.filtro_estado.value
+        return filters
+
+    def refresh_users_preserving_state(self):
+        current_page = self.pagination_controller.current_page
+        # Reutilizamos get_users() y filtramos client-side igual que aplicar_filtros
+        usuarios = self.user_controller.get_users()
+        search_text = (self.search_field.value or "").strip().lower()
+        if search_text:
+            usuarios = [u for u in usuarios if (u.nombre and search_text in u.nombre.lower()) or (u.apellido and search_text in u.apellido.lower())]
+        if self.filtro_rol.value != "Todos":
+            usuarios = [u for u in usuarios if u.rol == self.filtro_rol.value]
+        if self.filtro_estado.value == "Activos":
+            usuarios = [u for u in usuarios if u.estado]
+        elif self.filtro_estado.value == "Inactivos":
+            usuarios = [u for u in usuarios if not u.estado]
+        self.pagination_controller.set_items(usuarios)
+        total_pages = (
+            self.pagination_controller.get_total_pages()
+            if hasattr(self.pagination_controller, 'get_total_pages')
+            else self.pagination_controller.total_pages
+            if hasattr(self.pagination_controller, 'total_pages')
+            else 1
+        )
+        if total_pages == 0:
+            current_page = 1
+        elif current_page > total_pages:
+            current_page = total_pages
+        self.pagination_controller.current_page = current_page
+        self.pagination_widget.update_items(usuarios)
+        self.update_users_table()
+        try:
+            self.users_table.update()
+        except Exception:
+            pass
+        self.page.update()
 
     def update_users_table(self, usuarios=None):
         """
@@ -690,7 +737,7 @@ class UsersView(ModuleView):
 
             self.show_message(mensaje, ft.colors.GREEN)
             self.cancelar_formulario(e)
-            self.load_data(preserve_page=True)
+            self.load_data()
 
         except Exception as ex:
             # Mostrar error en el formulario
@@ -848,7 +895,7 @@ class UsersView(ModuleView):
                     raise Exception(message)
                 mensaje = "Usuario activado" if not self.usuario_a_toggle.estado else "Usuario desactivado"
                 self.show_message(mensaje, ft.colors.GREEN)
-                self.load_data(preserve_page=True)
+                self.load_data()
             except Exception as ex:
                 self.show_message(f"Error al cambiar estado: {str(ex)}", ft.colors.RED)
             finally:

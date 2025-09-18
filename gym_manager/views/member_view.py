@@ -381,7 +381,14 @@ class MembersView(ModuleView):
                     ),
                     # Tabla con scroll
                     ft.Container(
-                        content=self.members_table,
+                        content=ft.Column(
+                            controls=[
+                                self.members_table
+                            ],
+                            spacing=0,
+                            scroll=ft.ScrollMode.ALWAYS,
+                            expand=True,
+                        ),
                         expand=True,
                         height=600,
                     ),

@@ -468,7 +468,7 @@ class PaymentMethodView(ModuleView):
         """Callback cuando cambia la página"""
         self.update_methods_table()
 
-    def load_data(self, preserve_page=False):
+    def load_data(self):
         """
         Carga los datos iniciales de la vista
         """
@@ -660,7 +660,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_modal(e)
-            self.load_data(preserve_page=True)
+            self.load_data()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -707,7 +707,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_edit_modal(e)
-            self.load_data(preserve_page=True)
+            self.load_data()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -742,7 +742,7 @@ class PaymentMethodView(ModuleView):
         if success:
             self.show_message(message, ft.colors.GREEN)
             self.close_delete_modal(e)
-            self.load_data(preserve_page=True)
+            self.load_data()
         else:
             self.show_message(message, ft.colors.RED)
 
@@ -818,7 +818,7 @@ class PaymentMethodView(ModuleView):
                 f"Método de pago {'activado' if method_data['estado'] else 'desactivado'} exitosamente",
                 ft.colors.GREEN
             )
-            self.load_data()
+            self.refresh_methods_preserving_state()
         else:
             self.show_message(message, ft.colors.RED)
 
