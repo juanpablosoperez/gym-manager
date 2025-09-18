@@ -10,9 +10,9 @@ class UserController:
         self.db_session = get_db_session()
 
     def get_users(self):
-        """Obtiene todos los usuarios del sistema."""
+        """Obtiene todos los usuarios del sistema ordenados por ID descendente (más recientes primero)."""
         try:
-            return self.db_session.query(Usuario).all()
+            return self.db_session.query(Usuario).order_by(Usuario.id_usuario.desc()).all()
         except SQLAlchemyError as e:
             logger.error(f"Error al obtener usuarios: {str(e)}")
             return []
