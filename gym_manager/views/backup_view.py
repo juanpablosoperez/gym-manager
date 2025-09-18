@@ -190,7 +190,7 @@ class BackupView(BaseView):
         ])
         
         self.setup_backup_view()
-        self.load_backups()
+        # La carga inicial se realiza en get_content() mediante _load_backups_async()
 
     def get_content(self):
         """Implementación del método requerido por BaseView"""
@@ -332,6 +332,13 @@ class BackupView(BaseView):
             backups = self.backup_service.get_backups()
             self.pagination_controller.set_items(backups)
             self.pagination_controller.current_page = 1
+            # Asegurar que el widget de paginación esté en la jerarquía antes de actualizar
+            try:
+                if hasattr(self.pagination_widget, 'container') and self.pagination_widget.container.page is None:
+                    # Forzar un update de page para insertar controles pendientes
+                    self.page.update()
+            except Exception:
+                pass
             self.pagination_widget.update_items(backups)
             self.update_backups_table()
         except Exception as e:
@@ -383,7 +390,11 @@ class BackupView(BaseView):
                 for backup in backups
             ]
             
-            # Actualizar la página y forzar scroll al tope
+            # Forzar update de la tabla para evitar dependencias de otros controles
+            try:
+                self.backup_table.update()
+            except Exception:
+                pass
             self.page.update()
             try:
                 if hasattr(self.page, "scroll_to"):
