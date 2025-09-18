@@ -47,14 +47,16 @@ class PaymentController:
                             query = query.order_by(order_column.asc())
                 else:
                     # Ordenamiento por defecto: fecha de pago descendente (más reciente primero)
-                    query = query.order_by(Pago.fecha_pago.desc())
+                    # Usar ID como criterio de desempate para mantener orden consistente
+                    query = query.order_by(Pago.fecha_pago.desc(), Pago.id_pago.desc())
                 
                 # Límite de resultados
                 if filters.get('limit'):
                     query = query.limit(filters['limit'])
             else:
                 # Si no hay filtros, aplicar ordenamiento por defecto
-                query = query.order_by(Pago.fecha_pago.desc())
+                # Usar ID como criterio de desempate para mantener orden consistente
+                query = query.order_by(Pago.fecha_pago.desc(), Pago.id_pago.desc())
             
             return query.all()
         except (DBAPIError, PendingRollbackError):

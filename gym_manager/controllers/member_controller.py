@@ -43,10 +43,16 @@ class MemberController:
                             query = query.order_by(order_column.desc())
                         else:
                             query = query.order_by(order_column.asc())
+                else:
+                    # Ordenamiento por defecto: fecha de registro descendente (más recientes primero)
+                    query = query.order_by(Miembro.fecha_registro.desc())
                 
                 # Límite de resultados
                 if filters.get('limit'):
                     query = query.limit(filters['limit'])
+            else:
+                # Ordenamiento por defecto cuando no hay filtros: fecha de registro descendente
+                query = query.order_by(Miembro.fecha_registro.desc())
             
             return query.all()
         except SQLAlchemyError as e:

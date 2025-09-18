@@ -483,11 +483,15 @@ class RoutinesView(ModuleView):
     def show_new_routine_modal(self, e):
         self.file_selected_label = ft.Text("")
         self.selected_file = None
+        # Mensaje de error para el modal
+        self.routine_modal_error = ft.Text("", color=ft.colors.RED, size=14, visible=False)
         self.new_routine_modal = ft.AlertDialog(
             title=ft.Text("Nueva Rutina", size=26, weight=ft.FontWeight.BOLD),
             content=ft.Container(
                 content=ft.Column(
                     controls=[
+                        self.routine_modal_error,
+                        ft.Divider(),
                         ft.TextField(
                             label="Nombre",
                             width=480,
@@ -565,25 +569,42 @@ class RoutinesView(ModuleView):
         self.new_routine_description.current.value = ""
         self.selected_file = None
         self.file_selected_label.value = ""
+        # Limpiar mensaje de error del modal
+        if hasattr(self, 'routine_modal_error'):
+            self.routine_modal_error.value = ""
+            self.routine_modal_error.visible = False
         self.page.update()
 
     def save_routine(self, e):
         try:
+            # Limpiar mensaje de error previo
+            if hasattr(self, 'routine_modal_error'):
+                self.routine_modal_error.value = ""
+                self.routine_modal_error.visible = False
+            
             if not self.new_routine_name.current.value:
-                self.show_message("El nombre es requerido", ft.colors.RED)
+                self.routine_modal_error.value = "El nombre es requerido"
+                self.routine_modal_error.visible = True
+                self.page.update()
                 return
             if not self.new_routine_difficulty.current.value:
-                self.show_message("La dificultad es requerida", ft.colors.RED)
+                self.routine_modal_error.value = "La dificultad es requerida"
+                self.routine_modal_error.visible = True
+                self.page.update()
                 return
-            if not hasattr(self, 'selected_file'):
-                self.show_message("Por favor, seleccione un archivo de rutina", ft.colors.RED)
+            if not hasattr(self, 'selected_file') or not self.selected_file:
+                self.routine_modal_error.value = "Por favor, seleccione un archivo de rutina (obligatorio)"
+                self.routine_modal_error.visible = True
+                self.page.update()
                 return
             
             # Validar tamaño del archivo (máximo 1MB para compatibilidad)
             MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB en bytes
             file_size = os.path.getsize(self.selected_file.path)
             if file_size > MAX_FILE_SIZE:
-                self.show_message(f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB", ft.colors.RED)
+                self.routine_modal_error.value = f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB"
+                self.routine_modal_error.visible = True
+                self.page.update()
                 return
             with open(self.selected_file.path, 'rb') as file:
                 file_content = file.read()
@@ -618,11 +639,15 @@ class RoutinesView(ModuleView):
         self.editing_routine = rutina
         self.file_selected_label = ft.Text("")
         self.selected_file = None
+        # Mensaje de error para el modal de edición
+        self.routine_modal_error = ft.Text("", color=ft.colors.RED, size=14, visible=False)
         self.new_routine_modal = ft.AlertDialog(
             title=ft.Text("Editar Rutina", size=26, weight=ft.FontWeight.BOLD),
             content=ft.Container(
                 content=ft.Column(
                     controls=[
+                        self.routine_modal_error,
+                        ft.Divider(),
                         ft.TextField(
                             label="Nombre",
                             width=480,
@@ -693,11 +718,20 @@ class RoutinesView(ModuleView):
 
     def update_routine(self, e):
         try:
+            # Limpiar mensaje de error previo
+            if hasattr(self, 'routine_modal_error'):
+                self.routine_modal_error.value = ""
+                self.routine_modal_error.visible = False
+            
             if not self.new_routine_name.current.value:
-                self.show_message("El nombre es requerido", ft.colors.RED)
+                self.routine_modal_error.value = "El nombre es requerido"
+                self.routine_modal_error.visible = True
+                self.page.update()
                 return
             if not self.new_routine_difficulty.current.value:
-                self.show_message("La dificultad es requerida", ft.colors.RED)
+                self.routine_modal_error.value = "La dificultad es requerida"
+                self.routine_modal_error.visible = True
+                self.page.update()
                 return
             routine_data = {
                 'nombre': self.new_routine_name.current.value,
@@ -709,7 +743,9 @@ class RoutinesView(ModuleView):
                 MAX_FILE_SIZE = 1 * 1024 * 1024  # 1MB en bytes
                 file_size = os.path.getsize(self.selected_file.path)
                 if file_size > MAX_FILE_SIZE:
-                    self.show_message(f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB", ft.colors.RED)
+                    self.routine_modal_error.value = f"El archivo es demasiado grande. Máximo permitido: 1MB. Tu archivo: {file_size / (1024*1024):.1f}MB"
+                    self.routine_modal_error.visible = True
+                    self.page.update()
                     return
                 
                 with open(self.selected_file.path, 'rb') as file:
