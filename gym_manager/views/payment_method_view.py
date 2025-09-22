@@ -616,12 +616,6 @@ class PaymentMethodView(ModuleView):
                                                     tooltip="Activar" if not method['estado'] else "Desactivar",
                                                     on_click=lambda e, m=method: self.toggle_method_status(m)
                                                 ),
-                                                ft.IconButton(
-                                                    icon=ft.icons.DELETE,
-                                                    icon_color=ft.colors.RED,
-                                                    tooltip="Eliminar",
-                                                    on_click=lambda e, m=method: self.delete_method(m)
-                                                ),
                                             ],
                                             spacing=0,
                                         )
