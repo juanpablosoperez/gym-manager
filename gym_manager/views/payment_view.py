@@ -1251,7 +1251,6 @@ class PaymentsView(ModuleView):
         self.date_to_field.content.controls[0].value = ""
         # Filtro por método de pago eliminado
         self.status_filter.value = "Pagado"
-        self.payment_method_filter.value = "Todos"
         self.page.update()
         # Recargar datos sin filtros usando el método asíncrono
         self.page.loop.create_task(self._load_data_async())
