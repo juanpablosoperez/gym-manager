@@ -762,6 +762,24 @@ class RoutinesView(ModuleView):
 
     def delete_routine(self, rutina):
         self.routine_to_delete = rutina
+        
+        # Verificar si la rutina está asignada a miembros
+        miembros_asignados = self.routine_controller.count_members_assigned_to_routine(rutina.id_rutina)
+        
+        if miembros_asignados > 0:
+            # Actualizar el contenido del modal para rutinas asignadas
+            self.confirm_dialog.content = ft.Text(
+                f"⚠️ Esta rutina está asignada a {miembros_asignados} miembro(s).\n"
+                f"¿Estás seguro de que deseas eliminar la rutina '{rutina.nombre}'?\n\n"
+                f"Esta acción eliminará la rutina y la desasignará de todos los miembros.",
+                size=14
+            )
+        else:
+            # Contenido normal para rutinas no asignadas
+            self.confirm_dialog.content = ft.Text(
+                f"¿Estás seguro de que deseas eliminar la rutina '{rutina.nombre}'?"
+            )
+        
         self.confirm_dialog.open = True
         self.page.update()
 
